@@ -11,6 +11,7 @@ class FiilingClassView extends GetView<FiilingClassController> {
   const FiilingClassView({super.key});
   @override
   Widget build(BuildContext context) {
+    final double viewportHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 32;
     return Scaffold(
       backgroundColor: const Color(0xFFF6FAFD),
       body: SafeArea(
@@ -24,11 +25,14 @@ class FiilingClassView extends GetView<FiilingClassController> {
             Flexible(
                 flex: 3,
                 fit: FlexFit.loose,
-                child: SideInfoPanel(
+                child: SizedBox(
+                  height: viewportHeight,
+                  child: SideInfoPanel(
                   title: 'SMART POLICE\nSTATION',
                   description: 'Loreim re in charge of planning and managing marketing\ncampaigns that promote a company\'s brand. marketing\ncampaigns that promote a company\'s brand.',
                   logoAsset: Assets.images.efpLogo.path,
                   illustrationAsset: Assets.images.law.path,
+                  ),
                 ),
               ),
               const SizedBox(width: 24),

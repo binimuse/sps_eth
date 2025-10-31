@@ -11,6 +11,7 @@ class CallClassView extends GetView<CallClassController> {
   const CallClassView({super.key});
   @override
   Widget build(BuildContext context) {
+    final double viewportHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 32;
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
@@ -20,20 +21,25 @@ class CallClassView extends GetView<CallClassController> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              // Left info/illustration panel
-              Expanded(
+              // Left info/illustration panel (match FiilingClassView sizing)
+              Flexible(
                 flex: 3,
-                child: SideInfoPanel(
+                fit: FlexFit.loose,
+                child: SizedBox(
+                  height: viewportHeight,
+                  child: SideInfoPanel(
                   title: 'SMART POLICE\nSTATION',
                   description: 'Loreim re in charge of planning and managing marketing\ncampaigns that promote a company\'s brand. marketing\ncampaigns that promote a company\'s brand.',
                   logoAsset: Assets.images.efpLogo.path,
                   illustrationAsset: Assets.images.law.path,
+                  ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 24),
               // Middle video + actions
-              Expanded(
+              Flexible(
                 flex: 6,
+                fit: FlexFit.loose,
                 child: Column(
                   children: [
                     // Video area
@@ -175,10 +181,11 @@ class CallClassView extends GetView<CallClassController> {
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 24),
               // Right info sidebar
-              Expanded(
+              Flexible(
                 flex: 4,
+                fit: FlexFit.loose,
                 child: Column(
                   children: [
                     _InfoCard(
@@ -282,7 +289,7 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, ),
+          Text(title,style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
           const SizedBox(height: 12),
           ...rows.map((r) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
@@ -312,7 +319,7 @@ class _DocumentsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Supporting Document', ),
+          Text('Supporting Document',style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
           const SizedBox(height: 12),
           ...[
             'Incident Document',
@@ -365,13 +372,13 @@ class _TermsAndActions extends StatelessWidget {
             children: [
               Icon(Icons.check_box, color: AppColors.grayDark),
               const SizedBox(width: 8),
-              Text('Terms and Condition', ),
+              Text('Terms and Condition',style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             'These are the terms and conditions for Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand.',
-            
+            style: TextStyle(color: AppColors.grayDark),
           ),
           const SizedBox(height: 8),
           Row(

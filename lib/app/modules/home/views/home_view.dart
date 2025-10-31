@@ -614,9 +614,7 @@ class _ContactCallCard extends StatelessWidget {
             height: 64,
             child: _SwipeToCall(
             onComplete: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Calling... (dummy action)')),
-              );
+            
             },
             ),
           ),

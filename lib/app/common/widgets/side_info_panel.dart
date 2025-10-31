@@ -32,20 +32,20 @@ class SideInfoPanel extends StatelessWidget {
           Image.asset(
             logoAsset,
             width: 72,
-            height: 72,
+            height: 50,
             fit: BoxFit.contain,
           ),
           const SizedBox(height: 12),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: AppTextStyles.menuBold.copyWith(color: AppColors.primary),
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
           ),
           const SizedBox(height: 16),
           Text(
             description,
             textAlign: TextAlign.center,
-            style: AppTextStyles.onboardingBody,
+            style: TextStyle(color: AppColors.grayDark),
           ),
           const SizedBox(height: 24),
           ClipRRect(
