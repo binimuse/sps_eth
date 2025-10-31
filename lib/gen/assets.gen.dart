@@ -952,6 +952,12 @@ class $AssetsImagesGen {
   /// File path: assets/images/nid.png
   AssetGenImage get nid => const AssetGenImage('assets/images/nid.png');
 
+  /// File path: assets/images/person.png
+  AssetGenImage get person => const AssetGenImage('assets/images/person.png');
+
+  /// File path: assets/images/person2.png
+  AssetGenImage get person2 => const AssetGenImage('assets/images/person2.png');
+
   /// File path: assets/images/sps.png
   AssetGenImage get sps => const AssetGenImage('assets/images/sps.png');
 
@@ -966,6 +972,8 @@ class $AssetsImagesGen {
     law,
     news,
     nid,
+    person,
+    person2,
     sps,
     sucess,
   ];

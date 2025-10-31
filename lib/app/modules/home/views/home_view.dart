@@ -68,23 +68,7 @@ class HomeView extends GetView<HomeController> {
   }
 }
 
-class CallClass extends StatelessWidget {
-  const CallClass({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFE9F6FF),
-      appBar: AppBar(
-        title: const Text('Call'),
-        centerTitle: true,
-      ),
-      body: const Center(
-        child: Text('Calling screen (placeholder)'),
-      ),
-    );
-  }
-}
 
 class _HeroPanel extends StatelessWidget {
   @override
@@ -229,7 +213,7 @@ class _DigitalClockState extends State<_DigitalClock> {
           style: Theme.of(context).textTheme.displayLarge?.copyWith(
                 fontFeatures: const [FontFeature.tabularFigures()],
                 letterSpacing: 2,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: const Color(0xFF0F3955),
               ),
         );
@@ -412,7 +396,7 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                       print('calling ..');
                       widget.onComplete();
                       // Navigate to call_class and then reset when back
-                      Get.to(() => const CallClass())?.then((_) {
+                      Get.toNamed(Routes.CALL_CLASS)?.then((_) {
                         setState(() => _dragX = 0);
                       });
                     } else {
