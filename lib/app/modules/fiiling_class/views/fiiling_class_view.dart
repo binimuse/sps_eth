@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:get/get.dart';
+import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/app/theme/app_sizes.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
@@ -93,13 +94,19 @@ class FiilingClassView extends GetView<FiilingClassController> {
                           Expanded(
                             child: Align(
                               alignment: Alignment.topCenter,
-                              child: const SizedBox(
-                                height: 420,
-                                width: double.infinity,
-                                child: _ServiceCard(
-                                  title: 'Residence ID',
-                                  subtitle: 'Please Start your process using your\nResidence id / National id',
-                                  icon: Icons.badge,
+                              child: GestureDetector(
+                                  onTap: () {
+                                 Get.toNamed(Routes.RESIDENCE_ID);
+                                    // Navigate to the next step or perform an action
+                                  },
+                                child: const SizedBox(
+                                  height: 420,
+                                  width: double.infinity,
+                                  child: _ServiceCard(
+                                    title: 'Residence ID',
+                                    subtitle: 'Please Start your process using your\nResidence id / National id',
+                                    icon: Icons.badge,
+                                  ),
                                 ),
                               ),
                             ),

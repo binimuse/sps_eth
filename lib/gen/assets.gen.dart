@@ -933,8 +933,41 @@ class $AssetsIconsGen {
 class $AssetsImagesGen {
   const $AssetsImagesGen();
 
+  /// File path: assets/images/Arabic.png
+  AssetGenImage get arabic => const AssetGenImage('assets/images/Arabic.png');
+
+  /// File path: assets/images/English.png
+  AssetGenImage get english => const AssetGenImage('assets/images/English.png');
+
+  /// File path: assets/images/French.png
+  AssetGenImage get french => const AssetGenImage('assets/images/French.png');
+
+  /// File path: assets/images/Machine.png
+  AssetGenImage get machine => const AssetGenImage('assets/images/Machine.png');
+
+  /// File path: assets/images/Oromoo.png
+  AssetGenImage get oromoo => const AssetGenImage('assets/images/Oromoo.png');
+
+  /// File path: assets/images/Spanish.png
+  AssetGenImage get spanish => const AssetGenImage('assets/images/Spanish.png');
+
+  /// File path: assets/images/afar.png
+  AssetGenImage get afar => const AssetGenImage('assets/images/afar.png');
+
+  /// File path: assets/images/amhric.png
+  AssetGenImage get amhric => const AssetGenImage('assets/images/amhric.png');
+
+  /// File path: assets/images/back.png
+  AssetGenImage get back => const AssetGenImage('assets/images/back.png');
+
+  /// File path: assets/images/back1.png
+  AssetGenImage get back1 => const AssetGenImage('assets/images/back1.png');
+
   /// File path: assets/images/calling.png
   AssetGenImage get calling => const AssetGenImage('assets/images/calling.png');
+
+  /// File path: assets/images/card.png
+  AssetGenImage get card => const AssetGenImage('assets/images/card.png');
 
   /// File path: assets/images/efp_logo.png
   AssetGenImage get efpLogo =>
@@ -945,6 +978,9 @@ class $AssetsImagesGen {
 
   /// File path: assets/images/law.png
   AssetGenImage get law => const AssetGenImage('assets/images/law.png');
+
+  /// File path: assets/images/near.png
+  AssetGenImage get near => const AssetGenImage('assets/images/near.png');
 
   /// File path: assets/images/news.png
   AssetGenImage get news => const AssetGenImage('assets/images/news.png');
@@ -958,24 +994,53 @@ class $AssetsImagesGen {
   /// File path: assets/images/person2.png
   AssetGenImage get person2 => const AssetGenImage('assets/images/person2.png');
 
+  /// File path: assets/images/recent.png
+  AssetGenImage get recent => const AssetGenImage('assets/images/recent.png');
+
+  /// File path: assets/images/recent1.png
+  AssetGenImage get recent1 => const AssetGenImage('assets/images/recent1.png');
+
+  /// File path: assets/images/recent2.png
+  AssetGenImage get recent2 => const AssetGenImage('assets/images/recent2.png');
+
   /// File path: assets/images/sps.png
   AssetGenImage get sps => const AssetGenImage('assets/images/sps.png');
 
   /// File path: assets/images/sucess.png
   AssetGenImage get sucess => const AssetGenImage('assets/images/sucess.png');
 
+  /// File path: assets/images/tigregna.png
+  AssetGenImage get tigregna =>
+      const AssetGenImage('assets/images/tigregna.png');
+
   /// List of all assets
   List<AssetGenImage> get values => [
+    arabic,
+    english,
+    french,
+    machine,
+    oromoo,
+    spanish,
+    afar,
+    amhric,
+    back,
+    back1,
     calling,
+    card,
     efpLogo,
     email,
     law,
+    near,
     news,
     nid,
     person,
     person2,
+    recent,
+    recent1,
+    recent2,
     sps,
     sucess,
+    tigregna,
   ];
 }
 

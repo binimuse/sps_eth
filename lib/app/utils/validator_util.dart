@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
-import 'package:get/get.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
 
 

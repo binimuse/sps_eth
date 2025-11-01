@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
-import 'package:sps_eth_app/app/theme/app_text_styles.dart';
 
 class SideInfoPanel extends StatelessWidget {
   final String title;

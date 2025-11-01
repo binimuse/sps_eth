@@ -1,7 +1,5 @@
 import 'package:dio/dio.dart' as dio;
 
-import 'package:get/get.dart';
-import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/app/utils/auth_util.dart';
 
 
@@ -17,11 +15,9 @@ class DioUtil {
   static const String _contentTypeJson = 'application/json';
 
   // Add a flag to prevent multiple simultaneous token refresh attempts
-  String? _cachedToken;
 
   // Clear token cache on initialization to ensure clean state
   void _initializeTokenCache() {
-    _cachedToken = null;
   }
 
   dio.Dio getDio({bool? useAccessToken, bool? forFileUpload}) {
@@ -58,7 +54,6 @@ class DioUtil {
     return dio.InterceptorsWrapper(
       onError: (dio.DioException e, handler) async {
         if (e.response?.statusCode == 401) {
-          print('401 Unauthorized error detected, logging out user...');
           await _handleLogout();
           return handler.next(e);
         }
@@ -73,7 +68,6 @@ class DioUtil {
         // Validate tokens before making request
         bool isAuthenticated = await AuthUtil().isFullyAuthenticated();
         if (!isAuthenticated) {
-          print('Tokens are invalid, logging out user before request');
           await _handleLogout();
           return handler.reject(
             dio.DioException(
@@ -109,26 +103,6 @@ class DioUtil {
     );
   }
 
-  Future<dio.Response> _retryRequest(
-    dio.Dio dio,
-    dio.RequestOptions requestOptions, {
-    int maxRetries = 3,
-  }) async {
-    int retryCount = 0;
-    while (retryCount < maxRetries) {
-      try {
-        return await dio.fetch(requestOptions);
-      } catch (e) {
-        retryCount++;
-        if (retryCount >= maxRetries) {
-          rethrow;
-        }
-        // Exponential backoff: wait 1s, 2s, 4s
-        await Future.delayed(Duration(seconds: 1 << (retryCount - 1)));
-      }
-    }
-    throw Exception('Max retries exceeded');
-  }
 
   // Future<String?> _refreshTokenSafely() async {
   //   // If already refreshing, wait for the result
@@ -203,7 +177,6 @@ class DioUtil {
 
   Future<void> _handleLogout() async {
     // Clear the cached token and refresh state
-    _cachedToken = null;
 
     await AuthUtil().logOut();
    // Get.offAllNamed(Routes.LOGIN);
@@ -211,7 +184,6 @@ class DioUtil {
 
   // Method to manually clear the token cache (useful for testing or manual logout)
   void clearTokenCache() {
-    _cachedToken = null;
   }
 
   Future<List?> handleDioError(dio.DioException error) async {

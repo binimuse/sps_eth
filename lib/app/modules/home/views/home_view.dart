@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:video_player/video_player.dart';
@@ -55,6 +54,8 @@ class HomeView extends GetView<HomeController> {
                         _ClockPanel(),
                         SizedBox(height: 16),
                         Expanded(child: _AlertsPanel()),
+                        SizedBox(height: 16),
+                        _NearbyPoliceStationsCard(),
                       ],
                     ),
                   ),
@@ -243,15 +244,15 @@ class _AlertsPanel extends StatelessWidget {
               topRight: Radius.circular(16),
             ),
             child: Image.asset(
-              Assets.images.news.path,
-              height: 160,
+              Assets.images.recent.path,
+              height: 120, // Minimized height
               width: double.infinity,
               fit: BoxFit.cover,
             ),
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Text(
+            child: Text(
               'RECENT ALERTS',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
@@ -281,42 +282,48 @@ class _AlertTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.asset(
-              Assets.images.news.path,
-            width: 72,
-            height: 56,
-            fit: BoxFit.cover,
+    return GestureDetector(
+      onTap: () {
+        // Handle alert tap if needed
+        Get.toNamed(Routes.RECENT_ALERTS);
+      },
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+                Assets.images.news.path,
+              width: 72,
+              height: 56,
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0F3955),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F3955),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'managing marketing campaigns that Loreim re in charge of',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
-              ),
-            ],
+                const SizedBox(height: 4),
+                const Text(
+                  'managing marketing campaigns that Loreim re in charge of',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -565,9 +572,7 @@ class _ContactCallCard extends StatelessWidget {
                           children: [
                             Text('Get Help and Contact',
                                 style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F3955))),
-                            SizedBox(height: 4),
-                            Text('These are the terms and conditions for in charge of planning ',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E))),
+                            
                           ],
                         ),
                       ),
@@ -629,7 +634,7 @@ class _StartFillingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-      Get.toNamed(Routes.FIILING_CLASS);
+      Get.toNamed(Routes.LANGUAGE);
       },
       child: Container(
         height: double.infinity,
@@ -664,6 +669,42 @@ class _StartFillingCard extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E))),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NearbyPoliceStationsCard extends StatelessWidget {
+  const _NearbyPoliceStationsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+      Get.toNamed(Routes.NEARBY_POLICE);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            Assets.images.near.path,
+            width: double.infinity,
+            height: 200, // Adjust height as needed
+            fit: BoxFit.cover,
           ),
         ),
       ),

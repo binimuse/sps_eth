@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
-import 'package:sps_eth_app/app/theme/app_text_styles.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
 
@@ -138,6 +137,7 @@ class CallClassView extends GetView<CallClassController> {
                             ),
                           ),
                           const SizedBox(height: 8),
+                          // Replace the static text field with a TextField widget for user input
                           Container(
                             height: 100,
                             alignment: Alignment.topLeft,
@@ -146,7 +146,13 @@ class CallClassView extends GetView<CallClassController> {
                               color: AppColors.backgroundLight,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text('Send Message Details', ),
+                            child: TextField(
+                              maxLines: null,
+                              decoration: InputDecoration(
+                                hintText: 'Send Message Details',
+                                border: InputBorder.none,
+                              ),
+                            ),
                           ),
                            const SizedBox(height: 8),
                           Row(
@@ -390,7 +396,9 @@ class _TermsAndActions extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    Get.back();
+                  },
                   child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff), ),
                 ),
               ),

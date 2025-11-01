@@ -25,7 +25,7 @@ void main() async {
   await PreferenceUtils.init();
 
   selectedLocale = LanUtil.getSelecctedLanguage();
-
+    
 
 
   await Future<void>.delayed(const Duration(milliseconds: 5000));
@@ -49,7 +49,8 @@ void main() async {
             translations: MainTranslations(),
             locale: Locale(selectedLocale),
             navigatorObservers: [BotToastNavigatorObserver()],
-         
+
+
             title: 'SPS Ethiopia'.tr,
             debugShowCheckedModeBanner: false,
             builder: (context, child) {
