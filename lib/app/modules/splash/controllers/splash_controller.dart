@@ -1,11 +1,9 @@
 import 'package:get/get.dart';
 
-class ResidenceIdController extends GetxController {
-  //TODO: Implement ResidenceIdController
+class SplashController extends GetxController {
+  //TODO: Implement SplashController
 
   final count = 0.obs;
-  final isFinding = false.obs;
-
   @override
   void onInit() {
     super.onInit();

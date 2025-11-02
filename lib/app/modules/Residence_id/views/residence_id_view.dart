@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:get/get.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
-import 'package:sps_eth_app/app/modules/Residence_id/views/card_find.dart';
+
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
 import '../controllers/residence_id_controller.dart';
@@ -29,7 +29,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
               children: [
                 // LEFT PROMO CARD
                 SizedBox(
-                  width: 340,
+                  width: 300,
                   child: PromoCard(
                   ),
                 ),
@@ -39,70 +39,145 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                 // CENTER CONTENT
                 Expanded(
                   flex: 2,
-                  child: Container(
-                    height: 50.h, // Reduced width to minimize card size
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Image.asset(
-                          Assets.images.card.path,
-                          fit: BoxFit.cover,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Scanning For ID ....',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black54,
+                  child: Obx(() {
+                    final isFinding = controller.isFinding.value;
+                    return Container(
+                      height: isFinding ? 70.h : 50.h, // Adjust height dynamically
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Insert ID Number Here',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            Assets.images.card.path,
+                            fit: BoxFit.cover,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Scanning For ID ....',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black54,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                          const SizedBox(height: 16),
+                          TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Insert ID Number Here',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
-                          onPressed: () {
-                           // Get.to(CardFind());
-                          },
-                          child: const Text('Find'),
-                        ),
-                      ],
-                    ),
-                  ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () {
+                              controller.isFinding.value = true;
+                            },
+                            child: const Text('Find'),
+                          ),
+                          if (isFinding) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: const [
+                                  Text(
+                                    'ID Information',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text('Name Information: Abeba Shimeles Adera'),
+                                  Text('Birth Date: Aug 12, 2024'),
+                                  Text('Email: abeba@gmail.com'),
+                                  Text('Phone Number: 0913427553'),
+                                  Text('Residence Address: -'),
+                                  SizedBox(height: 16),
+                                  // Row(
+                                  //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  //   children: [
+                                  //     ElevatedButton(
+                                  //       style: ElevatedButton.styleFrom(
+                                  //         backgroundColor: Colors.grey,
+                                  //         foregroundColor: Colors.white,
+                                  //         padding: const EdgeInsets.symmetric(
+                                  //             horizontal: 24, vertical: 12),
+                                  //         shape: RoundedRectangleBorder(
+                                  //           borderRadius: BorderRadius.circular(12),
+                                  //         ),
+                                  //       ),
+                                  //       onPressed: () {
+                                  //         controller.isFinding.value = false;
+                                  //       },
+                                  //       child: const Text('Cancel'),
+                                  //     ),
+                                  //     ElevatedButton(
+                                  //       style: ElevatedButton.styleFrom(
+                                  //         backgroundColor: Colors.blueAccent,
+                                  //         foregroundColor: Colors.white,
+                                  //         padding: const EdgeInsets.symmetric(
+                                  //             horizontal: 24, vertical: 12),
+                                  //         shape: RoundedRectangleBorder(
+                                  //           borderRadius: BorderRadius.circular(12),
+                                  //         ),
+                                  //       ),
+                                  //       onPressed: () {
+                                  //         // Confirm action
+                                  //       },
+                                  //       child: const Text('Confirm'),
+                                  //     ),
+                                  //   ],
+                                  // ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
                 ),
 
                 const SizedBox(width: 24),
 
                 // RIGHT SIDEBAR
-                Image.asset(
+                if(!controller.isFinding.value) Image.asset(
                   Assets.images.machine.path,
                   fit: BoxFit.cover,
                 ),

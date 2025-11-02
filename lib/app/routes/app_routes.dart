@@ -11,6 +11,7 @@ abstract class Routes {
   static const RECENT_ALERTS = _Paths.RECENT_ALERTS;
   static const LANGUAGE = _Paths.LANGUAGE;
   static const RESIDENCE_ID = _Paths.RESIDENCE_ID;
+  static const SPLASH = _Paths.SPLASH;
 }
 
 abstract class _Paths {
@@ -23,4 +24,5 @@ abstract class _Paths {
   static const RECENT_ALERTS = '/recent-alerts';
   static const LANGUAGE = '/language';
   static const RESIDENCE_ID = '/residence-id';
+  static const SPLASH = '/splash';
 }

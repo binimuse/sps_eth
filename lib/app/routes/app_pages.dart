@@ -14,6 +14,8 @@ import '../modules/nearby_police/bindings/nearby_police_binding.dart';
 import '../modules/nearby_police/views/nearby_police_view.dart';
 import '../modules/recent_alerts/bindings/recent_alerts_binding.dart';
 import '../modules/recent_alerts/views/recent_alerts_view.dart';
+import '../modules/splash/bindings/splash_binding.dart';
+import '../modules/splash/views/splash_view.dart';
 
 part 'app_routes.dart';
 
@@ -57,6 +59,11 @@ class AppPages {
       name: _Paths.RESIDENCE_ID,
       page: () => const ResidenceIdView(),
       binding: ResidenceIdBinding(),
+    ),
+    GetPage(
+      name: _Paths.SPLASH,
+      page: () => const SplashView(),
+      binding: SplashBinding(),
     ),
   ];
 }

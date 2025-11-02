@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -559,10 +561,15 @@ class _ContactCallCard extends StatelessWidget {
                         width: 64,
                         height: 65,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                         
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.support_agent, size: 36, color: Color(0xFF0F3955)),
+                        child: Image.asset(
+                  Assets.images.contact.path,
+              height: 120, // Minimized height
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
                       ),
                       const SizedBox(width: 16),
                       const Expanded(
@@ -599,7 +606,12 @@ class _ContactCallCard extends StatelessWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.call, size: 36, color: Color(0xFF0F3955)),
+                        child: Image.asset(
+                          Assets.images.phone.path,
+              height: 120, // Minimized height
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
                       ),
                       const SizedBox(width: 16),
                       const Expanded(
@@ -650,23 +662,25 @@ class _StartFillingCard extends StatelessWidget {
           ),
           padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
+              SizedBox(
                 width: 72,
                 height: 72,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.credit_card, size: 40, color: Color(0xFF0F3955)),
+                child: Image.asset(
+                  Assets.images.insertcard.path,
+              height: 120, // Minimized height
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
               ),
               const SizedBox(height: 16),
               const Text('Start Filling and Insert ID',
                   style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F3955))),
               const SizedBox(height: 8),
               const Text('These are the terms and conditions for in charge of planning',
-                  textAlign: TextAlign.center,
+                  textAlign: TextAlign.start,
                   style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E))),
             ],
           ),

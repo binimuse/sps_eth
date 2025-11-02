@@ -969,12 +969,19 @@ class $AssetsImagesGen {
   /// File path: assets/images/card.png
   AssetGenImage get card => const AssetGenImage('assets/images/card.png');
 
+  /// File path: assets/images/contact.png
+  AssetGenImage get contact => const AssetGenImage('assets/images/contact.png');
+
   /// File path: assets/images/efp_logo.png
   AssetGenImage get efpLogo =>
       const AssetGenImage('assets/images/efp_logo.png');
 
   /// File path: assets/images/email.png
   AssetGenImage get email => const AssetGenImage('assets/images/email.png');
+
+  /// File path: assets/images/insertcard.png
+  AssetGenImage get insertcard =>
+      const AssetGenImage('assets/images/insertcard.png');
 
   /// File path: assets/images/law.png
   AssetGenImage get law => const AssetGenImage('assets/images/law.png');
@@ -993,6 +1000,9 @@ class $AssetsImagesGen {
 
   /// File path: assets/images/person2.png
   AssetGenImage get person2 => const AssetGenImage('assets/images/person2.png');
+
+  /// File path: assets/images/phone.png
+  AssetGenImage get phone => const AssetGenImage('assets/images/phone.png');
 
   /// File path: assets/images/recent.png
   AssetGenImage get recent => const AssetGenImage('assets/images/recent.png');
@@ -1027,14 +1037,17 @@ class $AssetsImagesGen {
     back1,
     calling,
     card,
+    contact,
     efpLogo,
     email,
+    insertcard,
     law,
     near,
     news,
     nid,
     person,
     person2,
+    phone,
     recent,
     recent1,
     recent2,

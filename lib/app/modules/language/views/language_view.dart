@@ -14,13 +14,15 @@ class LanguageView extends GetView<LanguageController> {
   Widget build(BuildContext context) {
     final languages = [
       {'name': 'English', 'image': Assets.images.english.path},
+        {'name': 'አማርኛ', 'image': Assets.images.amhric.path},
+          {'name': 'Afaan Oromoo', 'image': Assets.images.oromoo.path},
       {'name': 'French', 'image': Assets.images.french.path},
-      {'name': 'Spanish', 'image': Assets.images.spanish.path},
+    
       {'name': 'Arabic', 'image': Assets.images.arabic.path},
-      {'name': 'አማርኛ', 'image': Assets.images.amhric.path},
-      {'name': 'Afaan Oromoo', 'image': Assets.images.oromoo.path},
-      {'name': 'ነጋሪት', 'image': Assets.images.tigregna.path},
-      {'name': 'Afar', 'image': Assets.images.afar.path},
+    
+    
+      {'name': 'ትግርኛ', 'image': Assets.images.tigregna.path},
+   
     ];
 
     final double viewportHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 32;
