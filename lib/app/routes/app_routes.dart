@@ -7,10 +7,12 @@ abstract class Routes {
 
   static const CALL_CLASS = _Paths.CALL_CLASS;
   static const FIILING_CLASS = _Paths.FIILING_CLASS;
+  static const FORM_CLASS = _Paths.FORM_CLASS;
   static const NEARBY_POLICE = _Paths.NEARBY_POLICE;
   static const RECENT_ALERTS = _Paths.RECENT_ALERTS;
   static const LANGUAGE = _Paths.LANGUAGE;
   static const RESIDENCE_ID = _Paths.RESIDENCE_ID;
+  static const SERVICE_LIST = _Paths.SERVICE_LIST;
   static const SPLASH = _Paths.SPLASH;
 }
 
@@ -20,9 +22,11 @@ abstract class _Paths {
 
   static const CALL_CLASS = '/call-class';
   static const FIILING_CLASS = '/fiiling-class';
+  static const FORM_CLASS = '/form-class';
   static const NEARBY_POLICE = '/nearby-police';
   static const RECENT_ALERTS = '/recent-alerts';
   static const LANGUAGE = '/language';
   static const RESIDENCE_ID = '/residence-id';
+  static const SERVICE_LIST = '/service-list';
   static const SPLASH = '/splash';
 }

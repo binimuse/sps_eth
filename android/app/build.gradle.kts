@@ -8,7 +8,8 @@ plugins {
 android {
     namespace = "com.sps.eth.sps_eth_app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // ndkVersion will be auto-downloaded by Gradle if not specified
+    // ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

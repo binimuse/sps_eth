@@ -963,6 +963,10 @@ class $AssetsImagesGen {
   /// File path: assets/images/back1.png
   AssetGenImage get back1 => const AssetGenImage('assets/images/back1.png');
 
+  /// File path: assets/images/background.png
+  AssetGenImage get background =>
+      const AssetGenImage('assets/images/background.png');
+
   /// File path: assets/images/calling.png
   AssetGenImage get calling => const AssetGenImage('assets/images/calling.png');
 
@@ -972,12 +976,19 @@ class $AssetsImagesGen {
   /// File path: assets/images/contact.png
   AssetGenImage get contact => const AssetGenImage('assets/images/contact.png');
 
+  /// File path: assets/images/crime.png
+  AssetGenImage get crime => const AssetGenImage('assets/images/crime.png');
+
   /// File path: assets/images/efp_logo.png
   AssetGenImage get efpLogo =>
       const AssetGenImage('assets/images/efp_logo.png');
 
   /// File path: assets/images/email.png
   AssetGenImage get email => const AssetGenImage('assets/images/email.png');
+
+  /// File path: assets/images/incident.png
+  AssetGenImage get incident =>
+      const AssetGenImage('assets/images/incident.png');
 
   /// File path: assets/images/insertcard.png
   AssetGenImage get insertcard =>
@@ -1004,6 +1015,10 @@ class $AssetsImagesGen {
   /// File path: assets/images/phone.png
   AssetGenImage get phone => const AssetGenImage('assets/images/phone.png');
 
+  /// File path: assets/images/popupimage.png
+  AssetGenImage get popupimage =>
+      const AssetGenImage('assets/images/popupimage.png');
+
   /// File path: assets/images/recent.png
   AssetGenImage get recent => const AssetGenImage('assets/images/recent.png');
 
@@ -1012,6 +1027,9 @@ class $AssetsImagesGen {
 
   /// File path: assets/images/recent2.png
   AssetGenImage get recent2 => const AssetGenImage('assets/images/recent2.png');
+
+  /// File path: assets/images/scanid.png
+  AssetGenImage get scanid => const AssetGenImage('assets/images/scanid.png');
 
   /// File path: assets/images/sps.png
   AssetGenImage get sps => const AssetGenImage('assets/images/sps.png');
@@ -1022,6 +1040,9 @@ class $AssetsImagesGen {
   /// File path: assets/images/tigregna.png
   AssetGenImage get tigregna =>
       const AssetGenImage('assets/images/tigregna.png');
+
+  /// File path: assets/images/traffic.png
+  AssetGenImage get traffic => const AssetGenImage('assets/images/traffic.png');
 
   /// List of all assets
   List<AssetGenImage> get values => [
@@ -1035,11 +1056,14 @@ class $AssetsImagesGen {
     amhric,
     back,
     back1,
+    background,
     calling,
     card,
     contact,
+    crime,
     efpLogo,
     email,
+    incident,
     insertcard,
     law,
     near,
@@ -1048,12 +1072,15 @@ class $AssetsImagesGen {
     person,
     person2,
     phone,
+    popupimage,
     recent,
     recent1,
     recent2,
+    scanid,
     sps,
     sucess,
     tigregna,
+    traffic,
   ];
 }
 

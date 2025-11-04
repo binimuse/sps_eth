@@ -43,10 +43,10 @@ class AuthUtil {
   Future<Map<String, dynamic>> getUserData() async {
     try {
       String? userData = await _storage.read(key: Constants.userData);
-      if (userData == null || userData.isEmpty) {
+      if (userData?.isEmpty ?? true) {
         return {};
       }
-      return json.decode(userData);
+      return json.decode(userData!);
     } catch (e) {
       print("Error reading user data: $e");
       return {};
