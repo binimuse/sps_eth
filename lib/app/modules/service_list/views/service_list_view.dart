@@ -310,12 +310,14 @@ class _ServiceSubSection extends StatelessWidget {
   final String description;
   final bool isCall;
   final VoidCallback onTap;
+  final String? image;
 
   const _ServiceSubSection({
     required this.title,
     required this.description,
     required this.onTap,
     this.isCall = false,
+    this.image,
   });
 
   @override
@@ -338,7 +340,7 @@ class _ServiceSubSection extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Icon placeholder
+            // Image placeholder
             Container(
               width: 50,
               height: 50,
@@ -348,13 +350,24 @@ class _ServiceSubSection extends StatelessWidget {
               ),
               child: Stack(
                 children: [
-                  Center(
-                    child: Icon(
-                      isCall ? Icons.people : Icons.description,
-                      size: 24,
-                      color: const Color(0xFF2D6E91),
+                  if (image != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        image!,
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  else
+                    Center(
+                      child: Icon(
+                        isCall ? Icons.people : Icons.description,
+                        size: 24,
+                        color: const Color(0xFF2D6E91),
+                      ),
                     ),
-                  ),
                   // Badge placeholder
                   Positioned(
                     right: 3,

@@ -96,16 +96,19 @@ class FiilingClassView extends GetView<FiilingClassController> {
                               alignment: Alignment.topCenter,
                               child: GestureDetector(
                                   onTap: () {
+
+                                      
                                  Get.toNamed(Routes.RESIDENCE_ID);
+
                                     // Navigate to the next step or perform an action
                                   },
-                                child: const SizedBox(
+                                child: SizedBox(
                                   height: 420,
                                   width: double.infinity,
                                   child: _ServiceCard(
                                     title: 'Residence ID',
                                     subtitle: 'Please Start your process using your\nResidence id / National id',
-                                    icon: Icons.badge,
+                                    image: Assets.images.localResident.path,
                                   ),
                                 ),
                               ),
@@ -115,13 +118,13 @@ class FiilingClassView extends GetView<FiilingClassController> {
                           Expanded(
                             child: Align(
                               alignment: Alignment.topCenter,
-                              child: const SizedBox(
+                              child: SizedBox(
                                 height: 420,
                                 width: double.infinity,
                                 child: _ServiceCard(
-                                  title: 'Visitor ID / Passport',
+                                  title: 'Visitor ID',
                                   subtitle: 'If you are foreigner you can start your process\nusing your passport id',
-                                  icon: Icons.travel_explore,
+                                  image: Assets.images.visitor.path,
                                 ),
                               ),
                             ),
@@ -143,8 +146,8 @@ class FiilingClassView extends GetView<FiilingClassController> {
 class _ServiceCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final IconData icon;
-  const _ServiceCard({required this.title, required this.subtitle, required this.icon});
+  final String image;
+  const _ServiceCard({required this.title, required this.subtitle, required this.image});
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +169,15 @@ class _ServiceCard extends StatelessWidget {
               color: const Color(0xFFE6F3FB),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 120, color: const Color(0xFF2D6E91)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                image,
+                width: 220,
+                height: 200,
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
           const SizedBox(height: 24),
           Text(title,

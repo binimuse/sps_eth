@@ -942,6 +942,10 @@ class $AssetsImagesGen {
   /// File path: assets/images/French.png
   AssetGenImage get french => const AssetGenImage('assets/images/French.png');
 
+  /// File path: assets/images/Local_Resident.png
+  AssetGenImage get localResident =>
+      const AssetGenImage('assets/images/Local_Resident.png');
+
   /// File path: assets/images/Machine.png
   AssetGenImage get machine => const AssetGenImage('assets/images/Machine.png');
 
@@ -950,6 +954,9 @@ class $AssetsImagesGen {
 
   /// File path: assets/images/Spanish.png
   AssetGenImage get spanish => const AssetGenImage('assets/images/Spanish.png');
+
+  /// File path: assets/images/Visitor.png
+  AssetGenImage get visitor => const AssetGenImage('assets/images/Visitor.png');
 
   /// File path: assets/images/afar.png
   AssetGenImage get afar => const AssetGenImage('assets/images/afar.png');
@@ -1049,9 +1056,11 @@ class $AssetsImagesGen {
     arabic,
     english,
     french,
+    localResident,
     machine,
     oromoo,
     spanish,
+    visitor,
     afar,
     amhric,
     back,
