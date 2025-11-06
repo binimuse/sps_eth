@@ -986,6 +986,10 @@ class $AssetsImagesGen {
   /// File path: assets/images/crime.png
   AssetGenImage get crime => const AssetGenImage('assets/images/crime.png');
 
+  /// File path: assets/images/document_scan.png
+  AssetGenImage get documentScan =>
+      const AssetGenImage('assets/images/document_scan.png');
+
   /// File path: assets/images/efp_logo.png
   AssetGenImage get efpLogo =>
       const AssetGenImage('assets/images/efp_logo.png');
@@ -1070,6 +1074,7 @@ class $AssetsImagesGen {
     card,
     contact,
     crime,
+    documentScan,
     efpLogo,
     email,
     incident,

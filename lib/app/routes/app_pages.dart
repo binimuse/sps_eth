@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 
 import '../modules/Residence_id/bindings/residence_id_binding.dart';
 import '../modules/Residence_id/views/residence_id_view.dart';
+import '../modules/visitor_id/bindings/visitor_id_binding.dart';
+import '../modules/visitor_id/views/visitor_id_view.dart';
 import '../modules/call_class/bindings/call_class_binding.dart';
 import '../modules/call_class/views/call_class_view.dart';
 import '../modules/fiiling_class/bindings/fiiling_class_binding.dart';
@@ -78,6 +80,11 @@ class AppPages {
       name: _Paths.SPLASH,
       page: () => const SplashView(),
       binding: SplashBinding(),
+    ),
+    GetPage(
+      name: _Paths.VISITOR_ID,
+      page: () => const VisitorIdView(),
+      binding: VisitorIdBinding(),
     ),
   ];
 }

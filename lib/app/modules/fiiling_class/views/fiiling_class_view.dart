@@ -103,7 +103,7 @@ class FiilingClassView extends GetView<FiilingClassController> {
                                     // Navigate to the next step or perform an action
                                   },
                                 child: SizedBox(
-                                  height: 420,
+                                  height: 320,
                                   width: double.infinity,
                                   child: _ServiceCard(
                                     title: 'Residence ID',
@@ -118,13 +118,18 @@ class FiilingClassView extends GetView<FiilingClassController> {
                           Expanded(
                             child: Align(
                               alignment: Alignment.topCenter,
-                              child: SizedBox(
-                                height: 420,
-                                width: double.infinity,
-                                child: _ServiceCard(
-                                  title: 'Visitor ID',
-                                  subtitle: 'If you are foreigner you can start your process\nusing your passport id',
-                                  image: Assets.images.visitor.path,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Get.toNamed(Routes.VISITOR_ID);
+                                },
+                                child: SizedBox(
+                                  height: 320,
+                                  width: double.infinity,
+                                  child: _ServiceCard(
+                                    title: 'Visitor ID',
+                                    subtitle: 'If you are foreigner you can start your process\nusing your passport id',
+                                    image: Assets.images.visitor.path,
+                                  ),
                                 ),
                               ),
                             ),
@@ -160,11 +165,12 @@ class _ServiceCard extends StatelessWidget {
         ],
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
           Container(
-            width: 220,
-            height: 200,
+            width: 160,
+            height: 140,
             decoration: BoxDecoration(
               color: const Color(0xFFE6F3FB),
               borderRadius: BorderRadius.circular(12),
@@ -173,13 +179,13 @@ class _ServiceCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               child: Image.asset(
                 image,
-                width: 220,
-                height: 200,
+                width: 160,
+                height: 140,
                 fit: BoxFit.cover,
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Text(title,
               style:  TextStyle(
                 fontWeight: FontWeight.bold,
@@ -187,12 +193,16 @@ class _ServiceCard extends StatelessWidget {
                 color: Color(0xFF0A5B95),
                 fontFamily: 'DMSans',
               )),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF4F6B7E), fontSize: 11),
+            ),
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );

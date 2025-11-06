@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:get/get.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
@@ -21,6 +20,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
         ),
       ),
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: Colors.white.withOpacity(0.9),
         body: SafeArea(
           child: Padding(
@@ -40,23 +40,42 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                 // CENTER CONTENT
                 Expanded(
                   flex: 2,
-                  child: Container(
-                    height: 70.h,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Back Button
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBDCE7)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                        onPressed: () => Get.back(),
+                        icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                        label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                      ),
+                      const SizedBox(height: 16),
+                      // Main Card
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
                         // Top Section: ID Scanning Icon and Text
                         SizedBox(
                           height: 80,
@@ -188,8 +207,11 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

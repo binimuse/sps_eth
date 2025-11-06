@@ -719,14 +719,7 @@ class FormClassView extends GetView<FormClassController> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Keyboard Here',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Color(0xFF0F3955),
-                ),
-              ),
+            
               DropdownButton<String>(
                 value: controller.selectedLanguage.value,
                 items: ['English', 'Amharic', 'Tigrinya'].map((lang) {

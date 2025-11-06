@@ -1,25 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-class ChatMessage {
-  final String text;
-  final bool isFromOP; // true if from OP (Officer/Operator), false if from other party
-  final String time;
+class VisitorIdController extends GetxController {
+  // Form controllers for Personal Information
+  final clearanceForController = TextEditingController();
+  final emailController = TextEditingController();
+  final phoneController = TextEditingController();
+  final addressController = TextEditingController();
+  final maritalStatusController = TextEditingController();
 
-  ChatMessage({
-    required this.text,
-    required this.isFromOP,
-    required this.time,
-  });
-}
-
-class CallClassController extends GetxController {
-  // Chat messages
-  final messages = <ChatMessage>[].obs;
-  
-  // Message input controller
-  final messageController = TextEditingController();
-  
   // Keyboard state
   final selectedLanguage = 'English'.obs;
   final TextEditingController keyboardController = TextEditingController();
@@ -29,29 +18,6 @@ class CallClassController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Initialize with sample messages
-    messages.addAll([
-      ChatMessage(
-        text: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-        isFromOP: true,
-        time: "8:00 PM",
-      ),
-      ChatMessage(
-        text: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-        isFromOP: false,
-        time: "8:00 PM",
-      ),
-      ChatMessage(
-        text: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-        isFromOP: true,
-        time: "8:00 PM",
-      ),
-      ChatMessage(
-        text: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-        isFromOP: false,
-        time: "8:00 PM",
-      ),
-    ]);
   }
 
   @override
@@ -61,26 +27,14 @@ class CallClassController extends GetxController {
 
   @override
   void onClose() {
-    messageController.dispose();
+    clearanceForController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    addressController.dispose();
+    maritalStatusController.dispose();
     keyboardController.dispose();
     focusedField?.dispose();
     super.onClose();
-  }
-
-  void sendMessage() {
-    if (messageController.text.trim().isEmpty) return;
-    
-    final now = DateTime.now();
-    final timeString = '${now.hour > 12 ? now.hour - 12 : now.hour}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
-    
-    messages.add(ChatMessage(
-      text: messageController.text.trim(),
-      isFromOP: true,
-      time: timeString,
-    ));
-    
-    messageController.clear();
-    update();
   }
 
   void setFocusedField(FocusNode? focusNode, TextEditingController textController) {
@@ -129,8 +83,5 @@ class CallClassController extends GetxController {
     keyboardController.text = focusedController!.text;
     keyboardController.selection = focusedController!.selection;
   }
-
-  void clearMessage() {
-    messageController.clear();
-  }
 }
+
