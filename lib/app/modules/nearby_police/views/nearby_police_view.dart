@@ -18,15 +18,20 @@ class NearbyPoliceView extends GetView<NearbyPoliceController> {
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Nearby Police Stations', style: TextStyle(color: Colors.black87)),
+        title: const Text(
+          'Nearby Police Stations',
+          style: TextStyle(color: Colors.black87),
+        ),
         centerTitle: false,
       ),
       body: SafeArea(
         child: Obx(() {
-          // Map will show markers once the controller loads them
+          if (controller.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
           return GoogleMap(
             initialCameraPosition: controller.initialCamera,
-            onMapCreated: (GoogleMapController mapController) {},
+            onMapCreated: controller.onMapCreated,
             markers: controller.markers,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,

@@ -1098,16 +1098,6 @@ class $AssetsImagesGen {
   ];
 }
 
-class $AssetsLogosGen {
-  const $AssetsLogosGen();
-
-  /// File path: assets/logos/logo.svg
-  SvgGenImage get logo => const SvgGenImage('assets/logos/logo.svg');
-
-  /// List of all assets
-  List<SvgGenImage> get values => [logo];
-}
-
 class $AssetsLottieGen {
   const $AssetsLottieGen();
 
@@ -1123,7 +1113,6 @@ class Assets {
 
   static const $AssetsIconsGen icons = $AssetsIconsGen();
   static const $AssetsImagesGen images = $AssetsImagesGen();
-  static const $AssetsLogosGen logos = $AssetsLogosGen();
   static const $AssetsLottieGen lottie = $AssetsLottieGen();
 }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:sps_eth_app/app/modules/form_class/views/widget/scanning_document_view.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
@@ -109,21 +108,24 @@ class CallClassView extends GetView<CallClassController> {
                       // Action tiles
                       Row(
                         children: [
-                          Expanded(child: _ActionTile(icon: Icons.document_scanner, label: 'Scan Document', onPressed: () {
-                            ScanningDocumentView.show(context);
-                          })),
-                          const SizedBox(width: 16),
-                          Expanded(child: _ActionTile(icon: Icons.person, label: 'Take Photo', onPressed: () {
-                          //  TakePhotoView.show(context);
-                          })),
-                          const SizedBox(width: 16),
-                          Expanded(child: _ActionTile(icon: Icons.usb, label: 'Flash  Documents', onPressed: () {
-                        //    FlashDocumentsView.show(context);
-                          })),
-                          const SizedBox(width: 16),
-                          Expanded(child: _ActionTile(icon: Icons.receipt_long, label: 'Payment Receipt', onPressed: () {
-                    //        PaymentReceiptView.show(context);
-                          })),
+                          Expanded(
+                            child: Obx(() {
+                              final tiles = controller.actionTiles;
+                              return Row(
+                                children: [
+                                  for (var i = 0; i < tiles.length; i++) ...[
+                                    Expanded(
+                                      child: _ActionTile(
+                                        config: tiles[i],
+                                      ),
+                                    ),
+                                    if (i != tiles.length - 1)
+                                      const SizedBox(width: 16),
+                                  ],
+                                ],
+                              );
+                            }),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -141,22 +143,19 @@ class CallClassView extends GetView<CallClassController> {
                   fit: FlexFit.loose,
                   child: Column(
                     children: [
-                      _InfoCard(
-                        title: 'ID Information',
-                        rows: const [
-                          ['ID Information', '1231235163'],
-                          ['Name  Information', 'Abeba Shimeles Adera'],
-                          ['Birth Date', 'Aug 12 , 2024'],
-                          ['Email', 'abeba@gmail.com'],
-                          ['Phone Number', '0913427553'],
-                          ['Residence Address', '–'],
-                        ],
-                      ),
+                      Obx(() {
+                        return _InfoCard(
+                          title: 'ID Information',
+                          rows: controller.idInformation.toList(),
+                        );
+                      }),
                       const SizedBox(height: 12),
                    
-                      _DocumentsCard(),
+                      Obx(() => _DocumentsCard(
+                            documents: controller.supportingDocuments.toList(),
+                          )),
                       const SizedBox(height: 8),
-                      _TermsAndActions(),
+                      _TermsAndActions(controller: controller),
                     ],
                   ),
                 ),
@@ -210,14 +209,14 @@ Widget _roundCtrl(IconData icon, {Color? color}) {
 }
 
 class _ActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  const _ActionTile({required this.icon, required this.label, required this.onPressed});
+  const _ActionTile({required this.config});
+
+  final ActionTileConfig config;
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onPressed,
+      onTap: () => config.onPressed(context),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.whiteOff,
@@ -237,10 +236,14 @@ class _ActionTile extends StatelessWidget {
                 color: AppColors.primaryLighter,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, size: 36, color: AppColors.primary),
+              child: Icon(config.icon, size: 36, color: AppColors.primary),
             ),
             const SizedBox(height: 8),
-            Text(label, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
+            Text(
+              config.label,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+            ),
           ],
         ),
       ),
@@ -250,7 +253,7 @@ class _ActionTile extends StatelessWidget {
 
 class _InfoCard extends StatelessWidget {
   final String title;
-  final List<List<String>> rows;
+  final List<InfoRow> rows;
   const _InfoCard({required this.title, required this.rows});
 
   @override
@@ -271,8 +274,8 @@ class _InfoCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    Expanded(child: Text(r.first, )),
-                    Text(r.last, ),
+                    Expanded(child: Text(r.label, )),
+                    Text(r.value, ),
                   ],
                 ),
               )),
@@ -283,6 +286,10 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _DocumentsCard extends StatelessWidget {
+  const _DocumentsCard({required this.documents});
+
+  final List<DocumentItem> documents;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -297,17 +304,13 @@ class _DocumentsCard extends StatelessWidget {
         children: [
           Text('Supporting Document',style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
           const SizedBox(height: 12),
-          ...[
-            'Incident Document',
-            'Application',
-            'Others',
-          ].map((label) => Padding(
+          ...documents.map((item) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    Expanded(child: Text(label, )),
+                    Expanded(child: Text(item.label, )),
                     Row(children: [
-                      _docChip(),
+                      _docChip(item.fileName),
                       const SizedBox(width: 6),
                       
                     ])
@@ -319,19 +322,23 @@ class _DocumentsCard extends StatelessWidget {
     );
   }
 
-  Widget _docChip() {
+  Widget _docChip(String fileName) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text('Doc name.pdf', ),
+      child: Text(fileName, ),
     );
   }
 }
 
 class _TermsAndActions extends StatelessWidget {
+  const _TermsAndActions({required this.controller});
+
+  final CallClassController controller;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -352,10 +359,12 @@ class _TermsAndActions extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            'These are the terms and conditions for Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand.',
-            style: TextStyle(color: AppColors.grayDark),
-          ),
+          Obx(() {
+            return Text(
+              controller.termsAndConditions.value,
+              style: TextStyle(color: AppColors.grayDark),
+            );
+          }),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -367,7 +376,7 @@ class _TermsAndActions extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () {
-                    Get.back();
+                    controller.cancelCall();
                   },
                   child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff), ),
                 ),
@@ -380,7 +389,7 @@ class _TermsAndActions extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: () {},
+                  onPressed: controller.confirmTerms,
                   child: Text('Confirm / Agree', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff), ),
                 ),
               ),
@@ -450,14 +459,16 @@ class _ChatWidget extends GetView<CallClassController> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'June 12, 2024',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
+                Obx(() {
+                  return Text(
+                    controller.discussionDate.value,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  );
+                }),
               ],
             ),
           ),

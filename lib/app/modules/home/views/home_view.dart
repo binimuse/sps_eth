@@ -1,9 +1,10 @@
-
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
-import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:responsive_sizer/responsive_sizer.dart';
+import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:video_player/video_player.dart';
 
@@ -29,16 +30,24 @@ class HomeView extends GetView<HomeController> {
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       children: [
-                        Expanded(child: _HeroPanel()),
+                        Expanded(child: _HeroPanel(controller: controller)),
                         const SizedBox(height: 16),
                         SizedBox(
                           height: 210,
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(flex: 2, child: _ContactCallCard()),
+                              Expanded(
+                                flex: 2,
+                                child: _ContactCallCard(controller: controller),
+                              ),
                               const SizedBox(width: 16),
-                              Expanded(flex: 1, child: _StartFillingCard()),
+                              Expanded(
+                                flex: 1,
+                                child: _StartFillingCard(
+                                  controller: controller,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -50,14 +59,18 @@ class HomeView extends GetView<HomeController> {
                 Expanded(
                   flex: 2,
                   child: Padding(
-                    padding: const EdgeInsets.only(right: 16, top: 16, bottom: 16),
+                    padding: const EdgeInsets.only(
+                      right: 16,
+                      top: 16,
+                      bottom: 16,
+                    ),
                     child: Column(
-                      children: const [
-                        _ClockPanel(),
-                        SizedBox(height: 16),
-                        Expanded(child: _AlertsPanel()),
-                        SizedBox(height: 16),
-                        _NearbyPoliceStationsCard(),
+                      children: [
+                        _ClockPanel(controller: controller),
+                        const SizedBox(height: 16),
+                        Expanded(child: _AlertsPanel(controller: controller)),
+                        const SizedBox(height: 16),
+                        _NearbyPoliceStationsCard(controller: controller),
                       ],
                     ),
                   ),
@@ -71,9 +84,11 @@ class HomeView extends GetView<HomeController> {
   }
 }
 
-
-
 class _HeroPanel extends StatelessWidget {
+  const _HeroPanel({required this.controller});
+
+  final HomeController controller;
+
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
@@ -81,12 +96,17 @@ class _HeroPanel extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            Assets.images.news.path,
-            fit: BoxFit.cover,
-          ),
+          Image.asset(Assets.images.news.path, fit: BoxFit.cover),
           Container(color: Colors.black.withOpacity(0.25)),
-        
+          Positioned(
+            top: 16,
+            left: 16,
+            child: SizedBox(
+              width: 172,
+              child: Image.asset(Assets.images.sps.path, fit: BoxFit.contain),
+            ),
+          ),
+
           Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -99,9 +119,8 @@ class _HeroPanel extends StatelessWidget {
                       showDialog(
                         context: context,
                         barrierDismissible: true,
-                        builder: (_) => const _VideoPlayerDialog(
-                          videoUrl:
-                              'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+                        builder: (_) => _VideoPlayerDialog(
+                          videoUrl: controller.heroVideoUrl,
                         ),
                       );
                     },
@@ -111,10 +130,16 @@ class _HeroPanel extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.15),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white70, width: 2),
+                        border: Border.all(
+                          color: AppColors.secondaryDark,
+                          width: 2,
+                        ),
                       ),
-                      child: const Icon(Icons.play_arrow_rounded,
-                          color: Colors.white, size: 48),
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: AppColors.secondary,
+                        size: 48,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -122,13 +147,14 @@ class _HeroPanel extends StatelessWidget {
                     'SPS',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFFF5D77E),
-                          letterSpacing: 4,
-                        ),
+                      fontWeight: FontWeight.w800,
+                      fontFamily: GoogleFonts.sintony().fontFamily,
+                      color: AppColors.secondary,
+                      letterSpacing: 4,
+                      fontSize: 29.sp,
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Loreim re in charge of planning and managing marketing\n'
                     'campaigns that promote a company\'s brand. marketing\n'
                     'campaigns that promote a company\'s brand.',
@@ -142,7 +168,7 @@ class _HeroPanel extends StatelessWidget {
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -150,7 +176,9 @@ class _HeroPanel extends StatelessWidget {
 }
 
 class _ClockPanel extends StatelessWidget {
-  const _ClockPanel();
+  const _ClockPanel({required this.controller});
+
+  final HomeController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -158,13 +186,17 @@ class _ClockPanel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF9FC6DE), Color(0xFF7FB0CB)],
+          colors: [Color.fromARGB(255, 157, 205, 239), Color(0xFF5078A0)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
@@ -173,18 +205,20 @@ class _ClockPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  DateFormat('dd MMMM , yyyy').format(DateTime.now()).toUpperCase(),
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F3955),
-                  ),
-                ),
+                Obx(() {
+                  return Text(
+                    controller.formattedDate,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  );
+                }),
                 const SizedBox(height: 6),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: _DigitalClock(),
+                  child: _DigitalClock(controller: controller),
                 ),
               ],
             ),
@@ -195,43 +229,35 @@ class _ClockPanel extends StatelessWidget {
   }
 }
 
-class _DigitalClock extends StatefulWidget {
-  @override
-  State<_DigitalClock> createState() => _DigitalClockState();
-}
+class _DigitalClock extends StatelessWidget {
+  const _DigitalClock({required this.controller});
 
-class _DigitalClockState extends State<_DigitalClock> {
-  late final Stream<DateTime> _ticker =
-      Stream<DateTime>.periodic(const Duration(seconds: 1), (_) => DateTime.now());
+  final HomeController controller;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DateTime>(
-      stream: _ticker,
-      builder: (context, snapshot) {
-        final now = snapshot.data ?? DateTime.now();
-        final time = DateFormat('hh:mm:ss a').format(now);
-        return Text(
-          time,
-          style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                fontFeatures: const [FontFeature.tabularFigures()],
-                letterSpacing: 2,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F3955),
-              ),
-        );
-      },
-    );
+    return Obx(() {
+      return Text(
+        controller.formattedTime,
+        style: Theme.of(context).textTheme.displayLarge?.copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+          letterSpacing: 1,
+          fontWeight: FontWeight.w700,
+          fontFamily: GoogleFonts.sintony().fontFamily,
+          color: const Color.fromARGB(255, 250, 250, 250),
+        ),
+      );
+    });
   }
 }
 
 class _AlertsPanel extends StatelessWidget {
-  const _AlertsPanel();
+  const _AlertsPanel({required this.controller});
+
+  final HomeController controller;
 
   @override
   Widget build(BuildContext context) {
-    // Dummy list of alerts
-    final alerts = List.generate(6, (i) => 'Recent alert item ${i + 1}');
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -240,6 +266,17 @@ class _AlertsPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Padding(
+            padding: EdgeInsets.all(8),
+            child: Text(
+              'RECENT ALERTS',
+              style: TextStyle(
+                fontFamily: GoogleFonts.montserrat().fontFamily,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F3955),
+              ),
+            ),
+          ),
           ClipRRect(
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(16),
@@ -252,25 +289,22 @@ class _AlertsPanel extends StatelessWidget {
               fit: BoxFit.cover,
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              'RECENT ALERTS',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0F3955),
-              ),
-            ),
-          ),
+
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: alerts.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                return _AlertTile(title: alerts[index]);
-              },
-            ),
+            child: Obx(() {
+              final alerts = controller.alerts;
+              return ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: alerts.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  return _AlertTile(
+                    title: alerts[index],
+                    onTap: controller.openRecentAlerts,
+                  );
+                },
+              );
+            }),
           ),
         ],
       ),
@@ -280,21 +314,19 @@ class _AlertsPanel extends StatelessWidget {
 
 class _AlertTile extends StatelessWidget {
   final String title;
-  const _AlertTile({required this.title});
+  final VoidCallback onTap;
+  const _AlertTile({required this.title, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        // Handle alert tap if needed
-        Get.toNamed(Routes.RECENT_ALERTS);
-      },
+      onTap: onTap,
       child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.asset(
-                Assets.images.news.path,
+              Assets.images.news.path,
               width: 72,
               height: 56,
               fit: BoxFit.cover,
@@ -333,7 +365,7 @@ class _AlertTile extends StatelessWidget {
 // Removed old bottom actions bar and info card; replaced by _ContactCallCard
 
 class _SwipeToCall extends StatefulWidget {
-  final VoidCallback onComplete;
+  final Future<void> Function() onComplete;
   const _SwipeToCall({required this.onComplete});
 
   @override
@@ -366,11 +398,23 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: const [
-                    Icon(Icons.chevron_right, size: 36, color: Color(0xFF9DB3C1)),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 36,
+                      color: Color(0xFF9DB3C1),
+                    ),
                     SizedBox(width: 8),
-                    Icon(Icons.chevron_right, size: 36, color: Color(0xFF9DB3C1)),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 36,
+                      color: Color(0xFF9DB3C1),
+                    ),
                     SizedBox(width: 8),
-                    Icon(Icons.chevron_right, size: 36, color: Color(0xFF9DB3C1)),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 36,
+                      color: Color(0xFF9DB3C1),
+                    ),
                   ],
                 ),
               ),
@@ -384,7 +428,10 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(32),
-                    border: Border.all(color: const Color(0xFFB9D3E2), width: 2),
+                    border: Border.all(
+                      color: const Color(0xFFB9D3E2),
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
@@ -395,18 +442,19 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                 child: GestureDetector(
                   onHorizontalDragUpdate: (d) {
                     setState(() {
-                      _dragX = (_dragX + d.delta.dx).clamp(0.0, trackWidth - knobWidth);
+                      _dragX = (_dragX + d.delta.dx).clamp(
+                        0.0,
+                        trackWidth - knobWidth,
+                      );
                     });
                   },
                   onHorizontalDragEnd: (_) {
                     final isComplete = _dragX > (trackWidth - knobWidth) * 0.85;
                     if (isComplete) {
-                      // ignore: avoid_print
-                      print('calling ..');
-                      widget.onComplete();
-                      // Navigate to call_class and then reset when back
-                      Get.toNamed(Routes.CALL_CLASS)?.then((_) {
-                        setState(() => _dragX = 0);
+                      widget.onComplete().whenComplete(() {
+                        if (mounted) {
+                          setState(() => _dragX = 0);
+                        }
                       });
                     } else {
                       setState(() => _dragX = 0);
@@ -419,7 +467,11 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                       color: const Color(0xFF2ED158),
                       borderRadius: BorderRadius.circular(36),
                       boxShadow: const [
-                        BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
                       ],
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -428,11 +480,13 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                       children: [
                         Icon(Icons.phone, color: Colors.white, size: 28),
                         SizedBox(width: 8),
-                        Text('Swipe to Call',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                            )),
+                        Text(
+                          'Swipe to Call',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -510,9 +564,11 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
               child: IconButton(
                 color: Colors.white,
                 iconSize: 28,
-                icon: Icon(_controller.value.isPlaying
-                    ? Icons.pause_circle_filled
-                    : Icons.play_circle_filled),
+                icon: Icon(
+                  _controller.value.isPlaying
+                      ? Icons.pause_circle_filled
+                      : Icons.play_circle_filled,
+                ),
                 onPressed: () {
                   setState(() {
                     if (_controller.value.isPlaying) {
@@ -523,7 +579,7 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
                   });
                 },
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -532,108 +588,88 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
 }
 
 class _ContactCallCard extends StatelessWidget {
+  const _ContactCallCard({required this.controller});
+
+  final HomeController controller;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       height: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: const LinearGradient(
+          colors: [
+            Color.fromARGB(255, 126, 196, 246),
+            Color.fromARGB(255, 232, 235, 238),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
           Expanded(
             child: Row(
-            children: [
-              // Left: help/contact
-              Expanded(
-                child: Container(
-                  // fill available height
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE7F4FF),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 65,
-                        decoration: BoxDecoration(
-                         
-                          borderRadius: BorderRadius.circular(12),
+              children: [
+                // Left: help/contact
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 65,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Image.asset(
+                            Assets.images.contact.path,
+                            height: 120, // Minimized height
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
                         ),
-                        child: Image.asset(
-                  Assets.images.contact.path,
-              height: 120, // Minimized height
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text('Get Help and Contact',
-                                style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F3955))),
-                            
-                          ],
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Direct Call for Service',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primary,
+                                  fontSize: 13.sp,
+                                ),
+                              ),
+                              Text(
+                                'These are the terms and conditions for in charge of planning ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF4F6B7E),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              // Right: voice call small card
-              Expanded(
-                child: Container(
-                  // fill available height
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE9FFF2),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Image.asset(
-                          Assets.images.phone.path,
-              height: 120, // Minimized height
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Text('Click Here\nfor Voice Call',
-                            style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F3955))),
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ],
+
+                // Right: voice call small card
+              ],
             ),
           ),
           const SizedBox(height: 16),
           // Embedded swipe-to-call control
           SizedBox(
             height: 64,
-            child: _SwipeToCall(
-            onComplete: () {
-            
-            },
-            ),
+            child: _SwipeToCall(onComplete: controller.onSwipeToCallComplete),
           ),
         ],
       ),
@@ -642,12 +678,14 @@ class _ContactCallCard extends StatelessWidget {
 }
 
 class _StartFillingCard extends StatelessWidget {
+  const _StartFillingCard({required this.controller});
+
+  final HomeController controller;
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-      Get.toNamed(Routes.LANGUAGE);
-      },
+      onTap: controller.openLanguageSelection,
       child: Container(
         height: double.infinity,
         decoration: BoxDecoration(
@@ -662,26 +700,37 @@ class _StartFillingCard extends StatelessWidget {
           ),
           padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 72,
-                height: 72,
-                child: Image.asset(
-                  Assets.images.insertcard.path,
-              height: 120, // Minimized height
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
+              Center(
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: Image.asset(
+                    Assets.images.insertcard.path,
+                    height: 120, // Minimized height
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              const Text('Start Filling and Insert ID',
-                  style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0F3955))),
+              Text(
+                'Start Filling and Insert ID',
+                textAlign: TextAlign.start,
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primary,
+                ),
+              ),
               const SizedBox(height: 8),
-              const Text('These are the terms and conditions for in charge of planning',
-                  textAlign: TextAlign.start,
-                  style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E))),
+              const Text(
+                'These are the terms and conditions for in charge of planning',
+                textAlign: TextAlign.start,
+                style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
+              ),
             ],
           ),
         ),
@@ -691,14 +740,14 @@ class _StartFillingCard extends StatelessWidget {
 }
 
 class _NearbyPoliceStationsCard extends StatelessWidget {
-  const _NearbyPoliceStationsCard();
+  const _NearbyPoliceStationsCard({required this.controller});
+
+  final HomeController controller;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-      Get.toNamed(Routes.NEARBY_POLICE);
-      },
+      onTap: controller.openNearbyPoliceStations,
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
