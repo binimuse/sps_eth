@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:livekit_client/livekit_client.dart' hide ChatMessage;
 import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
@@ -59,28 +60,72 @@ class CallClassView extends GetView<CallClassController> {
                         clipBehavior: Clip.antiAlias,
                         child: Stack(
                           children: [
+                            // Main video (remote participant or placeholder)
                             AspectRatio(
                               aspectRatio: 16 / 9,
-                              child: Image.asset(
-                                Assets.images.person.path,
-                                fit: BoxFit.cover,
-                              ),
+                              child: Obx(() {
+                                final remoteParticipants = controller.remoteParticipants;
+                                if (remoteParticipants.isNotEmpty) {
+                                  final remoteVideoTrack = controller.getRemoteVideoTrack(remoteParticipants.first);
+                                  if (remoteVideoTrack != null) {
+                                    return VideoTrackRenderer(
+                                      remoteVideoTrack,
+                                    );
+                                  }
+                                }
+                                // Placeholder when no remote video
+                                return Container(
+                                  color: AppColors.black,
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.videocam_off, size: 48, color: AppColors.white70),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          controller.isConnected.value 
+                                              ? 'Waiting for participant...' 
+                                              : 'Not connected',
+                                          style: TextStyle(color: AppColors.white70),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
                             ),
-                            // PIP
+                            // PIP (local video)
                             Positioned(
                               right: 16,
                               bottom: 16,
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  width: 140,
-                                  height: 100,
-                                  color: AppColors.backgroundLight,
-                                  child: Image.asset(
-                                    Assets.images.person2.path,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
+                                child: Obx(() {
+                                  final localVideoTrack = controller.localVideoTrack.value;
+                                  if (localVideoTrack != null && controller.isVideoEnabled.value) {
+                                    return Container(
+                                      width: 140,
+                                      height: 100,
+                                      color: AppColors.black,
+                                      child: VideoTrackRenderer(
+                                        localVideoTrack,
+                                      ),
+                                    );
+                                  }
+                                  // Placeholder when local video is off
+                                  return Container(
+                                    width: 140,
+                                    height: 100,
+                                    color: AppColors.backgroundLight,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.person,
+                                        size: 40,
+                                        color: AppColors.grayDark,
+                                      ),
+                                    ),
+                                  );
+                                }),
                               ),
                             ),
                             // Controls
@@ -95,9 +140,34 @@ class CallClassView extends GetView<CallClassController> {
                                   const SizedBox(width: 12),
                                   _roundCtrl(Icons.message),
                                   const SizedBox(width: 12),
-                                  _roundCtrl(Icons.call_end, color: AppColors.danger),
+                                  GestureDetector(
+                                    onTap: () => controller.cancelCall(),
+                                    child: _roundCtrl(Icons.call_end, color: AppColors.danger),
+                                  ),
                                   const SizedBox(width: 12),
-                                  _roundCtrl(Icons.videocam),
+                                  Obx(() => GestureDetector(
+                                    onTap: () => controller.toggleVideo(),
+                                    child: _roundCtrl(
+                                      controller.isVideoEnabled.value 
+                                          ? Icons.videocam 
+                                          : Icons.videocam_off,
+                                      color: controller.isVideoEnabled.value 
+                                          ? null 
+                                          : AppColors.grayDark,
+                                    ),
+                                  )),
+                                  const SizedBox(width: 12),
+                                  Obx(() => GestureDetector(
+                                    onTap: () => controller.toggleAudio(),
+                                    child: _roundCtrl(
+                                      controller.isAudioEnabled.value 
+                                          ? Icons.mic 
+                                          : Icons.mic_off,
+                                      color: controller.isAudioEnabled.value 
+                                          ? null 
+                                          : AppColors.grayDark,
+                                    ),
+                                  )),
                                 ],
                               ),
                             ),

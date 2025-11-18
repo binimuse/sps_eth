@@ -1,7 +1,7 @@
 class Constants {
   //base url
   ///URLS
-  static const baseUrl = "http://142.132.228.77:3000/api/v1/";
+  static const baseUrl = "https://sps-admin.zorcloud.net/api/v1/";
   // static const String fileUploader =
   //     'http://5.75.142.45:3002/direct-single-file-upload';
 
@@ -23,8 +23,11 @@ class Constants {
   static const userData = "USER_DATA";
 
   // Authentication endpoints
-  static const signupuUrl = "/users/register";
+  static const signupUrl = "/auth/signup";
+  static const signupuUrl = "/users/register"; // Keep for backward compatibility
   static const loginUrl = "/auth/login";
+  static const requestOtpUrl = "/auth/request-otp";
+  static const verifyOtpUrl = "/auth/verify-otp";
 
   //products
   static const getParentProducts = "/product-categories/parent";
@@ -107,4 +110,10 @@ class Constants {
   static const getUnreadNotifications = "/notification/unread-messages";
   static const getNotificationById = "/notification/{id}";
   static const markNotificationAsRead = "/notification/{id}/mark-as-read";
+
+  // LiveKit video call endpoints
+  static const liveKitGetToken = "/livekit/token";
+  static const liveKitCreateRoom = "/livekit/room";
+  static const liveKitEndRoom = "/livekit/room/{roomName}";
+  static const liveKitGetRoomInfo = "/livekit/room/{roomName}";
 }

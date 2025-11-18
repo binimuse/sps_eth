@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
-
 import 'package:sps_eth_app/gen/assets.gen.dart';
-
-import '../controllers/residence_id_controller.dart';
 import 'package:sps_eth_app/app/common/widgets/promo_card.dart';
-import 'id_information_view.dart';
+import 'package:sps_eth_app/app/common/widgets/custom_loading_widget.dart';
+import 'package:sps_eth_app/app/utils/enums.dart';
+import '../controllers/residence_id_controller.dart';
 
 class ResidenceIdView extends GetView<ResidenceIdController> {
   const ResidenceIdView({super.key});
@@ -73,142 +71,160 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                               ),
                             ],
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                        // Top Section: ID Scanning Icon and Text
-                        SizedBox(
-                          height: 80,
-                          width: 80,
-                          child: Image.asset(
-                            Assets.images.scanid.path,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Scanning For ID ....',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF4A4A4A),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        
-                        // Middle Section: Input Field and Find Button in Row
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                decoration: InputDecoration(
-                                  hintText: 'Fayda ID / Phone / Residence',
-                                  hintStyle: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 14,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.grey[100],
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1976D2),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              onPressed: () {
-                                // Show ID Information popup
-                                IdInformationView.show(
-                                  context,
-                                  {
-                                    'id': '1231235163',
-                                    'name': 'Abeba Shimeles Adera',
-                                    'birthDate': 'Aug 12, 2024',
-                                    'email': 'abeba@gmail.com',
-                                    'phoneNumber': '0913427553',
-                                    'residenceAddress': '-',
-                                  },
-                                );
-                              },
-                              child: const Text(
-                                'Find',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        
-                        // Separator: "or" text
-                        const Text(
-                          'or',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF9E9E9E),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        
-                        // Bottom Section: Guest Option Card
-                        GestureDetector(
-                          onTap: () {
-                            // Handle guest continuation
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 50,
-                            ),
-                            decoration: BoxDecoration(
-                              image: DecorationImage(
-                                image: AssetImage(Assets.images.background.path),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            child: Column(
+                          child: Obx(() {
+                            // Show loading overlay
+                            if (controller.networkStatus.value == NetworkStatus.LOADING) {
+                              return const Center(child: CustomLoadingWidget());
+                            }
+
+                            return Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  Icons.person_outline,
-                                  size: 32,
-                                  color: const Color(0xFF1976D2),
+                                // Top Section: ID Scanning Icon and Text
+                                SizedBox(
+                                  height: 80,
+                                  width: 80,
+                                  child: Image.asset(
+                                    Assets.images.scanid.path,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 16),
                                 const Text(
-                                  'Continue as a Guest',
+                                  'Scanning For ID ....',
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF4A4A4A),
                                   ),
                                 ),
+                                const SizedBox(height: 24),
+                                
+                                // ID Input Field
+                                TextField(
+                                  controller: controller.idController,
+                                  decoration: InputDecoration(
+                                    hintText: 'ID',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 14,
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.grey[100],
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                
+                                // Phone Number Input Field
+                                TextField(
+                                  controller: controller.phoneController,
+                                  keyboardType: TextInputType.phone,
+                                  decoration: InputDecoration(
+                                    hintText: 'Phone Number',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 14,
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.grey[100],
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                
+                                // Find Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1976D2),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 32,
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: () => controller.signup(),
+                                    child: const Text(
+                                      'Find',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                
+                                // Separator: "or" text
+                                const Text(
+                                  'or',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF9E9E9E),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                
+                                // Bottom Section: Guest Option Card
+                                GestureDetector(
+                                  onTap: () {
+                                    // Handle guest continuation
+                                  },
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 35,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      image: DecorationImage(
+                                        image: AssetImage(Assets.images.background.path),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.person_outline,
+                                          size: 32,
+                                          color: const Color(0xFF1976D2),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'Continue as a Guest',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF4A4A4A),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ],
-                            ),
-                          ),
-                        ),
-                            ],
-                          ),
+                            );
+                          }),
                         ),
                       ),
                     ],
