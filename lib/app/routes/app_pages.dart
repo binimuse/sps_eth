@@ -6,6 +6,8 @@ import '../modules/visitor_id/bindings/visitor_id_binding.dart';
 import '../modules/visitor_id/views/visitor_id_view.dart';
 import '../modules/call_class/bindings/call_class_binding.dart';
 import '../modules/call_class/views/call_class_view.dart';
+import '../modules/login/bindings/login_binding.dart';
+import '../modules/login/views/login_view.dart';
 import '../modules/fiiling_class/bindings/fiiling_class_binding.dart';
 import '../modules/fiiling_class/views/fiiling_class_view.dart';
 import '../modules/form_class/bindings/form_class_binding.dart';
@@ -85,6 +87,11 @@ class AppPages {
       name: _Paths.VISITOR_ID,
       page: () => const VisitorIdView(),
       binding: VisitorIdBinding(),
+    ),
+    GetPage(
+      name: _Paths.LOGIN,
+      page: () => const LoginView(),
+      binding: LoginBinding(),
     ),
   ];
 }

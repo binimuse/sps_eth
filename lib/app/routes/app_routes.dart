@@ -15,6 +15,7 @@ abstract class Routes {
   static const SERVICE_LIST = _Paths.SERVICE_LIST;
   static const SPLASH = _Paths.SPLASH;
   static const VISITOR_ID = _Paths.VISITOR_ID;
+  static const LOGIN = _Paths.LOGIN;
 }
 
 abstract class _Paths {
@@ -31,4 +32,5 @@ abstract class _Paths {
   static const SERVICE_LIST = '/service-list';
   static const SPLASH = '/splash';
   static const VISITOR_ID = '/visitor-id';
+  static const LOGIN = '/login';
 }

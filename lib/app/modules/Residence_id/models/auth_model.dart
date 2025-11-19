@@ -1,4 +1,5 @@
 import 'package:json_annotation/json_annotation.dart';
+import 'package:sps_eth_app/app/modules/login/models/login_model.dart';
 
 part 'auth_model.g.dart';
 
@@ -164,7 +165,7 @@ class VerifyOtpData {
   final String? message;
   final String? accessToken;
   final String? refreshToken;
-  final SignupUser? user;
+  final LoginUser? user;
 
   Map<String, dynamic> toJson() => _$VerifyOtpDataToJson(this);
 }

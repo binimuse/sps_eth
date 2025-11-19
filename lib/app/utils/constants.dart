@@ -111,9 +111,16 @@ class Constants {
   static const getNotificationById = "/notification/{id}";
   static const markNotificationAsRead = "/notification/{id}/mark-as-read";
 
-  // LiveKit video call endpoints
+  // LiveKit video call endpoints (legacy - may be removed)
   static const liveKitGetToken = "/livekit/token";
   static const liveKitCreateRoom = "/livekit/room";
   static const liveKitEndRoom = "/livekit/room/{roomName}";
   static const liveKitGetRoomInfo = "/livekit/room/{roomName}";
+
+  // Direct Call endpoints
+  static const directCallRequest = "/direct-call/request";
+  static const directCallAccept = "/direct-call/accept/{sessionId}";
+  static const directCallReject = "/direct-call/reject/{sessionId}";
+  static const directCallEnd = "/direct-call/end/{sessionId}";
+  static const directCallPending = "/direct-call/pending";
 }

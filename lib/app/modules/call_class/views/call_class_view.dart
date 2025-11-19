@@ -11,16 +11,13 @@ class CallClassView extends GetView<CallClassController> {
   const CallClassView({super.key});
   @override
   Widget build(BuildContext context) {
-    // Hide keyboard when scaffold builds
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      SystemChannels.textInput.invokeMethod('TextInput.hide');
-      FocusScope.of(context).unfocus();
-    });
+    // Only hide keyboard when this view is actually visible and user taps outside
+    // Don't hide on every build as it interferes with other screens
 
     final double viewportHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 32;
     return GestureDetector(
       onTap: () {
-        // Hide keyboard when tapping outside
+        // Hide keyboard when tapping outside (only when this view is active)
         SystemChannels.textInput.invokeMethod('TextInput.hide');
         FocusScope.of(context).unfocus();
       },
@@ -82,12 +79,14 @@ class CallClassView extends GetView<CallClassController> {
                                       children: [
                                         Icon(Icons.videocam_off, size: 48, color: AppColors.white70),
                                         const SizedBox(height: 8),
-                                        Text(
-                                          controller.isConnected.value 
-                                              ? 'Waiting for participant...' 
-                                              : 'Not connected',
+                                        Obx(() => Text(
+                                          controller.connectionStatus.value.isNotEmpty
+                                              ? controller.connectionStatus.value
+                                              : (controller.isConnected.value 
+                                                  ? 'Waiting for participant...' 
+                                                  : 'Not connected'),
                                           style: TextStyle(color: AppColors.white70),
-                                        ),
+                                        )),
                                       ],
                                     ),
                                   ),
@@ -128,49 +127,103 @@ class CallClassView extends GetView<CallClassController> {
                                 }),
                               ),
                             ),
-                            // Controls
-                            Positioned(
-                              bottom: 10,
-                              left: 0,
-                              right: 0,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  _roundCtrl(Icons.home),
-                                  const SizedBox(width: 12),
-                                  _roundCtrl(Icons.message),
-                                  const SizedBox(width: 12),
-                                  GestureDetector(
-                                    onTap: () => controller.cancelCall(),
-                                    child: _roundCtrl(Icons.call_end, color: AppColors.danger),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Obx(() => GestureDetector(
-                                    onTap: () => controller.toggleVideo(),
-                                    child: _roundCtrl(
-                                      controller.isVideoEnabled.value 
-                                          ? Icons.videocam 
-                                          : Icons.videocam_off,
-                                      color: controller.isVideoEnabled.value 
-                                          ? null 
-                                          : AppColors.grayDark,
+                            // Start Call buttons - Show when call is not active
+                            Obx(() {
+                              final callStatus = controller.callStatus.value;
+                              final isCallActive = callStatus == 'active' || callStatus == 'connecting' || callStatus == 'pending';
+                              
+                              if (isCallActive) return const SizedBox.shrink();
+                              
+                              return Positioned(
+                                bottom: 10,
+                                left: 0,
+                                right: 0,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        print('🔘 [BUTTONS] Cancel button pressed');
+                                        Get.back();
+                                      },
+                                      child: _roundCtrl(Icons.close, color: AppColors.danger),
                                     ),
-                                  )),
-                                  const SizedBox(width: 12),
-                                  Obx(() => GestureDetector(
-                                    onTap: () => controller.toggleAudio(),
-                                    child: _roundCtrl(
-                                      controller.isAudioEnabled.value 
-                                          ? Icons.mic 
-                                          : Icons.mic_off,
-                                      color: controller.isAudioEnabled.value 
-                                          ? null 
-                                          : AppColors.grayDark,
+                                    const SizedBox(width: 12),
+                                    GestureDetector(
+                                      onTap: () {
+                                        print('🔘 [BUTTONS] Confirm / Agree button pressed');
+                                        controller.confirmTerms();
+                                      },
+                                      child: _roundCtrl(Icons.check, color: AppColors.success),
                                     ),
-                                  )),
-                                ],
-                              ),
-                            ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            // Call controls - Only show when call is active
+                            Obx(() {
+                              final isCallActive = controller.callStatus.value == 'active' || 
+                                                   controller.callStatus.value == 'connecting';
+                              if (!isCallActive) return const SizedBox.shrink();
+                              
+                              return Positioned(
+                                bottom: 10,
+                                left: 0,
+                                right: 0,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => Get.back(),
+                                      child: _roundCtrl(Icons.home),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    GestureDetector(
+                                      onTap: () {
+                                        // Scroll to bottom of chat or focus on message input
+                                        // This can be enhanced with a scroll controller if needed
+                                        FocusScope.of(context).requestFocus(controller.focusedField);
+                                      },
+                                      child: _roundCtrl(Icons.message),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    GestureDetector(
+                                      onTap: () => controller.endCall(),
+                                      child: _roundCtrl(Icons.call_end, color: AppColors.danger),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    GestureDetector(
+                                      onTap: () => controller.toggleVideo(),
+                                      child: _roundCtrl(
+                                        controller.isVideoEnabled.value 
+                                            ? Icons.videocam 
+                                            : Icons.videocam_off,
+                                        color: controller.isVideoEnabled.value 
+                                            ? null 
+                                            : AppColors.grayDark,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    GestureDetector(
+                                      onTap: () => controller.toggleAudio(),
+                                      child: _roundCtrl(
+                                        controller.isAudioEnabled.value 
+                                            ? Icons.mic 
+                                            : Icons.mic_off,
+                                        color: controller.isAudioEnabled.value 
+                                            ? null 
+                                            : AppColors.grayDark,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    GestureDetector(
+                                      onTap: () => controller.switchCamera(),
+                                      child: _roundCtrl(Icons.flip_camera_ios),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
                           ],
                         ),
                       ),
@@ -211,22 +264,32 @@ class CallClassView extends GetView<CallClassController> {
                 Flexible(
                   flex: 4,
                   fit: FlexFit.loose,
-                  child: Column(
-                    children: [
-                      Obx(() {
-                        return _InfoCard(
-                          title: 'ID Information',
-                          rows: controller.idInformation.toList(),
-                        );
-                      }),
-                      const SizedBox(height: 12),
-                   
-                      Obx(() => _DocumentsCard(
-                            documents: controller.supportingDocuments.toList(),
-                          )),
-                      const SizedBox(height: 8),
-                      _TermsAndActions(controller: controller),
-                    ],
+                  child: SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: viewportHeight,
+                      ),
+                      child: IntrinsicHeight(
+                        child: Column(
+                          children: [
+                            Obx(() {
+                              return _InfoCard(
+                                title: 'ID Information',
+                                rows: controller.idInformation.toList(),
+                              );
+                            }),
+                            const SizedBox(height: 12),
+                         
+                            Obx(() => _DocumentsCard(
+                                  documents: controller.supportingDocuments.toList(),
+                                )),
+                            const SizedBox(height: 8),
+                            _TermsAndActions(controller: controller),
+                            const Spacer(), // Push buttons to top if needed
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -436,35 +499,115 @@ class _TermsAndActions extends StatelessWidget {
             );
           }),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.danger,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    controller.cancelCall();
-                  },
-                  child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff), ),
+          Obx(() {
+            final callStatus = controller.callStatus.value;
+            print('🔘 [BUTTONS] Current call status: $callStatus');
+            final isCallActive = callStatus == 'active' || callStatus == 'connecting' || callStatus == 'pending';
+            print('🔘 [BUTTONS] Is call active: $isCallActive');
+            
+            if (isCallActive) {
+              // Show end call button when call is active
+              print('🔘 [BUTTONS] Showing End Call button');
+              return ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  minimumSize: const Size(double.infinity, 0),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: controller.confirmTerms,
-                  child: Text('Confirm / Agree', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff), ),
+                onPressed: () {
+                  print('🔘 [BUTTONS] End Call button pressed');
+                  controller.endCall();
+                },
+                child: Text(
+                  callStatus == 'connecting' 
+                      ? 'Connecting...' 
+                      : callStatus == 'pending'
+                          ? 'Waiting for agent...'
+                          : 'End Call',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff),
                 ),
-              ),
-            ],
-          ),
+              );
+            } else {
+              // Show start call buttons when call is not active
+              print('🔘 [BUTTONS] Showing Start Call buttons');
+              return Container(
+                width: double.infinity,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Make buttons more visible with a border
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.danger,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                elevation: 4,
+                              ),
+                              onPressed: () {
+                                print('🔘 [BUTTONS] Cancel button pressed');
+                                Get.back();
+                              },
+                              child: Text(
+                                'Cancel', 
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold, 
+                                  color: AppColors.whiteOff,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 4,
+                      ),
+                      onPressed: () {
+                        print('🔘 [BUTTONS] Confirm / Agree button pressed');
+                        controller.confirmTerms();
+                      },
+                      child: Text(
+                        'Confirm / Agree', 
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          color: AppColors.whiteOff,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Status indicator
+                    Obx(() => Text(
+                      'Status: ${controller.connectionStatus.value.isEmpty ? "Ready to call" : controller.connectionStatus.value}',
+                      style: TextStyle(
+                        color: AppColors.grayDark,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    )),
+                  ],
+                ),
+              );
+            }
+          }),
         ],
       ),
     );

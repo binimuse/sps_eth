@@ -137,7 +137,7 @@ VerifyOtpData _$VerifyOtpDataFromJson(Map<String, dynamic> json) =>
       refreshToken: json['refreshToken'] as String?,
       user: json['user'] == null
           ? null
-          : SignupUser.fromJson(json['user'] as Map<String, dynamic>),
+          : LoginUser.fromJson(json['user'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$VerifyOtpDataToJson(VerifyOtpData instance) =>

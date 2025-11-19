@@ -110,28 +110,37 @@ class AuthUtil {
   }
 
   // Enhanced authentication check that validates token content
+  // Note: refreshToken is optional for OTP-based login, so we only require accessToken
   Future<bool> isFullyAuthenticated() async {
     try {
       String? accessToken = await getAccessToken();
       String? refreshToken = await getRefreshToken();
 
-      bool hasValidTokens =
-          accessToken != null &&
-          refreshToken != null &&
-          accessToken.isNotEmpty &&
-          refreshToken.isNotEmpty;
+      // Access token is required, refresh token is optional (OTP login might not provide it)
+      bool hasValidAccessToken =
+          accessToken != null && accessToken.isNotEmpty;
 
-      if (!hasValidTokens) {
+      if (!hasValidAccessToken) {
         print("Authentication validation failed:");
         print(
           "  Access Token: ${accessToken != null ? "exists (${accessToken.length} chars)" : "null"}",
         );
         print(
-          "  Refresh Token: ${refreshToken != null ? "exists (${refreshToken.length} chars)" : "null"}",
+          "  Refresh Token: ${refreshToken != null ? "exists (${refreshToken.length} chars)" : "null (optional)"}",
         );
+        return false;
       }
 
-      return hasValidTokens;
+      // If we have refresh token, it should also be valid
+      if (refreshToken != null && refreshToken.isEmpty) {
+        print("⚠️ Warning: Refresh token is empty string (this is OK for OTP login)");
+      }
+
+      print("✅ Authentication validation passed:");
+      print("  Access Token: exists (${accessToken.length} chars)");
+      print("  Refresh Token: ${refreshToken != null && refreshToken.isNotEmpty ? "exists (${refreshToken.length} chars)" : "not provided (OK)"}");
+      
+      return true;
     } catch (e) {
       print("Error in isFullyAuthenticated: $e");
       return false;

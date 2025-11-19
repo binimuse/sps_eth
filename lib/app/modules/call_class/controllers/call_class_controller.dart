@@ -4,8 +4,14 @@ import 'package:get/get.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sps_eth_app/app/modules/form_class/views/widget/scanning_document_view.dart';
-import 'package:sps_eth_app/app/modules/call_class/services/livekit_service.dart';
+import 'package:sps_eth_app/app/modules/call_class/services/direct_call_service.dart';
+import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocket_service.dart';
+import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
+import 'package:dio/dio.dart' as dio;
 import 'package:sps_eth_app/app/utils/dio_util.dart';
+import 'package:sps_eth_app/app/utils/enums.dart';
+import 'package:sps_eth_app/app/utils/auth_util.dart';
+import 'package:sps_eth_app/app/utils/jwt_util.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
 
 class ChatMessage {
@@ -69,6 +75,12 @@ class CallClassController extends GetxController {
           .obs;
   final RxString discussionDate = 'June 12, 2024'.obs;
 
+  // Direct Call services
+  final DirectCallService _directCallService = DirectCallService(
+    DioUtil().getDio(useAccessToken: true),
+  );
+  DirectCallWebSocketService? _webSocketService;
+
   // LiveKit related
   Room? _room;
   LocalParticipant? _localParticipant;
@@ -78,15 +90,293 @@ class CallClassController extends GetxController {
   final Rx<VideoTrack?> localVideoTrack = Rx<VideoTrack?>(null);
   final RxList<RemoteParticipant> remoteParticipants = <RemoteParticipant>[].obs;
   final RxString connectionStatus = 'Disconnected'.obs;
-  String? _roomName;
-  String? _participantName;
+  
+  // Direct Call state
+  final RxString callStatus = 'idle'.obs; // idle, pending, connecting, active, ended
+  final Rx<String?> currentSessionId = Rx<String?>('');
+  final Rx<String?> currentRoomName = Rx<String?>('');
+  final Rx<String?> currentWsUrl = Rx<String?>('');
+  final Rx<NetworkStatus> callNetworkStatus = NetworkStatus.IDLE.obs;
+  
+  // For employee side
+  final RxList<PendingCall> pendingCalls = <PendingCall>[].obs;
+  final Rx<IncomingCallEvent?> incomingCall = Rx<IncomingCallEvent?>(null);
 
   @override
   void onInit() {
     super.onInit();
     _loadInitialData();
-    // Initialize LiveKit connection when controller is created
-    // You can call connectToRoom() when needed, e.g., after user confirms terms
+  }
+  
+  @override
+  void onReady() {
+    super.onReady();
+    // Check authentication first before allowing access
+    // Using onReady ensures the view is fully built before navigation
+    _checkAuthBeforeAccess();
+  }
+  
+  /// Check authentication before allowing access to video call
+  /// Redirects to login if not authenticated
+  /// Includes retry logic to handle timing issues after login
+  Future<void> _checkAuthBeforeAccess() async {
+    print('🔐 [AUTH CHECK] Starting authentication check...');
+    
+    // Retry logic: Sometimes secure storage needs a moment after login
+    const maxRetries = 3;
+    const retryDelay = Duration(milliseconds: 500);
+    
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      print('🔐 [AUTH CHECK] Attempt $attempt of $maxRetries...');
+      
+      // Check if user is authenticated
+      final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+      print('🔐 [AUTH CHECK] isFullyAuthenticated: $isAuthenticated');
+      
+      if (!isAuthenticated) {
+        if (attempt < maxRetries) {
+          print('⚠️ [AUTH CHECK] Authentication check failed, retrying in ${retryDelay.inMilliseconds}ms...');
+          await Future.delayed(retryDelay);
+          continue;
+        } else {
+          print('❌ [AUTH CHECK] User not authenticated after $maxRetries attempts, redirecting to login');
+          _redirectToLogin();
+          return;
+        }
+      }
+      
+      // Also check if token is not expired
+      final token = await AuthUtil().getAccessToken();
+      print('🔐 [AUTH CHECK] Access token exists: ${token != null}');
+      
+      if (token == null) {
+        if (attempt < maxRetries) {
+          print('⚠️ [AUTH CHECK] Token is null, retrying in ${retryDelay.inMilliseconds}ms...');
+          await Future.delayed(retryDelay);
+          continue;
+        } else {
+          print('❌ [AUTH CHECK] Token is null after $maxRetries attempts, redirecting to login');
+          _redirectToLogin();
+          return;
+        }
+      }
+      
+      if (JwtUtil.isTokenExpired(token)) {
+        print('❌ [AUTH CHECK] Token expired, redirecting to login');
+        print('🔐 [AUTH CHECK] Token expiration check: ${JwtUtil.isTokenExpired(token)}');
+        _redirectToLogin();
+        return;
+      }
+      
+      // Authentication successful
+      print('✅ [AUTH CHECK] User authenticated on attempt $attempt');
+      print('✅ [AUTH CHECK] Token is valid, connecting WebSocket...');
+      // User is authenticated, connect WebSocket
+      await _checkAuthAndConnectWebSocket();
+      return;
+    }
+  }
+  
+  /// Redirect to login page
+  Future<void> _redirectToLogin() async {
+    print('🔐 [AUTH] Redirecting to login page...');
+    final result = await Get.toNamed('/login');
+    print('🔐 [AUTH] Login result: $result');
+    
+    // If login was successful, reconnect WebSocket and stay on call class view
+    if (result == true) {
+      print('✅ [AUTH] Login successful, reconnecting WebSocket...');
+      await _checkAuthAndConnectWebSocket();
+      print('✅ [AUTH] WebSocket reconnection completed - user is now on call class view');
+    } else {
+      // User cancelled login or login failed, go back to previous screen (home)
+      print('❌ [AUTH] Login cancelled or failed, going back to previous screen');
+      Get.back();
+    }
+  }
+  
+  /// Check authentication and connect WebSocket if authenticated
+  Future<void> _checkAuthAndConnectWebSocket() async {
+    print('🔌 [WEBSOCKET] Checking authentication for WebSocket connection...');
+    final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+    print('🔌 [WEBSOCKET] isAuthenticated: $isAuthenticated');
+    
+    if (isAuthenticated) {
+      // Also check if token is not expired
+      final token = await AuthUtil().getAccessToken();
+      print('🔌 [WEBSOCKET] Token exists: ${token != null}');
+      
+      if (token != null && !JwtUtil.isTokenExpired(token)) {
+        print('✅ [WEBSOCKET] Token valid, connecting WebSocket...');
+        await _connectWebSocket();
+      } else {
+        print('❌ [WEBSOCKET] Token expired or null, user needs to login');
+        if (token != null) {
+          print('🔌 [WEBSOCKET] Token expired: ${JwtUtil.isTokenExpired(token)}');
+        }
+        _showLoginRequiredDialog();
+      }
+    } else {
+      print('❌ [WEBSOCKET] User not authenticated, WebSocket connection skipped');
+    }
+  }
+  
+  /// Connect to Direct Call WebSocket
+  Future<void> _connectWebSocket() async {
+    print('🔌 [WEBSOCKET] Starting WebSocket connection...');
+    try {
+      _webSocketService = DirectCallWebSocketService();
+      print('🔌 [WEBSOCKET] WebSocket service created');
+      
+      // Set up event handlers
+      _webSocketService!.onIncomingCall = (event) {
+        print('📞 [WEBSOCKET EVENT] incomingCall: sessionId=${event.sessionId}, roomName=${event.roomName}, callerId=${event.callerId}');
+        incomingCall.value = event;
+        // Show notification or update UI
+        AppToasts.showWarning('Incoming call from ${event.callerId}');
+        // Optionally refresh pending calls
+        _loadPendingCalls();
+      };
+      
+      _webSocketService!.onCallAccepted = (event) {
+        print('✅ [WEBSOCKET EVENT] callAccepted: sessionId=${event.sessionId}, roomName=${event.roomName}');
+        print('📊 [WEBSOCKET EVENT] Current sessionId: ${currentSessionId.value}');
+        if (event.sessionId == currentSessionId.value) {
+          print('✅ [WEBSOCKET EVENT] Session IDs match, updating call status to active');
+          callStatus.value = 'active';
+          connectionStatus.value = 'Connected';
+          AppToasts.showSuccess('Call accepted');
+        } else {
+          print('⚠️ [WEBSOCKET EVENT] Session IDs do not match! Event: ${event.sessionId}, Current: ${currentSessionId.value}');
+        }
+      };
+      
+      _webSocketService!.onCallRejected = (event) {
+        print('❌ [WEBSOCKET EVENT] callRejected: sessionId=${event.sessionId}, message=${event.message}');
+        if (event.sessionId == currentSessionId.value) {
+          callStatus.value = 'ended';
+          _handleCallEnded();
+          AppToasts.showError(event.message ?? 'Call rejected');
+        }
+      };
+      
+      _webSocketService!.onCallEnded = (event) {
+        print('🔚 [WEBSOCKET EVENT] callEnded: sessionId=${event.sessionId}, duration=${event.duration}, message=${event.message}');
+        if (event.sessionId == currentSessionId.value) {
+          callStatus.value = 'ended';
+          _handleCallEnded();
+          AppToasts.showWarning(event.message ?? 'Call ended');
+        }
+      };
+      
+      _webSocketService!.onConnected = () {
+        print('✅ [WEBSOCKET] Direct Call WebSocket connected successfully');
+        print('🔌 [WEBSOCKET] Socket ID: ${_webSocketService?.socketId}');
+      };
+      
+      _webSocketService!.onDisconnected = () {
+        print('❌ [WEBSOCKET] Direct Call WebSocket disconnected');
+      };
+      
+      _webSocketService!.onError = (error) {
+        print('❌ [WEBSOCKET ERROR] Error: $error');
+        // Don't show error toast for auth errors, show login dialog instead
+        if (error.toString().toLowerCase().contains('auth') || 
+            error.toString().toLowerCase().contains('unauthorized')) {
+          print('🔐 [WEBSOCKET ERROR] Auth error detected, showing login dialog');
+          _showLoginRequiredDialog();
+        } else {
+          AppToasts.showError('WebSocket error: $error');
+        }
+      };
+      
+      // Connect
+      print('🔌 [WEBSOCKET] Calling connect()...');
+      await _webSocketService!.connect();
+      print('🔌 [WEBSOCKET] connect() completed, isConnected: ${_webSocketService?.isConnected}');
+    } catch (e, stackTrace) {
+      print('❌ [WEBSOCKET ERROR] Exception connecting WebSocket: $e');
+      print('❌ [WEBSOCKET ERROR] Stack trace: $stackTrace');
+      if (e.toString().toLowerCase().contains('auth') || 
+          e.toString().toLowerCase().contains('token')) {
+        _showLoginRequiredDialog();
+      }
+    }
+  }
+  
+  /// Show login required dialog
+  void _showLoginRequiredDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Login Required'),
+        content: const Text(
+          'You need to be logged in to use the video call feature. Please login to continue.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              // Navigate to login screen
+              final result = await Get.toNamed('/login');
+              // If login was successful, reconnect WebSocket
+              if (result == true) {
+                await _checkAuthAndConnectWebSocket();
+              }
+            },
+            child: const Text('Go to Login'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+  }
+  
+  /// Check if user is authenticated before performing call operations
+  Future<bool> _checkAuthentication() async {
+    final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+    if (!isAuthenticated) {
+      _showLoginRequiredDialog();
+      return false;
+    }
+    
+    // Check if token is expired
+    final token = await AuthUtil().getAccessToken();
+    if (token == null || JwtUtil.isTokenExpired(token)) {
+      _showLoginRequiredDialog();
+      return false;
+    }
+    
+    return true;
+  }
+  
+  /// Load pending calls (Employee only)
+  Future<void> _loadPendingCalls() async {
+    // Check authentication first
+    final isAuthenticated = await _checkAuthentication();
+    if (!isAuthenticated) {
+      return;
+    }
+    
+    try {
+      final calls = await _directCallService.getPendingCalls();
+      pendingCalls.assignAll(calls);
+    } catch (e) {
+      print('Error loading pending calls: $e');
+      // If it's an auth error, show login dialog
+      if (e.toString().toLowerCase().contains('401') || 
+          e.toString().toLowerCase().contains('unauthorized')) {
+        _showLoginRequiredDialog();
+      }
+    }
+  }
+  
+  /// Public method to load pending calls (can be called from UI)
+  Future<void> loadPendingCalls() async {
+    await _loadPendingCalls();
   }
 
   void _loadInitialData() {
@@ -159,63 +449,281 @@ class CallClassController extends GetxController {
   @override
   void onClose() {
     disconnectFromRoom();
+    _webSocketService?.disconnect();
     messageController.dispose();
     keyboardController.dispose();
     focusedField?.dispose();
     super.onClose();
   }
 
-  /// Connect to LiveKit room
-  /// Call this method when you're ready to start the video call
-  /// roomName and participantName should be provided from your backend or navigation params
-  Future<void> connectToRoom({
-    required String roomName,
-    required String participantName,
-  }) async {
+  /// Request a call (Client/User role)
+  /// This is the new Direct Call flow
+  Future<void> requestCall() async {
+    print('📞 [REQUEST CALL] Starting call request...');
+    
+    // Check authentication first
+    final isAuthenticated = await _checkAuthentication();
+    if (!isAuthenticated) {
+      print('❌ [REQUEST CALL] Authentication check failed');
+      return;
+    }
+    
+    print('✅ [REQUEST CALL] Authentication passed');
+    
     try {
-      _roomName = roomName;
-      _participantName = participantName;
+      callNetworkStatus.value = NetworkStatus.LOADING;
+      callStatus.value = 'pending';
+      print('📞 [REQUEST CALL] Status set to pending');
+
+      // Request permissions first
+      print('📞 [REQUEST CALL] Requesting camera permission...');
+      final cameraStatus = await Permission.camera.request();
+      print('📞 [REQUEST CALL] Camera permission: ${cameraStatus.toString()}');
+      
+      print('📞 [REQUEST CALL] Requesting microphone permission...');
+      final microphoneStatus = await Permission.microphone.request();
+      print('📞 [REQUEST CALL] Microphone permission: ${microphoneStatus.toString()}');
+
+      if (!cameraStatus.isGranted || !microphoneStatus.isGranted) {
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        callStatus.value = 'idle';
+        print('❌ [REQUEST CALL] Permissions denied - Camera: ${cameraStatus.isGranted}, Microphone: ${microphoneStatus.isGranted}');
+        AppToasts.showError('Camera and microphone permissions are required');
+        return;
+      }
+
+      print('✅ [REQUEST CALL] Permissions granted');
+      print('📞 [REQUEST CALL] Calling Direct Call API...');
+      
+      // Request call via Direct Call API
+      final responseWrapper = await _directCallService.requestCall();
+      
+      // Extract data from wrapper
+      if (responseWrapper.success != true || responseWrapper.data == null) {
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        callStatus.value = 'idle';
+        print('❌ [REQUEST CALL] API response indicates failure or missing data');
+        print('  - success: ${responseWrapper.success}');
+        print('  - data: ${responseWrapper.data}');
+        AppToasts.showError('Failed to request call');
+        return;
+      }
+      
+      final response = responseWrapper.data!;
+      
+      print('📞 [REQUEST CALL] API Response received:');
+      print('  - token: ${response.token != null ? "${response.token!.substring(0, 20)}..." : "null"}');
+      print('  - roomName: ${response.roomName}');
+      print('  - sessionId: ${response.sessionId}');
+      print('  - wsUrl: ${response.wsUrl}');
+
+      if (response.token == null || 
+          response.roomName == null || 
+          response.sessionId == null || 
+          response.wsUrl == null) {
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        callStatus.value = 'idle';
+        print('❌ [REQUEST CALL] Missing required fields in response data');
+        AppToasts.showError('Failed to request call');
+        return;
+      }
+
+      // Store session info
+      currentSessionId.value = response.sessionId;
+      currentRoomName.value = response.roomName;
+      currentWsUrl.value = response.wsUrl;
+      print('💾 [REQUEST CALL] Session info stored:');
+      print('  - sessionId: ${currentSessionId.value}');
+      print('  - roomName: ${currentRoomName.value}');
+      print('  - wsUrl: ${currentWsUrl.value}');
+
+      callNetworkStatus.value = NetworkStatus.SUCCESS;
+      callStatus.value = 'connecting';
       connectionStatus.value = 'Connecting...';
+      print('📞 [REQUEST CALL] Status set to connecting');
+
+      // Connect to LiveKit room
+      print('🎥 [LIVEKIT] Starting LiveKit room connection...');
+      await _connectToLiveKitRoom(
+        wsUrl: response.wsUrl!,
+        token: response.token!,
+        roomName: response.roomName!,
+      );
+
+      AppToasts.showSuccess('Call requested. Waiting for agent...');
+    } on dio.DioException catch (e) {
+      print('❌ [REQUEST CALL] DioException: ${e.response?.statusCode}');
+      print('❌ [REQUEST CALL] Response: ${e.response?.data}');
+      
+      callNetworkStatus.value = NetworkStatus.ERROR;
+      callStatus.value = 'idle';
+      
+      String errorMessage = 'Failed to request call';
+      
+      if (e.response?.statusCode == 403) {
+        // Parse error message from response
+        try {
+          final responseData = e.response?.data;
+          if (responseData is Map<String, dynamic>) {
+            final error = responseData['error'];
+            if (error is Map && error.containsKey('message')) {
+              errorMessage = error['message'] ?? 'Access forbidden. This action requires USER role.';
+            } else {
+              errorMessage = 'Access forbidden. This action requires USER role.';
+            }
+          }
+        } catch (_) {
+          errorMessage = 'Access forbidden. This action requires USER role.';
+        }
+        
+        // Get user role for debugging
+        final userInfo = await AuthUtil().getUserData();
+        if (userInfo.isNotEmpty && userInfo.containsKey('role')) {
+          final role = userInfo['role'];
+          if (role is Map && role.containsKey('name')) {
+            print('❌ [REQUEST CALL] Current user role: ${role['name']}');
+            errorMessage += '\nYour current role: ${role['name']}';
+          }
+        }
+      } else if (e.response?.statusCode == 503) {
+        errorMessage = 'No agents available. Please try again later.';
+      } else if (e.response != null) {
+        try {
+          final responseData = e.response!.data;
+          if (responseData is Map<String, dynamic>) {
+            final error = responseData['error'];
+            if (error is Map && error.containsKey('message')) {
+              errorMessage = error['message'] ?? errorMessage;
+            } else if (responseData.containsKey('message')) {
+              errorMessage = responseData['message'] ?? errorMessage;
+            }
+          }
+        } catch (_) {}
+      }
+      
+      print('❌ [REQUEST CALL] Error message: $errorMessage');
+      AppToasts.showError(errorMessage);
+    } catch (e, stackTrace) {
+      print('❌ [REQUEST CALL] Exception: $e');
+      print('❌ [REQUEST CALL] Stack trace: $stackTrace');
+      callNetworkStatus.value = NetworkStatus.ERROR;
+      callStatus.value = 'idle';
+      AppToasts.showError('Failed to request call: $e');
+    }
+  }
+
+  /// Accept a call (Employee role)
+  Future<void> acceptCall(String sessionId) async {
+    // Check authentication first
+    final isAuthenticated = await _checkAuthentication();
+    if (!isAuthenticated) {
+      return;
+    }
+    
+    try {
+      callNetworkStatus.value = NetworkStatus.LOADING;
 
       // Request permissions
       final cameraStatus = await Permission.camera.request();
       final microphoneStatus = await Permission.microphone.request();
 
       if (!cameraStatus.isGranted || !microphoneStatus.isGranted) {
-        connectionStatus.value = 'Permissions denied';
-        Get.snackbar(
-          'Permissions Required',
-          'Camera and microphone permissions are required for video calls',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        AppToasts.showError('Camera and microphone permissions are required');
         return;
       }
 
-      // Get access token from backend using Retrofit service
-      final tokenResponse = await LiveKitService(
-        DioUtil().getDio(useAccessToken: true),
-      ).getAccessToken({
-        'roomName': roomName,
-        'participantName': participantName,
-      });
+      // Accept call via API
+      final responseWrapper = await _directCallService.acceptCall(sessionId);
 
-      // Check response status
-      if (tokenResponse.status != true || tokenResponse.data == null) {
-        connectionStatus.value = 'Token generation failed';
-        isConnected.value = false;
-        AppToasts.showError(tokenResponse.message ?? 'Failed to get access token');
+      // Extract data from wrapper
+      if (responseWrapper.success != true || responseWrapper.data == null) {
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        AppToasts.showError('Failed to accept call');
+        return;
+      }
+      
+      final response = responseWrapper.data!;
+
+      if (response.token == null || 
+          response.roomName == null || 
+          response.sessionId == null || 
+          response.wsUrl == null) {
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        AppToasts.showError('Failed to accept call');
         return;
       }
 
-      final tokenData = tokenResponse.data!;
+      // Store session info
+      currentSessionId.value = response.sessionId;
+      currentRoomName.value = response.roomName;
+      currentWsUrl.value = response.wsUrl;
 
+      callNetworkStatus.value = NetworkStatus.SUCCESS;
+      callStatus.value = 'connecting';
+      connectionStatus.value = 'Connecting...';
+
+      // Connect to LiveKit room
+      await _connectToLiveKitRoom(
+        wsUrl: response.wsUrl!,
+        token: response.token!,
+        roomName: response.roomName!,
+      );
+
+      // Remove from pending calls
+      pendingCalls.removeWhere((call) => call.id == sessionId);
+      incomingCall.value = null;
+
+      AppToasts.showSuccess('Call accepted');
+    } catch (e) {
+      callNetworkStatus.value = NetworkStatus.ERROR;
+      AppToasts.showError('Failed to accept call: $e');
+    }
+  }
+
+  /// Reject a call (Employee role)
+  Future<void> rejectCall(String sessionId) async {
+    // Check authentication first
+    final isAuthenticated = await _checkAuthentication();
+    if (!isAuthenticated) {
+      return;
+    }
+    
+    try {
+      await _directCallService.rejectCall(sessionId);
+      
+      // Remove from pending calls
+      pendingCalls.removeWhere((call) => call.id == sessionId);
+      incomingCall.value = null;
+      
+      AppToasts.showSuccess('Call rejected');
+    } catch (e) {
+      AppToasts.showError('Failed to reject call: $e');
+    }
+  }
+
+  /// Connect to LiveKit room (internal helper)
+  Future<void> _connectToLiveKitRoom({
+    required String wsUrl,
+    required String token,
+    required String roomName,
+  }) async {
+    print('🎥 [LIVEKIT] ========== Starting LiveKit Connection ==========');
+    print('🎥 [LIVEKIT] wsUrl: $wsUrl');
+    print('🎥 [LIVEKIT] roomName: $roomName');
+    print('🎥 [LIVEKIT] token: ${token.substring(0, 20)}...');
+    
+    try {
       // Create room
+      print('🎥 [LIVEKIT] Creating Room instance...');
       _room = Room();
+      print('🎥 [LIVEKIT] Room instance created');
 
       // Connect to room
+      print('🎥 [LIVEKIT] Calling room.connect()...');
       await _room!.connect(
-        tokenData.url,
-        tokenData.accessToken,
+        wsUrl,
+        token,
         roomOptions: const RoomOptions(
           adaptiveStream: true,
           dynacast: true,
@@ -226,50 +734,78 @@ class CallClassController extends GetxController {
           ),
         ),
       );
+      print('🎥 [LIVEKIT] room.connect() completed');
 
       // Set up event listeners
+      print('🎥 [LIVEKIT] Setting up event listeners...');
       _room!.addListener(_onRoomChanged);
-      
-      // Listen to room events for participant changes
       _room!.addListener(() {
         _onRemoteParticipantsChanged();
       });
+      print('🎥 [LIVEKIT] Event listeners set up');
 
       _localParticipant = _room!.localParticipant;
+      print('🎥 [LIVEKIT] Local participant: ${_localParticipant != null ? "exists" : "null"}');
+      
+      if (_localParticipant != null) {
+        print('🎥 [LIVEKIT] Local participant identity: ${_localParticipant!.identity}');
+        print('🎥 [LIVEKIT] Local participant sid: ${_localParticipant!.sid}');
+      }
+
       isConnected.value = true;
       connectionStatus.value = 'Connected';
+      callStatus.value = 'active';
+      print('🎥 [LIVEKIT] Connection state updated - isConnected: ${isConnected.value}');
+      print('🎥 [LIVEKIT] Room connection state: ${_room!.connectionState}');
 
       // Enable camera and microphone
+      print('🎥 [LIVEKIT] Enabling video...');
       await enableVideo();
+      print('🎥 [LIVEKIT] Video enabled: ${isVideoEnabled.value}');
+      
+      print('🎥 [LIVEKIT] Enabling audio...');
       await enableAudio();
+      print('🎥 [LIVEKIT] Audio enabled: ${isAudioEnabled.value}');
 
       // Get local video track
+      print('🎥 [LIVEKIT] Updating local video track...');
       _updateLocalVideoTrack();
-    } catch (e) {
+      print('🎥 [LIVEKIT] Local video track: ${localVideoTrack.value != null ? "exists" : "null"}');
+      
+      // Log room participants
+      print('🎥 [LIVEKIT] Remote participants count: ${_room!.remoteParticipants.length}');
+      print('🎥 [LIVEKIT] ========== LiveKit Connection Complete ==========');
+    } catch (e, stackTrace) {
+      print('❌ [LIVEKIT ERROR] Exception connecting to LiveKit: $e');
+      print('❌ [LIVEKIT ERROR] Stack trace: $stackTrace');
       connectionStatus.value = 'Connection failed';
       isConnected.value = false;
-      Get.snackbar(
-        'Connection Error',
-        'Failed to connect to video call: $e',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+      callStatus.value = 'ended';
+      AppToasts.showError('Failed to connect to video call: $e');
     }
   }
 
   /// Disconnect from room
   Future<void> disconnectFromRoom() async {
+    print('🔌 [DISCONNECT] Disconnecting from LiveKit room...');
     try {
       if (_room != null) {
+        print('🔌 [DISCONNECT] Room exists, calling disconnect()...');
         await _room!.disconnect();
+        print('🔌 [DISCONNECT] Room disconnected');
         _room = null;
         _localParticipant = null;
         isConnected.value = false;
         connectionStatus.value = 'Disconnected';
         localVideoTrack.value = null;
         remoteParticipants.clear();
+        print('🔌 [DISCONNECT] Cleanup completed');
+      } else {
+        print('⚠️ [DISCONNECT] Room is already null');
       }
-    } catch (e) {
-      print('Error disconnecting from room: $e');
+    } catch (e, stackTrace) {
+      print('❌ [DISCONNECT ERROR] Error disconnecting from room: $e');
+      print('❌ [DISCONNECT ERROR] Stack trace: $stackTrace');
     }
   }
 
@@ -284,14 +820,20 @@ class CallClassController extends GetxController {
 
   /// Enable video
   Future<void> enableVideo() async {
+    print('🎥 [VIDEO] Enabling video...');
     try {
       if (_localParticipant != null) {
+        print('🎥 [VIDEO] Local participant exists, calling setCameraEnabled(true)...');
         await _localParticipant!.setCameraEnabled(true);
         isVideoEnabled.value = true;
+        print('🎥 [VIDEO] Camera enabled: ${isVideoEnabled.value}');
         _updateLocalVideoTrack();
+      } else {
+        print('❌ [VIDEO] Local participant is null, cannot enable video');
       }
-    } catch (e) {
-      print('Error enabling video: $e');
+    } catch (e, stackTrace) {
+      print('❌ [VIDEO ERROR] Error enabling video: $e');
+      print('❌ [VIDEO ERROR] Stack trace: $stackTrace');
     }
   }
 
@@ -366,40 +908,78 @@ class CallClassController extends GetxController {
 
   /// Update local video track
   void _updateLocalVideoTrack() {
-    if (_localParticipant != null) {
-      final videoTrack = _localParticipant!.videoTrackPublications
-          .where((pub) => pub.subscribed)
-          .map((pub) => pub.track)
-          .whereType<LocalVideoTrack>()
-          .firstOrNull;
-      localVideoTrack.value = videoTrack;
+    if (_localParticipant == null) {
+      print('⚠️ [LOCAL TRACK] Local participant is null');
+      localVideoTrack.value = null;
+      return;
     }
+    
+    print('🎥 [LOCAL TRACK] Updating local video track...');
+    print('🎥 [LOCAL TRACK] Video track publications: ${_localParticipant!.videoTrackPublications.length}');
+    
+    for (var pub in _localParticipant!.videoTrackPublications) {
+      print('🎥 [LOCAL TRACK] - Publication: subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}');
+    }
+    
+    final videoTrack = _localParticipant!.videoTrackPublications
+        .where((pub) => pub.subscribed)
+        .map((pub) => pub.track)
+        .whereType<LocalVideoTrack>()
+        .firstOrNull;
+    
+    print('🎥 [LOCAL TRACK] Found local video track: ${videoTrack != null}');
+    
+    localVideoTrack.value = videoTrack;
   }
 
   /// Get remote video track for a participant
   VideoTrack? getRemoteVideoTrack(RemoteParticipant participant) {
+    print('🎥 [REMOTE TRACK] Getting remote video track for participant: ${participant.identity}');
+    print('🎥 [REMOTE TRACK] Video publications: ${participant.videoTrackPublications.length}');
+    
+    for (var pub in participant.videoTrackPublications) {
+      print('🎥 [REMOTE TRACK] - Publication: subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}');
+    }
+    
     final videoTrack = participant.videoTrackPublications
         .where((pub) => pub.subscribed)
         .map((pub) => pub.track)
         .whereType<RemoteVideoTrack>()
         .firstOrNull;
+    
+    print('🎥 [REMOTE TRACK] Found remote video track: ${videoTrack != null}');
+    
     return videoTrack;
   }
 
   /// Room event handler
   void _onRoomChanged() {
-    if (_room == null) return;
+    if (_room == null) {
+      print('⚠️ [ROOM EVENT] Room is null');
+      return;
+    }
 
+    print('🔄 [ROOM EVENT] Room changed - ConnectionState: ${_room!.connectionState}');
+    
     // Update connection status
     if (_room!.connectionState == ConnectionState.connected) {
+      print('✅ [ROOM EVENT] Room connected');
       connectionStatus.value = 'Connected';
       isConnected.value = true;
     } else if (_room!.connectionState == ConnectionState.disconnected) {
+      print('❌ [ROOM EVENT] Room disconnected');
       connectionStatus.value = 'Disconnected';
       isConnected.value = false;
     } else if (_room!.connectionState == ConnectionState.connecting) {
+      print('🔄 [ROOM EVENT] Room connecting...');
       connectionStatus.value = 'Connecting...';
+    } else if (_room!.connectionState == ConnectionState.reconnecting) {
+      print('🔄 [ROOM EVENT] Room reconnecting...');
+      connectionStatus.value = 'Reconnecting...';
     }
+
+    print('🔄 [ROOM EVENT] Remote participants: ${_room!.remoteParticipants.length}');
+    print('🔄 [ROOM EVENT] Local participant: ${_room!.localParticipant != null ? "exists" : "null"}');
 
     // Update local video track
     _updateLocalVideoTrack();
@@ -407,8 +987,26 @@ class CallClassController extends GetxController {
 
   /// Remote participants event handler
   void _onRemoteParticipantsChanged() {
-    if (_room == null) return;
-    remoteParticipants.assignAll(_room!.remoteParticipants.values.toList());
+    if (_room == null) {
+      print('⚠️ [PARTICIPANTS] Room is null');
+      return;
+    }
+    
+    final participants = _room!.remoteParticipants.values.toList();
+    print('👥 [PARTICIPANTS] Remote participants changed: ${participants.length}');
+    
+    for (var participant in participants) {
+      print('👥 [PARTICIPANTS] - Identity: ${participant.identity}, SID: ${participant.sid}');
+      print('👥 [PARTICIPANTS] - Video tracks: ${participant.videoTrackPublications.length}');
+      print('👥 [PARTICIPANTS] - Audio tracks: ${participant.audioTrackPublications.length}');
+      
+      for (var videoPub in participant.videoTrackPublications) {
+        print('👥 [PARTICIPANTS]   Video track: subscribed=${videoPub.subscribed}, muted=${videoPub.muted}, track=${videoPub.track != null}');
+      }
+    }
+    
+    remoteParticipants.assignAll(participants);
+    print('👥 [PARTICIPANTS] Updated remoteParticipants list: ${remoteParticipants.length}');
   }
 
   void sendMessage() {
@@ -432,21 +1030,48 @@ class CallClassController extends GetxController {
   }
 
   void cancelCall() async {
-    await disconnectFromRoom();
+    await endCall();
     Get.back();
   }
 
+  /// End the current call
+  Future<void> endCall() async {
+    final sessionId = currentSessionId.value;
+    if (sessionId == null || sessionId.isEmpty) {
+      await disconnectFromRoom();
+      return;
+    }
+
+    try {
+      await _directCallService.endCall(sessionId);
+      await _handleCallEnded();
+      AppToasts.showSuccess('Call ended');
+    } catch (e) {
+      // Even if API call fails, disconnect from LiveKit
+      await _handleCallEnded();
+      AppToasts.showError('Error ending call: $e');
+    }
+  }
+
+  /// Handle call ended (cleanup)
+  Future<void> _handleCallEnded() async {
+    await disconnectFromRoom();
+    callStatus.value = 'ended';
+    currentSessionId.value = '';
+    currentRoomName.value = '';
+    currentWsUrl.value = '';
+  }
+
   void confirmTerms() async {
-    // After confirming terms, connect to the video call
-    // You should get roomName and participantName from your backend or navigation params
-    // For now, using placeholder values - replace with actual values from your backend
-    final roomName = _roomName ?? 'room-${DateTime.now().millisecondsSinceEpoch}';
-    final participantName = _participantName ?? 'Participant-${DateTime.now().millisecondsSinceEpoch}';
+    // Check authentication before confirming terms
+    final isAuthenticated = await _checkAuthentication();
+    if (!isAuthenticated) {
+      return;
+    }
     
-    await connectToRoom(
-      roomName: roomName,
-      participantName: participantName,
-    );
+    // After confirming terms, request a call (Client role)
+    // The system will automatically assign an employee
+    await requestCall();
   }
 
   void onTakePhoto() {
