@@ -942,6 +942,10 @@ class $AssetsImagesGen {
   /// File path: assets/images/French.png
   AssetGenImage get french => const AssetGenImage('assets/images/French.png');
 
+  /// File path: assets/images/Home_Background.png
+  AssetGenImage get homeBackground =>
+      const AssetGenImage('assets/images/Home_Background.png');
+
   /// File path: assets/images/Local_Resident.png
   AssetGenImage get localResident =>
       const AssetGenImage('assets/images/Local_Resident.png');
@@ -1008,6 +1012,14 @@ class $AssetsImagesGen {
   /// File path: assets/images/law.png
   AssetGenImage get law => const AssetGenImage('assets/images/law.png');
 
+  /// File path: assets/images/logo_Background.png
+  AssetGenImage get logoBackground =>
+      const AssetGenImage('assets/images/logo_Background.png');
+
+  /// File path: assets/images/machine_gif.gif
+  AssetGenImage get machineGif =>
+      const AssetGenImage('assets/images/machine_gif.gif');
+
   /// File path: assets/images/near.png
   AssetGenImage get near => const AssetGenImage('assets/images/near.png');
 
@@ -1016,6 +1028,10 @@ class $AssetsImagesGen {
 
   /// File path: assets/images/nid.png
   AssetGenImage get nid => const AssetGenImage('assets/images/nid.png');
+
+  /// File path: assets/images/passport.png
+  AssetGenImage get passport =>
+      const AssetGenImage('assets/images/passport.png');
 
   /// File path: assets/images/person.png
   AssetGenImage get person => const AssetGenImage('assets/images/person.png');
@@ -1060,6 +1076,7 @@ class $AssetsImagesGen {
     arabic,
     english,
     french,
+    homeBackground,
     localResident,
     machine,
     oromoo,
@@ -1080,9 +1097,12 @@ class $AssetsImagesGen {
     incident,
     insertcard,
     law,
+    logoBackground,
+    machineGif,
     near,
     news,
     nid,
+    passport,
     person,
     person2,
     phone,

@@ -16,12 +16,20 @@ class HomeView extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE9F6FF),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Main tablet landscape canvas
-            return Row(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image
+            Image.asset(
+              Assets.images.homeBackground.path,
+              fit: BoxFit.fitWidth,
+            ),
+            // Content
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Main tablet landscape canvas
+                return Row(
               children: [
                 // LEFT COLUMN: hero then contact+call card
                 Expanded(
@@ -78,6 +86,8 @@ class HomeView extends GetView<HomeController> {
               ],
             );
           },
+        ),
+          ],
         ),
       ),
     );

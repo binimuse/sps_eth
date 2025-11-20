@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:livekit_client/livekit_client.dart' hide ChatMessage;
+import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
@@ -30,14 +31,27 @@ class CallClassView extends GetView<CallClassController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Left Chat Panel
-                Flexible(
-                  flex: 4,
-                  fit: FlexFit.loose,
-                  child: SizedBox(
-                    height: viewportHeight,
-                    child: _ChatWidget(),
+                // Flexible(
+                //   flex: 4,
+                //   fit: FlexFit.loose,
+                //   child: SizedBox(
+                //     height: viewportHeight,
+                //     child: _ChatWidget(),
+                //   ),
+                // ),
+                    Flexible(
+                flex: 4,
+                fit: FlexFit.loose,
+                child: SizedBox(
+                  height: viewportHeight,
+                  child: SideInfoPanel(
+                  title: 'SMART POLICE\nSTATION',
+                  description: 'Loreim re in charge of planning and managing marketing\ncampaigns that promote a company\'s brand. marketing\ncampaigns that promote a company\'s brand.',
+                  logoAsset: Assets.images.efpLogo.path,
+                  illustrationAsset: Assets.images.law.path,
                   ),
                 ),
+              ),
                 const SizedBox(width: 24),
                 // Middle video + actions
                 Flexible(
@@ -173,20 +187,20 @@ class CallClassView extends GetView<CallClassController> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    GestureDetector(
-                                      onTap: () => Get.back(),
-                                      child: _roundCtrl(Icons.home),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    GestureDetector(
-                                      onTap: () {
-                                        // Scroll to bottom of chat or focus on message input
-                                        // This can be enhanced with a scroll controller if needed
-                                        FocusScope.of(context).requestFocus(controller.focusedField);
-                                      },
-                                      child: _roundCtrl(Icons.message),
-                                    ),
-                                    const SizedBox(width: 12),
+                                    // GestureDetector(
+                                    //   onTap: () => Get.back(),
+                                    //   child: _roundCtrl(Icons.home),
+                                    // ),
+                                    // const SizedBox(width: 12),
+                                    // GestureDetector(
+                                    //   onTap: () {
+                                    //     // Scroll to bottom of chat or focus on message input
+                                    //     // This can be enhanced with a scroll controller if needed
+                                    //     FocusScope.of(context).requestFocus(controller.focusedField);
+                                    //   },
+                                    //   child: _roundCtrl(Icons.message),
+                                    // ),
+                                    // const SizedBox(width: 12),
                                     GestureDetector(
                                       onTap: () => controller.endCall(),
                                       child: _roundCtrl(Icons.call_end, color: AppColors.danger),
