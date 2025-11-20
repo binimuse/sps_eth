@@ -97,6 +97,7 @@ class CallClassController extends GetxController {
   final Rx<String?> currentRoomName = Rx<String?>('');
   final Rx<String?> currentWsUrl = Rx<String?>('');
   final Rx<NetworkStatus> callNetworkStatus = NetworkStatus.IDLE.obs;
+  final RxBool isEndingCall = false.obs; // Loading state for ending call
   
   // For employee side
   final RxList<PendingCall> pendingCalls = <PendingCall>[].obs;
@@ -1042,14 +1043,44 @@ class CallClassController extends GetxController {
       return;
     }
 
+    // Set loading state
+    isEndingCall.value = true;
+
     try {
       await _directCallService.endCall(sessionId);
       await _handleCallEnded();
       AppToasts.showSuccess('Call ended');
     } catch (e) {
+      // Check if it's a DioException with 400 status about PENDING call
+      bool isPendingCallError = false;
+      if (e is dio.DioException) {
+        final statusCode = e.response?.statusCode;
+        final responseData = e.response?.data;
+        
+        if (statusCode == 400) {
+          // Check if error message mentions PENDING status
+          final errorMessage = responseData?.toString() ?? '';
+          if (errorMessage.contains('PENDING') || 
+              errorMessage.contains('not active') ||
+              errorMessage.contains('Call session is not active')) {
+            isPendingCallError = true;
+          }
+        }
+      }
+      
       // Even if API call fails, disconnect from LiveKit
       await _handleCallEnded();
-      AppToasts.showError('Error ending call: $e');
+      
+      // Only show error if it's not a PENDING call error (which is expected)
+      if (!isPendingCallError) {
+        AppToasts.showError('Error ending call: ${e.toString()}');
+      } else {
+        // For pending calls, just clean up silently or show a neutral message
+        AppToasts.showSuccess('Call cancelled');
+      }
+    } finally {
+      // Always clear loading state
+      isEndingCall.value = false;
     }
   }
 

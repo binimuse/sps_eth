@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:livekit_client/livekit_client.dart' hide ChatMessage;
 import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
+import 'package:sps_eth_app/app/utils/enums.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
 import '../controllers/call_class_controller.dart';
@@ -522,26 +523,48 @@ class _TermsAndActions extends StatelessWidget {
             if (isCallActive) {
               // Show end call button when call is active
               print('🔘 [BUTTONS] Showing End Call button');
-              return ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.danger,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  minimumSize: const Size(double.infinity, 0),
-                ),
-                onPressed: () {
-                  print('🔘 [BUTTONS] End Call button pressed');
-                  controller.endCall();
-                },
-                child: Text(
-                  callStatus == 'connecting' 
-                      ? 'Connecting...' 
-                      : callStatus == 'pending'
-                          ? 'Waiting for agent...'
-                          : 'End Call',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff),
-                ),
-              );
+              return Obx(() {
+                final isEnding = controller.isEndingCall.value;
+                return ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.danger,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    minimumSize: const Size(double.infinity, 0),
+                  ),
+                  onPressed: isEnding ? null : () {
+                    print('🔘 [BUTTONS] End Call button pressed');
+                    controller.endCall();
+                  },
+                  child: isEnding
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.whiteOff),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Ending call...',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff),
+                            ),
+                          ],
+                        )
+                      : Text(
+                          callStatus == 'connecting' 
+                              ? 'Connecting...' 
+                              : callStatus == 'pending'
+                                  ? 'Waiting for agent...'
+                                  : 'End Call',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff),
+                        ),
+                );
+              });
             } else {
               // Show start call buttons when call is not active
               print('🔘 [BUTTONS] Showing Start Call buttons');
@@ -583,26 +606,52 @@ class _TermsAndActions extends StatelessWidget {
                           ),
                           const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        elevation: 4,
-                      ),
-                      onPressed: () {
-                        print('🔘 [BUTTONS] Confirm / Agree button pressed');
-                        controller.confirmTerms();
-                      },
-                      child: Text(
-                        'Confirm / Agree', 
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold, 
-                          color: AppColors.whiteOff,
-                          fontSize: 16,
+                    child: Obx(() {
+                      final isLoading = controller.callNetworkStatus.value == NetworkStatus.LOADING;
+                      return ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 4,
                         ),
-                      ),
-                    ),
+                        onPressed: isLoading ? null : () {
+                          print('🔘 [BUTTONS] Confirm / Agree button pressed');
+                          controller.confirmTerms();
+                        },
+                        child: isLoading
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.whiteOff),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Connecting...',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold, 
+                                      color: AppColors.whiteOff,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                'Confirm / Agree', 
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold, 
+                                  color: AppColors.whiteOff,
+                                  fontSize: 16,
+                                ),
+                              ),
+                      );
+                    }),
                   ),
                         ],
                       ),
