@@ -300,7 +300,7 @@ class ConfirmationPageView extends StatelessWidget {
 
                 // RIGHT SIDEBAR - Machine Image
                 Image.asset(
-                  Assets.images.machine.path,
+                  Assets.images.machineGif.path,
                   fit: BoxFit.cover,
                 ),
               ],
