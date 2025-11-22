@@ -56,49 +56,101 @@ class LanguageView extends GetView<LanguageController> {
               Flexible(
                 flex: 7,
                 fit: FlexFit.loose,
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: languages.length,
-                  itemBuilder: (context, index) {
-                    final language = languages[index];
-                    final isSelected = controller.selectedLanguageIndex == index;
-                    return GestureDetector(
-                      onTap: () {
-                        controller.selectLanguage(index);
-                        Get.toNamed(Routes.FIILING_CLASS);
-                      },
-                      child: Card(
-                        color: Colors.white.withOpacity(0.8), // Added white color with opacity
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: isSelected
-                              ? BorderSide(color: Colors.blue, width: 2)
-                              : BorderSide.none,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top info box + back button
+                    Row(
+                      children: [
+                          OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            side: const BorderSide(color: Color(0xFFCBDCE7)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => Get.back(),
+                          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                          label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(50),
-                              child: Image.asset(
-                                language['image']!,
-                                width: 180, // Increased size
-                                height: 180, // Increased size
-                                fit: BoxFit.cover,
+                           const SizedBox(width: 16),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE2F0F8),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text('Select Language',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F3955),
+                                    )),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Loreim re in charge of planning and managing marketing\n'
+                                  'campaigns that promote a company\'s brand.',
+                                  style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                     
+                      
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Language grid
+                    Expanded(
+                      child: GridView.builder(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        itemCount: languages.length,
+                        itemBuilder: (context, index) {
+                          final language = languages[index];
+                          final isSelected = controller.selectedLanguageIndex == index;
+                          return GestureDetector(
+                            onTap: () {
+                              controller.selectLanguage(index);
+                              Get.toNamed(Routes.FIILING_CLASS);
+                            },
+                            child: Card(
+                              color: Colors.white.withOpacity(0.8), // Added white color with opacity
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: isSelected
+                                    ? BorderSide(color: Colors.blue, width: 2)
+                                    : BorderSide.none,
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(50),
+                                    child: Image.asset(
+                                      language['image']!,
+                                      width: 180, // Increased size
+                                      height: 180, // Increased size
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(language['name']!,
+                                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(language['name']!,
-                                style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                          );
+                        },
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
             ],

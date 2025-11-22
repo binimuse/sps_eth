@@ -57,7 +57,7 @@ class FiilingClassView extends GetView<FiilingClassController> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: const [
-                                Text('List of Provided Services',
+                                Text('Select Residency Type',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w800,
                                       color: Color(0xFF0F3955),

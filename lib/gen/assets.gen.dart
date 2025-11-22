@@ -978,6 +978,9 @@ class $AssetsImagesGen {
   AssetGenImage get background =>
       const AssetGenImage('assets/images/background.png');
 
+  /// File path: assets/images/call_a.png
+  AssetGenImage get callA => const AssetGenImage('assets/images/call_a.png');
+
   /// File path: assets/images/calling.png
   AssetGenImage get calling => const AssetGenImage('assets/images/calling.png');
 
@@ -1000,6 +1003,9 @@ class $AssetsImagesGen {
 
   /// File path: assets/images/email.png
   AssetGenImage get email => const AssetGenImage('assets/images/email.png');
+
+  /// File path: assets/images/fill.png
+  AssetGenImage get fill => const AssetGenImage('assets/images/fill.png');
 
   /// File path: assets/images/incident.png
   AssetGenImage get incident =>
@@ -1087,6 +1093,7 @@ class $AssetsImagesGen {
     back,
     back1,
     background,
+    callA,
     calling,
     card,
     contact,
@@ -1094,6 +1101,7 @@ class $AssetsImagesGen {
     documentScan,
     efpLogo,
     email,
+    fill,
     incident,
     insertcard,
     law,

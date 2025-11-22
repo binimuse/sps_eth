@@ -13,6 +13,7 @@ abstract class Routes {
   static const LANGUAGE = _Paths.LANGUAGE;
   static const RESIDENCE_ID = _Paths.RESIDENCE_ID;
   static const SERVICE_LIST = _Paths.SERVICE_LIST;
+  static const SERVICE_DETAIL = _Paths.SERVICE_DETAIL;
   static const SPLASH = _Paths.SPLASH;
   static const VISITOR_ID = _Paths.VISITOR_ID;
   static const LOGIN = _Paths.LOGIN;
@@ -30,6 +31,7 @@ abstract class _Paths {
   static const LANGUAGE = '/language';
   static const RESIDENCE_ID = '/residence-id';
   static const SERVICE_LIST = '/service-list';
+  static const SERVICE_DETAIL = '/service-detail';
   static const SPLASH = '/splash';
   static const VISITOR_ID = '/visitor-id';
   static const LOGIN = '/login';

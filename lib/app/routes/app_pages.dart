@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../modules/Residence_id/bindings/residence_id_binding.dart';
@@ -22,6 +23,8 @@ import '../modules/recent_alerts/bindings/recent_alerts_binding.dart';
 import '../modules/recent_alerts/views/recent_alerts_view.dart';
 import '../modules/service_list/bindings/service_list_binding.dart';
 import '../modules/service_list/views/service_list_view.dart';
+import '../modules/service_list/bindings/service_detail_binding.dart';
+import '../modules/service_list/views/service_detail_view.dart';
 import '../modules/splash/bindings/splash_binding.dart';
 import '../modules/splash/views/splash_view.dart';
 
@@ -77,6 +80,14 @@ class AppPages {
       name: _Paths.SERVICE_LIST,
       page: () => const ServiceListView(),
       binding: ServiceListBinding(),
+    ),
+    GetPage(
+      name: _Paths.SERVICE_DETAIL,
+      page: () => const ServiceDetailView(),
+      binding: ServiceDetailBinding(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
     ),
     GetPage(
       name: _Paths.SPLASH,
