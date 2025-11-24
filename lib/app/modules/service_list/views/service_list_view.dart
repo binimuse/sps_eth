@@ -15,22 +15,33 @@ class ServiceListView extends GetView<ServiceListController> {
         MediaQuery.of(context).padding.vertical - 32;
     
     return Scaffold(
-      backgroundColor: const Color(0xFFF6FAFD),
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image
+            Image.asset(
+              Assets.images.logoBackground.path,
+              fit: BoxFit.fitWidth,
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // LEFT PANEL
-              Flexible(
+            Flexible(
                 flex: 3,
                 fit: FlexFit.loose,
                 child: SizedBox(
                   height: viewportHeight,
                   child: SideInfoPanel(
                     title: 'SMART POLICE\nSTATION',
-                    description: 'Loreim re in charge of planning and managing marketing\ncampaigns that promote a company\'s brand. marketing\ncampaigns that promote a company\'s brand.',
+                    description: 'Loreim re in charge of planning and managing marketing'
+                        'campaigns that promote a company\'s brand. marketing'
+                        'campaigns that promote a company\'s brand.',
                     logoAsset: Assets.images.efpLogo.path,
                     illustrationAsset: Assets.images.law.path,
                   ),
@@ -39,27 +50,42 @@ class ServiceListView extends GetView<ServiceListController> {
               const SizedBox(width: 24),
               // RIGHT CONTENT
               Flexible(
-                flex: 8,
+                 flex: 7,
                 fit: FlexFit.loose,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top bar with back button, title, and language selector
+                    // Top info box
                     Row(
                       children: [
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            side: const BorderSide(color: Color(0xFFCBDCE7)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE2F0F8),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'List of Provided Services',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 20,
+                                    color: Color(0xFF0F3955),
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Service List of planning and managing that promote a company\'s brand.',
+                                  style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
+                                ),
+                              ],
                             ),
                           ),
-                          onPressed: () => Get.back(),
-                          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                          label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 16),
                         // Language selector button
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
@@ -70,7 +96,6 @@ class ServiceListView extends GetView<ServiceListController> {
                             ),
                           ),
                           onPressed: () {
-                            // Navigate to language selection
                             Get.toNamed(Routes.LANGUAGE);
                           },
                           icon: const Icon(Icons.language, color: Color(0xFF0F3955), size: 20),
@@ -79,31 +104,17 @@ class ServiceListView extends GetView<ServiceListController> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Title and subtitle
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE2F0F8),
-                        borderRadius: BorderRadius.circular(8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        side: const BorderSide(color: Color(0xFFCBDCE7)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'List of Provided Services',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 20,
-                              color: Color(0xFF0F3955),
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Service List of planning and managing that promote a company\'s brand.',
-                            style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
-                          ),
-                        ],
-                      ),
+                      onPressed: () => Get.back(),
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                      label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
                     ),
                     const SizedBox(height: 24),
                     // Scrollable service cards list in a row
@@ -147,7 +158,9 @@ class ServiceListView extends GetView<ServiceListController> {
                 ),
               ),
             ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );

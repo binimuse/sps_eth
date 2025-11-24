@@ -15,11 +15,20 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
         MediaQuery.of(context).padding.vertical - 32;
     
     return Scaffold(
-      backgroundColor: const Color(0xFFF6FAFD),
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image
+            Image.asset(
+              Assets.images.logoBackground.path,
+              fit: BoxFit.fitWidth,
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // LEFT PANEL
@@ -44,22 +53,37 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top bar with back button, title, and language selector
+                    // Top info box
                     Row(
                       children: [
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            side: const BorderSide(color: Color(0xFFCBDCE7)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                        Expanded(
+                          child: Obx(() => Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE2F0F8),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          ),
-                          onPressed: () => Get.back(),
-                          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                          label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${controller.selectedService.value} Registration',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 20,
+                                    color: Color(0xFF0F3955),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Service List of planning and managing that promote a company\'s brand.',
+                                  style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          )),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 16),
                         // Language selector button
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
@@ -78,6 +102,19 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        side: const BorderSide(color: Color(0xFFCBDCE7)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () => Get.back(),
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                      label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                    ),
+                    const SizedBox(height: 16),
                     // Main content area with two columns
                     Expanded(
                       child: Row(
@@ -89,29 +126,29 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                             child: SingleChildScrollView(
                               child: Column(
                                 children: [
-                                  _buildServiceCard(
+                                  Obx(() => _buildServiceCard(
                                     title: 'Crime Report',
                                     description: 'Report crimes promptly and help maintain public safety.',
                                     image: Assets.images.crime.path,
                                     onTap: () => controller.selectService('Crime Report'),
                                     isSelected: controller.selectedService.value == 'Crime Report',
-                                  ),
+                                  )),
                                   const SizedBox(height: 16),
-                                  _buildServiceCard(
+                                  Obx(() => _buildServiceCard(
                                     title: 'Traffic Incident Report',
                                     description: 'Official platform for monitoring and managing traffic incidents.',
                                     image: Assets.images.traffic.path,
                                     onTap: () => controller.selectService('Traffic Incident Report'),
                                     isSelected: controller.selectedService.value == 'Traffic Incident Report',
-                                  ),
+                                  )),
                                   const SizedBox(height: 16),
-                                  _buildServiceCard(
+                                  Obx(() => _buildServiceCard(
                                     title: 'Incident Report',
                                     description: 'Ensuring accountability through proper incident documentation.',
                                     image: Assets.images.incident.path,
                                     onTap: () => controller.selectService('Incident Report'),
                                     isSelected: controller.selectedService.value == 'Incident Report',
-                                  ),
+                                  )),
                                 ],
                               ),
                             ),
@@ -119,43 +156,61 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                           const SizedBox(width: 16),
                           // Right column - Detail card and action cards
                           Flexible(
-                            flex: 1,
-                            child: Obx(() => Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    child: _buildDetailCard(),
-                                  ),
+                            flex: 2,
+                            child: Obx(() => Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFF0F3955).withOpacity(0.2),
+                                  width: 1,
                                 ),
-                                const SizedBox(height: 16),
-                                // Fill out Form and Call for Assistance cards side by side
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildActionCard(
-                                        title: 'Fill out Form',
-                                        description: 'Official platform for monitoring and managing traffic incidents.',
-                                        image: Assets.images.fill.path,
-                                        onTap: () {
-                                          Get.toNamed(Routes.FORM_CLASS);
-                                        },
-                                      ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x1A000000),
+                                    blurRadius: 10,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      child: _buildDetailCardContent(),
                                     ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: _buildActionCard(
-                                        title: 'Call for Assistance',
-                                        description: 'Ensuring accountability through proper incident documentation.',
-                                        image: Assets.images.callA.path,
-                                        onTap: () {
-                                          Get.toNamed(Routes.CALL_CLASS);
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // Fill out Form and Call for Assistance cards side by side
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: _buildActionCard(
+                                          title: 'Fill out Form',
+                                          description: 'Official platform for monitoring and managing traffic incidents.',
+                                          image: Assets.images.fill.path,
+                                          onTap: () {
+                                            Get.toNamed(Routes.FORM_CLASS);
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Flexible(
+                                        child: _buildActionCard(
+                                          title: 'Call for Assistance',
+                                          description: 'Ensuring accountability through proper incident documentation.',
+                                          image: Assets.images.callA.path,
+                                          onTap: () {
+                                         Get.toNamed(Routes.CALL_CLASS);
                                         },
                                       ),
                                     ),
                                   ],
-                                ),
-                              ],
+                                  ),
+                                ],
+                              ),
                             )),
                           ),
                         ],
@@ -165,7 +220,9 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                 ),
               ),
             ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -181,6 +238,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: 280,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -196,7 +254,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
             ),
           ],
         ),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -204,16 +262,16 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
             Row(
               children: [
                 Container(
-                  width: 90,
-                  height: 90,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     color: const Color(0xFFE6F3FB),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Image.asset(
                     image,
-                    width: 90,
-                    height: 90,
+                    width: 60,
+                    height: 60,
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -258,23 +316,10 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
     );
   }
 
-  Widget _buildDetailCard() {
+  Widget _buildDetailCardContent() {
     final serviceTitle = controller.selectedService.value;
     
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Title and subtitle
@@ -294,18 +339,19 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
               fontSize: 12,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           // Read me button
           SizedBox(
             width: 10.w,
+            height: 5.h,
             child: ElevatedButton(
               onPressed: () {
                 // Handle read me action
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: const Color(0xFFAA232F),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -320,7 +366,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           // Requirements section
           Text(
             'Requirements for $serviceTitle Registration form.',
@@ -330,42 +376,55 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
               color: Color(0xFF0F3955),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           // Requirements list
-          ...List.generate(4, (index) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: List.generate(4, (index) {
+                final isLast = index == 3;
+                return Column(
                   children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check,
-                        size: 14,
-                        color: Colors.white,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.green,
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Lorem Ipsum is a placeholder text commonly used in the design and publishing industries as a temporary filler.',
+                              style: TextStyle(
+                                color: Color(0xFF4F6B7E),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Lorem Ipsum is a placeholder text commonly used in the design and publishing industries as a temporary filler.',
-                        style: TextStyle(
-                          color: Color(0xFF4F6B7E),
-                          fontSize: 12,
-                        ),
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.grey[400],
                       ),
-                    ),
                   ],
-                ),
-              )),
+                );
+              }),
+            ),
+          ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildActionCard({
@@ -380,7 +439,10 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[200]!),
+          border: Border.all(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
           boxShadow: const [
             BoxShadow(
               color: Color(0x1A000000),
@@ -389,28 +451,40 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
             ),
           ],
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                Image.asset(
-                  image,
-                  width: 90,
-                  height: 90,
-                  fit: BoxFit.contain,
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6F3FB),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Image.asset(
+                    image,
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.contain,
+                  ),
                 ),
                 const Spacer(),
                 Container(
-                  width: 24,
-                  height: 24,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.arrow_forward_ios, size: 10, color: Color(0xFF0F3955)),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF0F3955)),
+                    onPressed: onTap,
+                  ),
                 ),
               ],
             ),
@@ -418,19 +492,17 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
             Text(
               title,
               style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                color: Color(0xFF0F3955),
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF0A5B95),
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 6),
             Text(
               description,
               style: const TextStyle(
                 color: Color(0xFF4F6B7E),
-                fontSize: 10,
+                fontSize: 11,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

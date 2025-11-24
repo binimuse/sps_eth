@@ -14,12 +14,21 @@ class FiilingClassView extends GetView<FiilingClassController> {
   Widget build(BuildContext context) {
     final double viewportHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 32;
     return Scaffold(
-      backgroundColor: const Color(0xFFF6FAFD),
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SingleChildScrollView(
-            child: Row(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image
+            Image.asset(
+              Assets.images.logoBackground.path,
+              fit: BoxFit.fitWidth,
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SingleChildScrollView(
+                child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // LEFT PANEL
@@ -30,7 +39,7 @@ class FiilingClassView extends GetView<FiilingClassController> {
                   height: viewportHeight,
                   child: SideInfoPanel(
                   title: 'SMART POLICE\nSTATION',
-                  description: 'Loreim re in charge of planning and managing marketing\ncampaigns that promote a company\'s brand. marketing\ncampaigns that promote a company\'s brand.',
+                  description: 'Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand. marketing campaigns that promote a company\'s brand.',
                   logoAsset: Assets.images.efpLogo.path,
                   illustrationAsset: Assets.images.law.path,
                   ),
@@ -140,8 +149,10 @@ class FiilingClassView extends GetView<FiilingClassController> {
                 ),
               ),
             ],
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

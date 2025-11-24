@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
 
 class SideInfoPanel extends StatelessWidget {
@@ -21,8 +22,12 @@ class SideInfoPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.whiteOff,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.2),
+          width: 1,
+        ),
       ),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -31,7 +36,7 @@ class SideInfoPanel extends StatelessWidget {
           Image.asset(
             logoAsset,
             width: 72,
-            height: 50,
+            height: 45,
             fit: BoxFit.contain,
           ),
           const SizedBox(height: 12),
@@ -40,20 +45,44 @@ class SideInfoPanel extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
           ),
-          const SizedBox(height: 16),
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.grayDark),
+          const SizedBox(height: 8),
+          Column(
+            children: [
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.primary, fontFamily: GoogleFonts.montserratAlternates(fontWeight: FontWeight.w500).fontFamily),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      AppColors.primary.withOpacity(0.3),
+                      Colors.transparent,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: AspectRatio(
               aspectRatio: 3 / 4,
               child: Image.asset(
                 illustrationAsset,
-                fit: BoxFit.cover,
+                fit: BoxFit.fitHeight,
               ),
             ),
           ),

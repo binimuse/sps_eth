@@ -28,11 +28,20 @@ class LanguageView extends GetView<LanguageController> {
     final double viewportHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 32;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image
+            Image.asset(
+              Assets.images.logoBackground.path,
+              fit: BoxFit.fitWidth,
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // LEFT PANEL
@@ -43,8 +52,8 @@ class LanguageView extends GetView<LanguageController> {
                   height: viewportHeight,
                   child: SideInfoPanel(
                     title: 'SMART POLICE\nSTATION',
-                    description: 'Loreim re in charge of planning and managing marketing\n'
-                        'campaigns that promote a company\'s brand. marketing\n'
+                    description: 'Loreim re in charge of planning and managing marketing'
+                        'campaigns that promote a company\'s brand. marketing'
                         'campaigns that promote a company\'s brand.',
                     logoAsset: Assets.images.efpLogo.path,
                     illustrationAsset: Assets.images.law.path,
@@ -59,20 +68,9 @@ class LanguageView extends GetView<LanguageController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top info box + back button
+                    // Top info box
                     Row(
                       children: [
-                          OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            side: const BorderSide(color: Color(0xFFCBDCE7)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: () => Get.back(),
-                          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                          label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
-                        ),
-                           const SizedBox(width: 16),
                         Expanded(
                           child: Container(
                             decoration: BoxDecoration(
@@ -98,9 +96,18 @@ class LanguageView extends GetView<LanguageController> {
                             ),
                           ),
                         ),
-                     
-                      
                       ],
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        side: const BorderSide(color: Color(0xFFCBDCE7)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Get.back(),
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                      label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
                     ),
                     const SizedBox(height: 16),
                     // Language grid
@@ -154,7 +161,9 @@ class LanguageView extends GetView<LanguageController> {
                 ),
               ),
             ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );

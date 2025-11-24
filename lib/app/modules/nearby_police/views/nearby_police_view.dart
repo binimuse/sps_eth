@@ -11,32 +11,42 @@ class NearbyPoliceView extends GetView<NearbyPoliceController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFE9F6FF),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Get.back(),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Nearby Police Stations',
-          style: TextStyle(color: Colors.black87),
-        ),
-        centerTitle: false,
-      ),
       body: SafeArea(
-        child: Obx(() {
-          if (controller.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return GoogleMap(
-            initialCameraPosition: controller.initialCamera,
-            onMapCreated: controller.onMapCreated,
-            markers: controller.markers,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-          );
-        }),
+        child: Stack(
+          children: [
+            Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return GoogleMap(
+                initialCameraPosition: controller.initialCamera,
+                onMapCreated: controller.onMapCreated,
+                markers: controller.markers,
+                myLocationButtonEnabled: false,
+                zoomControlsEnabled: false,
+              );
+            }),
+            // Back button
+            Positioned(
+              top: 16,
+              left: 16,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                  ),
+                  tooltip: 'Back',
+                  onPressed: Get.back,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

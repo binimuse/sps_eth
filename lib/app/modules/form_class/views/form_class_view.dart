@@ -12,30 +12,45 @@ class FormClassView extends GetView<FormClassController> {
 
   @override
   Widget build(BuildContext context) {
-    // Hide keyboard when scaffold builds
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      SystemChannels.textInput.invokeMethod('TextInput.hide');
-      FocusScope.of(context).unfocus();
-    });
-    
     return GestureDetector(
       onTap: () {
         // Hide keyboard when tapping outside
-        SystemChannels.textInput.invokeMethod('TextInput.hide');
         FocusScope.of(context).unfocus();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF6FAFD),
+        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // TOP BRANDING SECTION
-              Row(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image
+            Image.asset(
+              Assets.images.logoBackground.path,
+              fit: BoxFit.fitWidth,
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Image.asset(
+                  // TOP BRANDING SECTION
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBDCE7)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () => Get.back(),
+                        icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                        label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                      ),
+                      const SizedBox(width: 16),
+                      Image.asset(
                     Assets.images.efpLogo.path,
                     width: 60,
                     height: 60,
@@ -107,22 +122,16 @@ class FormClassView extends GetView<FormClassController> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Form Section
+                          // Form Section - takes more space now
                           Expanded(
-                            flex: 5,
+                            flex: 7,
                             child: _buildFormContent(),
                           ),
-                          const SizedBox(width: 16),
-                          // Progress and Keyboard Section
+                          const SizedBox(width: 24),
+                          // Progress Section only
                           Expanded(
-                            flex: 5,
-                            child: Column(
-                              children: [
-                                _buildProgressIndicator(),
-                                const SizedBox(height: 16),
-                                Expanded(child: _buildCustomKeyboard()),
-                              ],
-                            ),
+                            flex: 3,
+                            child: _buildProgressIndicator(),
                           ),
                         ],
                       ),
@@ -130,8 +139,10 @@ class FormClassView extends GetView<FormClassController> {
                   ],
                 ),
               ),
-            ],
-          ),
+                    ],
+                  ),
+            ),
+          ],
         ),
       ),
       ),
@@ -216,15 +227,15 @@ class FormClassView extends GetView<FormClassController> {
               : 'Step 3 Incident Details';
       
       return Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
+              color: Color(0x0D000000),
+              blurRadius: 20,
+              offset: Offset(0, 8),
             ),
           ],
         ),
@@ -332,15 +343,15 @@ class FormClassView extends GetView<FormClassController> {
 
   Widget _buildPersonalInfoForm() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: Color(0x0D000000),
+            blurRadius: 20,
+            offset: Offset(0, 8),
           ),
         ],
       ),
@@ -349,28 +360,13 @@ class FormClassView extends GetView<FormClassController> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-          const Text(
-            'Personal Information',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-              color: Color(0xFF0F3955),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'here you should insert the personal information',
-            style: TextStyle(
-              color: Color(0xFF4F6B7E),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 24),
+         
+          const SizedBox(height: 12),
           _buildDropdownField('Clearance For', controller.clearanceForController),
           const SizedBox(height: 16),
-          _buildTextField('Insert Your Email', controller.emailController),
+          _buildTextField('Insert Your Email', controller.emailController, keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 16),
-          _buildTextField('Phone number', controller.phoneController),
+          _buildTextField('Phone number', controller.phoneController, keyboardType: TextInputType.phone),
           const SizedBox(height: 16),
           _buildTextField('Current Address', controller.addressController, maxLines: 2),
           const SizedBox(height: 16),
@@ -385,15 +381,15 @@ class FormClassView extends GetView<FormClassController> {
 
   Widget _buildResidenceInfoForm() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: Color(0x0D000000),
+            blurRadius: 20,
+            offset: Offset(0, 8),
           ),
         ],
       ),
@@ -402,23 +398,8 @@ class FormClassView extends GetView<FormClassController> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-          const Text(
-            'Residence Information',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-              color: Color(0xFF0F3955),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'here you should insert the residence information',
-            style: TextStyle(
-              color: Color(0xFF4F6B7E),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 24),
+        
+          const SizedBox(height: 12),
           _buildDropdownField('Ethiopian / Foreigner', controller.ethiopianOrForeignerController),
           const SizedBox(height: 16),
           _buildTextField('Region', controller.regionController),
@@ -448,15 +429,15 @@ class FormClassView extends GetView<FormClassController> {
 
   Widget _buildIncidentDetailsForm() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+            color: Color(0x0D000000),
+            blurRadius: 20,
+            offset: Offset(0, 8),
           ),
         ],
       ),
@@ -465,23 +446,8 @@ class FormClassView extends GetView<FormClassController> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-          const Text(
-            'Incident Details',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-              color: Color(0xFF0F3955),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'here you should insert the Incident information',
-            style: TextStyle(
-              color: Color(0xFF4F6B7E),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 24),
+        
+          const SizedBox(height: 12),
           _buildFieldWithUpload(
             Get.context!,
             'Incident Summary',
@@ -511,40 +477,26 @@ class FormClassView extends GetView<FormClassController> {
     );
   }
 
-  Widget _buildTextField(String hint, TextEditingController textController, {int maxLines = 1}) {
-    final focusNode = FocusNode();
-    focusNode.addListener(() {
-      if (focusNode.hasFocus) {
-        // Hide system keyboard when field is focused
-        Future.microtask(() {
-          SystemChannels.textInput.invokeMethod('TextInput.hide');
-          FocusScope.of(Get.context!).unfocus();
-          focusNode.requestFocus();
-        });
-        controller.setFocusedField(focusNode, textController);
-      }
-    });
+  Widget _buildTextField(String hint, TextEditingController textController, {int maxLines = 1, TextInputType? keyboardType}) {
     return TextField(
       controller: textController,
-      focusNode: focusNode,
       maxLines: maxLines,
-      readOnly: true,
-      enableInteractiveSelection: true,
-      showCursor: true,
-      keyboardType: TextInputType.none,
-      onTap: () {
-        // Hide system keyboard immediately
-        SystemChannels.textInput.invokeMethod('TextInput.hide');
-        FocusScope.of(Get.context!).unfocus();
-        controller.setFocusedField(focusNode, textController);
-      },
+      keyboardType: keyboardType ?? TextInputType.text,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: Colors.grey[100],
+        fillColor: Colors.grey[50],
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF0F3955), width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
@@ -573,18 +525,6 @@ class FormClassView extends GetView<FormClassController> {
   }
 
   Widget _buildFieldWithUpload(BuildContext context, String label, TextEditingController textController, String hint, {bool showScanOnly = false}) {
-    final focusNode = FocusNode();
-    focusNode.addListener(() {
-      if (focusNode.hasFocus) {
-        // Hide system keyboard when field is focused
-        Future.microtask(() {
-          SystemChannels.textInput.invokeMethod('TextInput.hide');
-          FocusScope.of(Get.context!).unfocus();
-          focusNode.requestFocus();
-        });
-        controller.setFocusedField(focusNode, textController);
-      }
-    });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -599,25 +539,23 @@ class FormClassView extends GetView<FormClassController> {
         const SizedBox(height: 8),
         TextField(
           controller: textController,
-          focusNode: focusNode,
           maxLines: 3,
-          readOnly: true,
-          enableInteractiveSelection: true,
-          showCursor: true,
-          keyboardType: TextInputType.none,
-          onTap: () {
-            // Hide system keyboard immediately
-            SystemChannels.textInput.invokeMethod('TextInput.hide');
-            FocusScope.of(Get.context!).unfocus();
-            controller.setFocusedField(focusNode, textController);
-          },
+          keyboardType: TextInputType.multiline,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Colors.grey[50],
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF0F3955), width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
@@ -698,164 +636,4 @@ class FormClassView extends GetView<FormClassController> {
     );
   }
 
-  Widget _buildCustomKeyboard() {
-    return Obx(() => Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-            
-              DropdownButton<String>(
-                value: controller.selectedLanguage.value,
-                items: ['English', 'Amharic', 'Tigrinya'].map((lang) {
-                  return DropdownMenuItem(
-                    value: lang,
-                    child: Text(lang),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    controller.selectedLanguage.value = value;
-                  }
-                },
-                underline: Container(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _VirtualKeyboard(
-              onKeyPressed: (key) => controller.onKeyboardKeyPressed(key),
-            ),
-          ),
-        ],
-      ),
-    ));
-  }
-}
-
-class _VirtualKeyboard extends StatelessWidget {
-  final Function(String) onKeyPressed;
-
-  const _VirtualKeyboard({required this.onKeyPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = [
-      ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
-      ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
-      ['z', 'x', 'c', 'v', 'b', 'n', 'm'],
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[800],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        children: [
-          // First row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: rows[0].map((key) => _buildKey(key)).toList(),
-          ),
-          const SizedBox(height: 4),
-          // Second row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(width: 20),
-              ...rows[1].map((key) => _buildKey(key)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // Third row with special keys
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildSpecialKey('123?', () => onKeyPressed('123')),
-              ...rows[2].map((key) => _buildKey(key)),
-              _buildSpecialKey('⌫', () => onKeyPressed('backspace')),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // Bottom row with space and enter
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildSpecialKey('←', () => onKeyPressed('left'), width: 60),
-              _buildSpecialKey('Space', () => onKeyPressed('space'), width: 200),
-              _buildSpecialKey('→', () => onKeyPressed('right'), width: 60),
-              _buildSpecialKey('↵', () => onKeyPressed('enter'), width: 80),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKey(String key) {
-    return GestureDetector(
-      onTap: () => onKeyPressed(key),
-      child: Container(
-        width: 35,
-        height: 35,
-        margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: Colors.grey[700],
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Center(
-          child: Text(
-            key.toUpperCase(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSpecialKey(String label, VoidCallback onTap, {double? width}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: width ?? 60,
-        height: 35,
-        margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: Colors.grey[700],
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

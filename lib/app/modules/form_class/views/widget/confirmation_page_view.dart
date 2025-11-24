@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/promo_card.dart';
+import 'package:sps_eth_app/app/routes/app_pages.dart';
 
 class ConfirmationPageView extends StatelessWidget {
   final Map<String, String> formData;
@@ -25,9 +27,11 @@ class ConfirmationPageView extends StatelessWidget {
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // LEFT PROMO CARD
@@ -138,29 +142,11 @@ class ConfirmationPageView extends StatelessWidget {
                                           ),
                                         ),
                                         padding: const EdgeInsets.all(8),
-                                        child: GridView.builder(
-                                          physics: const NeverScrollableScrollPhysics(),
-                                          gridDelegate:
-                                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                            crossAxisCount: 7,
-                                          ),
-                                          itemCount: 49,
-                                          itemBuilder: (context, index) {
-                                            // Create a simple QR pattern
-                                            final row = index ~/ 7;
-                                            final col = index % 7;
-                                            final isBlack = (row == 0 || row == 6 || col == 0 || col == 6) ||
-                                                (row == 2 && col >= 2 && col <= 4) ||
-                                                (col == 2 && row >= 2 && row <= 4) ||
-                                                (row + col) % 3 == 0;
-                                            return Container(
-                                              margin: const EdgeInsets.all(0.5),
-                                              decoration: BoxDecoration(
-                                                color: isBlack ? Colors.black : Colors.white,
-                                                borderRadius: BorderRadius.circular(1),
-                                              ),
-                                            );
-                                          },
+                                        child: QrImageView(
+                                          data: _generateQRData(),
+                                          version: QrVersions.auto,
+                                          size: 84,
+                                          backgroundColor: Colors.white,
                                         ),
                                       ),
                                     ],
@@ -287,6 +273,24 @@ class ConfirmationPageView extends StatelessWidget {
                                     height: 1.5,
                                   ),
                                 ),
+                                const SizedBox(height: 24),
+                                // Home Button
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Get.offAllNamed(Routes.HOME);
+                                  },
+                                  icon: const Icon(Icons.home, size: 20),
+                                  label: const Text('Go to Home'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0F3955),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    elevation: 4,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -304,7 +308,9 @@ class ConfirmationPageView extends StatelessWidget {
                   fit: BoxFit.cover,
                 ),
               ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -339,6 +345,22 @@ class ConfirmationPageView extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _generateQRData() {
+    // Generate QR code data from form data
+    final qrData = {
+      'id': formData['id'] ?? '12351361346',
+      'category': formData['category'] ?? 'Economic',
+      'type': formData['incidentType'] ?? 'Crime',
+      'address': formData['address'] ?? 'A.A - K/K - Woreda 1',
+      'scheduleTime': formData['scheduleTime'] ?? 'June 12, 2024',
+    };
+    
+    // Convert to JSON string for QR code
+    return qrData.entries
+        .map((e) => '${e.key}:${e.value}')
+        .join('|');
   }
 }
 
