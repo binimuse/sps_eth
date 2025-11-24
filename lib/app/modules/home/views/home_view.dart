@@ -15,7 +15,14 @@ class HomeView extends GetView<HomeController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) async {
+        if (!didPop) {
+          await controller.onWillPop();
+        }
+      },
+      child: Scaffold(
       body: SafeArea(
         child: Stack(
           fit: StackFit.expand,
@@ -89,6 +96,7 @@ class HomeView extends GetView<HomeController> {
         ),
           ],
         ),
+      ),
       ),
     );
   }

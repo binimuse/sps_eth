@@ -105,6 +105,9 @@ class CallClassController extends GetxController {
   
   // Auto-start flag for home swipe
   final RxBool autoStartCall = false.obs;
+  
+  // Connection timeout monitor
+  Timer? _connectionTimeoutTimer;
 
   @override
   void onInit() {
@@ -133,6 +136,13 @@ class CallClassController extends GetxController {
       print('❌ [INIT ERROR] Error in onReady: $error');
       print('❌ [INIT ERROR] Stack trace: $stackTrace');
       AppToasts.showError('Failed to initialize call class: ${error.toString()}');
+      // Show detailed error dialog for debugging
+      AppToasts.showErrorDialog(
+        title: 'Initialization Error',
+        message: 'Failed to initialize call class. Please try again.',
+        errorDetails: error.toString(),
+        stackTrace: stackTrace.toString(),
+      );
     });
   }
   
@@ -144,7 +154,7 @@ class CallClassController extends GetxController {
       print('🔐 [AUTH CHECK] Starting authentication check...');
       
       // Retry logic: Sometimes secure storage needs a moment after login
-      const maxRetries = 3;
+      const maxRetries = 5; // Increased retries for better handling after login
       const retryDelay = Duration(milliseconds: 500);
       
       for (int attempt = 1; attempt <= maxRetries; attempt++) {
@@ -162,6 +172,12 @@ class CallClassController extends GetxController {
               continue;
             } else {
               print('❌ [AUTH CHECK] User not authenticated after $maxRetries attempts, redirecting to login');
+              // Show error dialog before redirecting
+              AppToasts.showErrorDialog(
+                title: 'Authentication Error',
+                message: 'User authentication failed after multiple attempts. Please login again.',
+                errorDetails: 'isFullyAuthenticated returned false after $maxRetries attempts',
+              );
               _redirectToLogin();
               return;
             }
@@ -178,6 +194,12 @@ class CallClassController extends GetxController {
               continue;
             } else {
               print('❌ [AUTH CHECK] Token is null after $maxRetries attempts, redirecting to login');
+              // Show error dialog before redirecting
+              AppToasts.showErrorDialog(
+                title: 'Token Error',
+                message: 'Access token is missing after multiple attempts. Please login again.',
+                errorDetails: 'Access token is null after $maxRetries attempts',
+              );
               _redirectToLogin();
               return;
             }
@@ -186,6 +208,12 @@ class CallClassController extends GetxController {
           if (JwtUtil.isTokenExpired(token)) {
             print('❌ [AUTH CHECK] Token expired, redirecting to login');
             print('🔐 [AUTH CHECK] Token expiration check: ${JwtUtil.isTokenExpired(token)}');
+            // Show error dialog before redirecting
+            AppToasts.showErrorDialog(
+              title: 'Token Expired',
+              message: 'Your session has expired. Please login again.',
+              errorDetails: 'Token expiration check returned true',
+            );
             _redirectToLogin();
             return;
           }
@@ -207,6 +235,13 @@ class CallClassController extends GetxController {
               print('❌ [AUTO START] Error auto-starting call: $e');
               print('❌ [AUTO START] Stack trace: $stackTrace');
               AppToasts.showError('Failed to auto-start call: ${e.toString()}');
+              // Show detailed error dialog
+              AppToasts.showErrorDialog(
+                title: 'Auto-Start Call Error',
+                message: 'Failed to automatically start the call. Please try manually.',
+                errorDetails: e.toString(),
+                stackTrace: stackTrace.toString(),
+              );
             }
           }
           return;
@@ -215,6 +250,13 @@ class CallClassController extends GetxController {
           print('❌ [AUTH CHECK] Stack trace: $stackTrace');
           if (attempt == maxRetries) {
             AppToasts.showError('Authentication check failed: ${e.toString()}');
+            // Show detailed error dialog
+            AppToasts.showErrorDialog(
+              title: 'Authentication Check Error',
+              message: 'An error occurred during authentication check. Please try again.',
+              errorDetails: e.toString(),
+              stackTrace: stackTrace.toString(),
+            );
             rethrow;
           }
           await Future.delayed(retryDelay);
@@ -224,6 +266,13 @@ class CallClassController extends GetxController {
       print('❌ [AUTH CHECK] Fatal error in _checkAuthBeforeAccess: $e');
       print('❌ [AUTH CHECK] Stack trace: $stackTrace');
       AppToasts.showError('Failed to initialize authentication: ${e.toString()}');
+      // Show detailed error dialog
+      AppToasts.showErrorDialog(
+        title: 'Authentication Initialization Error',
+        message: 'Failed to initialize authentication. Please restart the app.',
+        errorDetails: e.toString(),
+        stackTrace: stackTrace.toString(),
+      );
       rethrow;
     }
   }
@@ -252,17 +301,54 @@ class CallClassController extends GetxController {
             print('❌ [AUTO START] Error auto-starting call after login: $e');
             print('❌ [AUTO START] Stack trace: $stackTrace');
             AppToasts.showError('Failed to auto-start call: ${e.toString()}');
+            // Show detailed error dialog
+            AppToasts.showErrorDialog(
+              title: 'Auto-Start Call Error',
+              message: 'Failed to automatically start the call after login. Please try manually.',
+              errorDetails: e.toString(),
+              stackTrace: stackTrace.toString(),
+            );
           }
         }
       } else {
         // User cancelled login or login failed, go back to previous screen (home)
-        print('❌ [AUTH] Login cancelled or failed, going back to previous screen');
-        Get.back();
+        // Note: result can be null if login was done via Get.offNamed, which is normal
+        print('⚠️ [AUTH] Login result is null or false. Result: $result');
+        // Don't go back if result is null - this might mean login was done via offNamed
+        // Only go back if explicitly false
+        if (result == false) {
+          print('❌ [AUTH] Login was explicitly cancelled, going back to previous screen');
+          Get.back();
+        } else {
+          print('ℹ️ [AUTH] Login result is null (likely from offNamed navigation), staying on call class');
+          // Try to check auth again in case login completed via offNamed
+          try {
+            await Future.delayed(const Duration(milliseconds: 1000));
+            final isAuth = await AuthUtil().isFullyAuthenticated();
+            if (isAuth) {
+              print('✅ [AUTH] User is authenticated, connecting WebSocket...');
+              await _checkAuthAndConnectWebSocket();
+            } else {
+              print('❌ [AUTH] User still not authenticated after login, going back');
+              Get.back();
+            }
+          } catch (e) {
+            print('❌ [AUTH] Error checking auth after null result: $e');
+            Get.back();
+          }
+        }
       }
     } catch (e, stackTrace) {
       print('❌ [AUTH] Error in _redirectToLogin: $e');
       print('❌ [AUTH] Stack trace: $stackTrace');
       AppToasts.showError('Login navigation failed: ${e.toString()}');
+      // Show detailed error dialog
+      AppToasts.showErrorDialog(
+        title: 'Login Navigation Error',
+        message: 'An error occurred while navigating to login. Please try again.',
+        errorDetails: e.toString(),
+        stackTrace: stackTrace.toString(),
+      );
       Get.back();
     }
   }
@@ -311,8 +397,6 @@ class CallClassController extends GetxController {
       _webSocketService!.onIncomingCall = (event) {
         print('📞 [WEBSOCKET EVENT] incomingCall: sessionId=${event.sessionId}, roomName=${event.roomName}, callerId=${event.callerId}');
         incomingCall.value = event;
-        // Show notification or update UI
-        AppToasts.showWarning('Incoming call from ${event.callerId}');
         // Optionally refresh pending calls
         _loadPendingCalls();
       };
@@ -324,7 +408,6 @@ class CallClassController extends GetxController {
           print('✅ [WEBSOCKET EVENT] Session IDs match, updating call status to active');
           callStatus.value = 'active';
           connectionStatus.value = 'Connected';
-          AppToasts.showSuccess('Call accepted');
         } else {
           print('⚠️ [WEBSOCKET EVENT] Session IDs do not match! Event: ${event.sessionId}, Current: ${currentSessionId.value}');
         }
@@ -344,7 +427,6 @@ class CallClassController extends GetxController {
         if (event.sessionId == currentSessionId.value) {
           callStatus.value = 'ended';
           _handleCallEnded();
-          AppToasts.showWarning(event.message ?? 'Call ended');
         }
       };
       
@@ -364,9 +446,9 @@ class CallClassController extends GetxController {
             error.toString().toLowerCase().contains('unauthorized')) {
           print('🔐 [WEBSOCKET ERROR] Auth error detected, showing login dialog');
           _showLoginRequiredDialog();
-        } else {
-          AppToasts.showError('WebSocket error: $error');
         }
+        // Only show critical WebSocket errors that affect functionality
+        // Non-critical errors are logged but not shown to user
       };
       
       // Connect
@@ -378,6 +460,13 @@ class CallClassController extends GetxController {
       print('❌ [WEBSOCKET ERROR] Stack trace: $stackTrace');
       final errorMessage = e.toString();
       AppToasts.showError('WebSocket connection failed: $errorMessage');
+      // Show detailed error dialog for debugging
+      AppToasts.showErrorDialog(
+        title: 'WebSocket Connection Error',
+        message: 'Failed to connect to WebSocket. Please check your connection and try again.',
+        errorDetails: errorMessage,
+        stackTrace: stackTrace.toString(),
+      );
       if (errorMessage.toLowerCase().contains('auth') || 
           errorMessage.toLowerCase().contains('token') ||
           errorMessage.toLowerCase().contains('unauthorized')) {
@@ -537,6 +626,7 @@ class CallClassController extends GetxController {
 
   @override
   void onClose() {
+    _connectionTimeoutTimer?.cancel();
     disconnectFromRoom();
     _webSocketService?.disconnect();
     messageController.dispose();
@@ -638,8 +728,6 @@ class CallClassController extends GetxController {
         token: response.token!,
         roomName: response.roomName!,
       );
-
-      AppToasts.showSuccess('Call requested. Waiting for agent...');
     } on dio.DioException catch (e) {
       print('❌ [REQUEST CALL] DioException: ${e.response?.statusCode}');
       print('❌ [REQUEST CALL] Response: ${e.response?.data}');
@@ -691,13 +779,24 @@ class CallClassController extends GetxController {
       }
       
       print('❌ [REQUEST CALL] Error message: $errorMessage');
-      AppToasts.showError(errorMessage);
+      // Show detailed error dialog for debugging (toast is shown in dialog)
+      AppToasts.showErrorDialog(
+        title: 'Call Request Error',
+        message: errorMessage,
+        errorDetails: 'Status Code: ${e.response?.statusCode}\nError: ${e.toString()}\nResponse: ${e.response?.data}',
+      );
     } catch (e, stackTrace) {
       print('❌ [REQUEST CALL] Exception: $e');
       print('❌ [REQUEST CALL] Stack trace: $stackTrace');
       callNetworkStatus.value = NetworkStatus.ERROR;
       callStatus.value = 'idle';
-      AppToasts.showError('Failed to request call: $e');
+      // Show detailed error dialog for debugging (toast is shown in dialog)
+      AppToasts.showErrorDialog(
+        title: 'Call Request Error',
+        message: 'An unexpected error occurred while requesting the call. Please try again.',
+        errorDetails: e.toString(),
+        stackTrace: stackTrace.toString(),
+      );
     }
   }
 
@@ -762,8 +861,6 @@ class CallClassController extends GetxController {
       // Remove from pending calls
       pendingCalls.removeWhere((call) => call.id == sessionId);
       incomingCall.value = null;
-
-      AppToasts.showSuccess('Call accepted');
     } catch (e) {
       callNetworkStatus.value = NetworkStatus.ERROR;
       AppToasts.showError('Failed to accept call: $e');
@@ -784,8 +881,6 @@ class CallClassController extends GetxController {
       // Remove from pending calls
       pendingCalls.removeWhere((call) => call.id == sessionId);
       incomingCall.value = null;
-      
-      AppToasts.showSuccess('Call rejected');
     } catch (e) {
       AppToasts.showError('Failed to reject call: $e');
     }
@@ -808,8 +903,23 @@ class CallClassController extends GetxController {
       _room = Room();
       print('🎥 [LIVEKIT] Room instance created');
 
-      // Connect to room
+      // Set up event listeners BEFORE connecting to catch connection errors
+      print('🎥 [LIVEKIT] Setting up event listeners...');
+      _room!.addListener(_onRoomChanged);
+      _room!.addListener(() {
+        _onRemoteParticipantsChanged();
+      });
+      print('🎥 [LIVEKIT] Event listeners set up');
+
+      // Connect to room with timeout
       print('🎥 [LIVEKIT] Calling room.connect()...');
+      connectionStatus.value = 'Connecting...';
+      callStatus.value = 'connecting';
+      
+      // Start connection timeout monitor
+      _startConnectionTimeoutMonitor();
+      
+      // Add connection timeout (30 seconds)
       await _room!.connect(
         wsUrl,
         token,
@@ -822,24 +932,35 @@ class CallClassController extends GetxController {
             autoGainControl: true,
           ),
         ),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          print('❌ [LIVEKIT] Connection timeout after 30 seconds');
+          throw TimeoutException('Connection timeout: Failed to connect to video call server within 30 seconds. Please check your internet connection and try again.');
+        },
       );
+      
       print('🎥 [LIVEKIT] room.connect() completed');
 
-      // Set up event listeners
-      print('🎥 [LIVEKIT] Setting up event listeners...');
-      _room!.addListener(_onRoomChanged);
-      _room!.addListener(() {
-        _onRemoteParticipantsChanged();
-      });
-      print('🎥 [LIVEKIT] Event listeners set up');
+      // Wait a bit for connection state to stabilize
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Check if connection actually succeeded
+      if (_room!.connectionState != ConnectionState.connected) {
+        print('❌ [LIVEKIT] Connection state is not connected: ${_room!.connectionState}');
+        throw Exception('Connection failed: Room state is ${_room!.connectionState}');
+      }
 
       _localParticipant = _room!.localParticipant;
       print('🎥 [LIVEKIT] Local participant: ${_localParticipant != null ? "exists" : "null"}');
       
-      if (_localParticipant != null) {
-        print('🎥 [LIVEKIT] Local participant identity: ${_localParticipant!.identity}');
-        print('🎥 [LIVEKIT] Local participant sid: ${_localParticipant!.sid}');
+      if (_localParticipant == null) {
+        print('❌ [LIVEKIT] Local participant is null after connection');
+        throw Exception('Connection failed: Local participant is null');
       }
+      
+      print('🎥 [LIVEKIT] Local participant identity: ${_localParticipant!.identity}');
+      print('🎥 [LIVEKIT] Local participant sid: ${_localParticipant!.sid}');
 
       isConnected.value = true;
       connectionStatus.value = 'Connected';
@@ -849,12 +970,22 @@ class CallClassController extends GetxController {
 
       // Enable camera and microphone
       print('🎥 [LIVEKIT] Enabling video...');
-      await enableVideo();
-      print('🎥 [LIVEKIT] Video enabled: ${isVideoEnabled.value}');
+      try {
+        await enableVideo();
+        print('🎥 [LIVEKIT] Video enabled: ${isVideoEnabled.value}');
+      } catch (e) {
+        print('⚠️ [LIVEKIT] Warning: Failed to enable video: $e');
+        // Error toast already shown in enableVideo()
+      }
       
       print('🎥 [LIVEKIT] Enabling audio...');
-      await enableAudio();
-      print('🎥 [LIVEKIT] Audio enabled: ${isAudioEnabled.value}');
+      try {
+        await enableAudio();
+        print('🎥 [LIVEKIT] Audio enabled: ${isAudioEnabled.value}');
+      } catch (e) {
+        print('⚠️ [LIVEKIT] Warning: Failed to enable audio: $e');
+        // Error toast already shown in enableAudio()
+      }
 
       // Get local video track
       print('🎥 [LIVEKIT] Updating local video track...');
@@ -864,14 +995,74 @@ class CallClassController extends GetxController {
       // Log room participants
       print('🎥 [LIVEKIT] Remote participants count: ${_room!.remoteParticipants.length}');
       print('🎥 [LIVEKIT] ========== LiveKit Connection Complete ==========');
+      
+      // Cancel timeout monitor since connection succeeded
+      _connectionTimeoutTimer?.cancel();
+      _connectionTimeoutTimer = null;
+    } on TimeoutException catch (e) {
+      print('❌ [LIVEKIT ERROR] Connection timeout: $e');
+      _connectionTimeoutTimer?.cancel();
+      _connectionTimeoutTimer = null;
+      connectionStatus.value = 'Connection timeout';
+      isConnected.value = false;
+      callStatus.value = 'idle';
+      callNetworkStatus.value = NetworkStatus.ERROR;
+      // Show detailed error dialog (toast is shown in dialog)
+      AppToasts.showErrorDialog(
+        title: 'Connection Timeout',
+        message: 'Failed to connect to video call server. This may be due to slow internet connection or server issues.',
+        errorDetails: e.toString(),
+      );
+      await _handleCallEnded();
     } catch (e, stackTrace) {
       print('❌ [LIVEKIT ERROR] Exception connecting to LiveKit: $e');
       print('❌ [LIVEKIT ERROR] Stack trace: $stackTrace');
       connectionStatus.value = 'Connection failed';
       isConnected.value = false;
-      callStatus.value = 'ended';
-      AppToasts.showError('Failed to connect to video call: $e');
+      callStatus.value = 'idle';
+      
+      // Show user-friendly error message
+      String errorMessage = 'Failed to connect to video call';
+      if (e.toString().contains('timeout')) {
+        errorMessage = 'Connection timeout. Please check your internet connection.';
+      } else if (e.toString().contains('network') || e.toString().contains('socket')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (e.toString().contains('permission') || e.toString().contains('camera') || e.toString().contains('microphone')) {
+        errorMessage = 'Camera or microphone permission error. Please grant permissions and try again.';
+      } else if (e.toString().contains('token') || e.toString().contains('auth')) {
+        errorMessage = 'Authentication error. Please try logging in again.';
+      }
+      
+      // Show detailed error dialog for debugging (toast is shown in dialog)
+      AppToasts.showErrorDialog(
+        title: 'LiveKit Connection Error',
+        message: errorMessage,
+        errorDetails: e.toString(),
+        stackTrace: stackTrace.toString(),
+      );
+      _connectionTimeoutTimer?.cancel();
+      _connectionTimeoutTimer = null;
+      await _handleCallEnded();
     }
+  }
+  
+  /// Start connection timeout monitor
+  /// This will show an error if connection is stuck in "connecting" state for too long
+  void _startConnectionTimeoutMonitor() {
+    _connectionTimeoutTimer?.cancel();
+    
+    _connectionTimeoutTimer = Timer(const Duration(seconds: 35), () {
+      // Check if still connecting after timeout
+      if (callStatus.value == 'connecting' && 
+          (connectionStatus.value == 'Connecting...' || connectionStatus.value == 'Reconnecting...')) {
+        print('❌ [CONNECTION TIMEOUT] Connection stuck in connecting state for 35 seconds');
+        AppToasts.showError('Connection is taking too long. Please check your internet and try again.');
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        callStatus.value = 'idle';
+        connectionStatus.value = 'Connection timeout';
+        _handleCallEnded();
+      }
+    });
   }
 
   /// Disconnect from room
@@ -919,10 +1110,17 @@ class CallClassController extends GetxController {
         _updateLocalVideoTrack();
       } else {
         print('❌ [VIDEO] Local participant is null, cannot enable video');
+        throw Exception('Local participant is null');
       }
     } catch (e, stackTrace) {
       print('❌ [VIDEO ERROR] Error enabling video: $e');
       print('❌ [VIDEO ERROR] Stack trace: $stackTrace');
+      isVideoEnabled.value = false;
+      // Only show error if it's a permission issue, not connection issues
+      if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+        AppToasts.showError('Camera permission denied. Please grant permission and try again.');
+      }
+      rethrow;
     }
   }
 
@@ -950,13 +1148,26 @@ class CallClassController extends GetxController {
 
   /// Enable audio
   Future<void> enableAudio() async {
+    print('🎤 [AUDIO] Enabling audio...');
     try {
       if (_localParticipant != null) {
+        print('🎤 [AUDIO] Local participant exists, calling setMicrophoneEnabled(true)...');
         await _localParticipant!.setMicrophoneEnabled(true);
         isAudioEnabled.value = true;
+        print('🎤 [AUDIO] Microphone enabled: ${isAudioEnabled.value}');
+      } else {
+        print('❌ [AUDIO] Local participant is null, cannot enable audio');
+        throw Exception('Local participant is null');
       }
-    } catch (e) {
-      print('Error enabling audio: $e');
+    } catch (e, stackTrace) {
+      print('❌ [AUDIO ERROR] Error enabling audio: $e');
+      print('❌ [AUDIO ERROR] Stack trace: $stackTrace');
+      isAudioEnabled.value = false;
+      // Only show error if it's a permission issue, not connection issues
+      if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+        AppToasts.showError('Microphone permission denied. Please grant permission and try again.');
+      }
+      rethrow;
     }
   }
 
@@ -1050,21 +1261,40 @@ class CallClassController extends GetxController {
 
     print('🔄 [ROOM EVENT] Room changed - ConnectionState: ${_room!.connectionState}');
     
+    final previousState = connectionStatus.value;
+    
     // Update connection status
     if (_room!.connectionState == ConnectionState.connected) {
       print('✅ [ROOM EVENT] Room connected');
       connectionStatus.value = 'Connected';
       isConnected.value = true;
+      callStatus.value = 'active';
     } else if (_room!.connectionState == ConnectionState.disconnected) {
       print('❌ [ROOM EVENT] Room disconnected');
       connectionStatus.value = 'Disconnected';
       isConnected.value = false;
+      // Only show error if we were previously connected (not if we're just starting)
+      if (previousState == 'Connected') {
+        AppToasts.showError('Connection lost. Please try again.');
+        callStatus.value = 'idle';
+        _handleCallEnded();
+      }
     } else if (_room!.connectionState == ConnectionState.connecting) {
       print('🔄 [ROOM EVENT] Room connecting...');
       connectionStatus.value = 'Connecting...';
+      callStatus.value = 'connecting';
     } else if (_room!.connectionState == ConnectionState.reconnecting) {
       print('🔄 [ROOM EVENT] Room reconnecting...');
       connectionStatus.value = 'Reconnecting...';
+    }
+
+    // Check for connection errors
+    if (_room!.connectionState == ConnectionState.disconnected && 
+        (previousState == 'Connecting...' || previousState == 'Reconnecting...')) {
+      print('❌ [ROOM EVENT] Connection failed during connect/reconnect');
+      AppToasts.showError('Failed to connect. Please check your internet and try again.');
+      callStatus.value = 'idle';
+      callNetworkStatus.value = NetworkStatus.ERROR;
     }
 
     print('🔄 [ROOM EVENT] Remote participants: ${_room!.remoteParticipants.length}');
@@ -1137,7 +1367,6 @@ class CallClassController extends GetxController {
     try {
       await _directCallService.endCall(sessionId);
       await _handleCallEnded();
-      AppToasts.showSuccess('Call ended');
     } catch (e) {
       // Check if it's a DioException with 400 status about PENDING call
       bool isPendingCallError = false;
@@ -1161,11 +1390,9 @@ class CallClassController extends GetxController {
       
       // Only show error if it's not a PENDING call error (which is expected)
       if (!isPendingCallError) {
-        AppToasts.showError('Error ending call: ${e.toString()}');
-      } else {
-        // For pending calls, just clean up silently or show a neutral message
-        AppToasts.showSuccess('Call cancelled');
+        AppToasts.showError('Error ending call. Please try again.');
       }
+      // For pending calls, just clean up silently
     } finally {
       // Always clear loading state
       isEndingCall.value = false;

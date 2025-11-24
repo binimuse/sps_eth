@@ -5,20 +5,73 @@ import 'package:sps_eth_app/app/utils/validator_util.dart';
 
 
 class AuthUtil {
-  static final _storage = const FlutterSecureStorage();
+  // Configure FlutterSecureStorage with Android-specific options for Android 11 compatibility
+  // Android 11 has known issues with Keystore initialization, so we use encryptedSharedPreferences
+  // and resetOnError to handle NullPointerException issues
+  static final _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      // Use encrypted shared preferences for better Android 11 compatibility
+      encryptedSharedPreferences: true,
+      // Reset storage on error to handle Android 11 Keystore NullPointerException
+      resetOnError: true,
+    ),
+    // iOS options (keep default)
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  );
 
   Future<void> saveTokenAndUserInfo({
     required String accessToken,
     required String refreshToken,
     required Map<String, dynamic> user,
   }) async {
-    try {
-      await _storage.write(key: Constants.accessToken, value: accessToken);
-      await _storage.write(key: Constants.refreshToken, value: refreshToken);
-      await _storage.write(key: Constants.userData, value: jsonEncode(user));
-    } catch (e) {
-      print("Error saving tokens and user info: $e");
-      rethrow;
+    // Retry logic for Android 11 compatibility
+    const maxRetries = 3;
+    const retryDelay = Duration(milliseconds: 500);
+    
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print("💾 [AUTH UTIL] Attempting to save tokens (attempt $attempt/$maxRetries)...");
+        
+        // Save tokens with retry logic
+        await _storage.write(key: Constants.accessToken, value: accessToken);
+        await Future.delayed(const Duration(milliseconds: 100)); // Small delay between writes
+        
+        await _storage.write(key: Constants.refreshToken, value: refreshToken);
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        await _storage.write(key: Constants.userData, value: jsonEncode(user));
+        
+        print("✅ [AUTH UTIL] Tokens saved successfully on attempt $attempt");
+        return; // Success, exit retry loop
+      } catch (e, stackTrace) {
+        print("❌ [AUTH UTIL] Error saving tokens on attempt $attempt: $e");
+        print("❌ [AUTH UTIL] Stack trace: $stackTrace");
+        
+        // If it's the last attempt, rethrow the error
+        if (attempt == maxRetries) {
+          print("❌ [AUTH UTIL] All retry attempts failed");
+          rethrow;
+        }
+        
+        // Wait before retrying
+        print("⏳ [AUTH UTIL] Waiting ${retryDelay.inMilliseconds}ms before retry...");
+        await Future.delayed(retryDelay);
+        
+        // On Android 11, sometimes the Keystore needs to be reset
+        if (e.toString().contains('NullPointerException') || 
+            e.toString().contains('do.k.f')) {
+          print("⚠️ [AUTH UTIL] Detected Android 11 Keystore issue, attempting reset...");
+          try {
+            // Try to delete and recreate (this might help reset the Keystore state)
+            await _storage.delete(key: Constants.accessToken);
+            await Future.delayed(const Duration(milliseconds: 200));
+          } catch (_) {
+            // Ignore errors during cleanup
+          }
+        }
+      }
     }
   }
 

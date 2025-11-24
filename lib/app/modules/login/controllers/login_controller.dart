@@ -99,6 +99,13 @@ class LoginController extends GetxController {
       print('Stack trace: $s');
       networkStatus.value = NetworkStatus.ERROR;
       AppToasts.showError('An unexpected error occurred. Please try again.');
+      // Show detailed error dialog for debugging
+      AppToasts.showErrorDialog(
+        title: 'OTP Request Error',
+        message: 'An unexpected error occurred while requesting OTP. Please try again.',
+        errorDetails: e.toString(),
+        stackTrace: s.toString(),
+      );
     }
   }
 
@@ -196,12 +203,24 @@ class LoginController extends GetxController {
           } catch (e, stackTrace) {
             print('❌ [LOGIN] Error during navigation: $e');
             print('❌ [LOGIN] Stack trace: $stackTrace');
+            // Show error dialog instead of just printing
+            AppToasts.showErrorDialog(
+              title: 'Navigation Error',
+              message: 'Failed to navigate to call class after login. Please try again.',
+              errorDetails: e.toString(),
+              stackTrace: stackTrace.toString(),
+            );
             // Fallback: navigate directly to call-class route
             print('⚠️ [LOGIN] Using fallback navigation to call-class');
             try {
               Get.offNamed(Routes.CALL_CLASS);
             } catch (e2) {
               print('❌ [LOGIN] Fallback navigation also failed: $e2');
+              AppToasts.showErrorDialog(
+                title: 'Navigation Error',
+                message: 'Failed to navigate to call class. Please restart the app.',
+                errorDetails: e2.toString(),
+              );
             }
           }
         });
@@ -241,6 +260,13 @@ class LoginController extends GetxController {
       otpNetworkStatus.value = NetworkStatus.ERROR;
       otpError.value = 'An unexpected error occurred. Please try again.';
       AppToasts.showError('An unexpected error occurred. Please try again.');
+      // Show detailed error dialog for debugging
+      AppToasts.showErrorDialog(
+        title: 'OTP Verification Error',
+        message: 'An unexpected error occurred while verifying OTP. Please try again.',
+        errorDetails: e.toString(),
+        stackTrace: s.toString(),
+      );
     }
   }
 

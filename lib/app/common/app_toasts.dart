@@ -42,6 +42,181 @@ class AppToasts {
       snackPosition: SnackPosition.BOTTOM,
     );
   }
+
+  /// Show error dialog with detailed information for debugging
+  /// This allows users to take screenshots of errors
+  static void showErrorDialog({
+    required String title,
+    required String message,
+    String? errorDetails,
+    String? stackTrace,
+    VoidCallback? onClose,
+  }) {
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500),
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Error Icon and Title
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.error_outline,
+                        color: AppColors.danger,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.danger,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                
+                // Error Message
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.grayDark,
+                    height: 1.5,
+                  ),
+                ),
+                
+                // Error Details (if provided)
+                if (errorDetails != null && errorDetails.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundLight,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.grayLighter,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Error Details:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.grayDark,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          errorDetails,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.grayDark,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                // Stack Trace (if provided)
+                if (stackTrace != null && stackTrace.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundLight,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.grayLighter,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Stack Trace:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.grayDark,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          stackTrace,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.grayDark,
+                            fontFamily: 'monospace',
+                          ),
+                          maxLines: 10,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                const SizedBox(height: 24),
+                
+                // Close Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.danger,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      Get.back();
+                      onClose?.call();
+                    },
+                    child: Text(
+                      'Close',
+                      style: TextStyle(
+                        color: AppColors.whiteOff,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+  }
 }
 
 class ToastSuccessWidget extends StatelessWidget {

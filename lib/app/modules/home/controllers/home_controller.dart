@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
+import 'package:sps_eth_app/app/theme/app_colors.dart';
 
 class HomeController extends GetxController {
   final Rx<DateTime> now = DateTime.now().obs;
@@ -72,5 +75,61 @@ class HomeController extends GetxController {
 
   void goToFilling() {
     Get.toNamed(Routes.FIILING_CLASS);
+  }
+
+  /// Handle back button press - show confirmation dialog
+  Future<bool> onWillPop() async {
+    final shouldExit = await Get.dialog<bool>(
+      AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Exit App?',
+                style: TextStyle(
+                  color: AppColors.danger,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to close the app?',
+          style: TextStyle(color: AppColors.grayDark),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.primary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            style: TextButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+
+    if (shouldExit == true) {
+      // Exit the app
+      if (Platform.isAndroid) {
+        exit(0);
+      } else if (Platform.isIOS) {
+        exit(0);
+      }
+      return true;
+    }
+    return false;
   }
 }
