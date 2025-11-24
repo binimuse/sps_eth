@@ -102,11 +102,26 @@ class CallClassController extends GetxController {
   // For employee side
   final RxList<PendingCall> pendingCalls = <PendingCall>[].obs;
   final Rx<IncomingCallEvent?> incomingCall = Rx<IncomingCallEvent?>(null);
+  
+  // Auto-start flag for home swipe
+  final RxBool autoStartCall = false.obs;
 
   @override
   void onInit() {
     super.onInit();
-    _loadInitialData();
+    try {
+      // Check if auto-start is requested from arguments
+      final args = Get.arguments;
+      if (args != null && args is Map && args['autoStart'] == true) {
+        autoStartCall.value = true;
+        print('📞 [AUTO START] Auto-start call requested from home swipe');
+      }
+      _loadInitialData();
+    } catch (e, stackTrace) {
+      print('❌ [INIT ERROR] Error in onInit: $e');
+      print('❌ [INIT ERROR] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to initialize call class: ${e.toString()}');
+    }
   }
   
   @override
@@ -114,111 +129,174 @@ class CallClassController extends GetxController {
     super.onReady();
     // Check authentication first before allowing access
     // Using onReady ensures the view is fully built before navigation
-    _checkAuthBeforeAccess();
+    _checkAuthBeforeAccess().catchError((error, stackTrace) {
+      print('❌ [INIT ERROR] Error in onReady: $error');
+      print('❌ [INIT ERROR] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to initialize call class: ${error.toString()}');
+    });
   }
   
   /// Check authentication before allowing access to video call
   /// Redirects to login if not authenticated
   /// Includes retry logic to handle timing issues after login
   Future<void> _checkAuthBeforeAccess() async {
-    print('🔐 [AUTH CHECK] Starting authentication check...');
-    
-    // Retry logic: Sometimes secure storage needs a moment after login
-    const maxRetries = 3;
-    const retryDelay = Duration(milliseconds: 500);
-    
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      print('🔐 [AUTH CHECK] Attempt $attempt of $maxRetries...');
+    try {
+      print('🔐 [AUTH CHECK] Starting authentication check...');
       
-      // Check if user is authenticated
-      final isAuthenticated = await AuthUtil().isFullyAuthenticated();
-      print('🔐 [AUTH CHECK] isFullyAuthenticated: $isAuthenticated');
+      // Retry logic: Sometimes secure storage needs a moment after login
+      const maxRetries = 3;
+      const retryDelay = Duration(milliseconds: 500);
       
-      if (!isAuthenticated) {
-        if (attempt < maxRetries) {
-          print('⚠️ [AUTH CHECK] Authentication check failed, retrying in ${retryDelay.inMilliseconds}ms...');
-          await Future.delayed(retryDelay);
-          continue;
-        } else {
-          print('❌ [AUTH CHECK] User not authenticated after $maxRetries attempts, redirecting to login');
-          _redirectToLogin();
+      for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          print('🔐 [AUTH CHECK] Attempt $attempt of $maxRetries...');
+          
+          // Check if user is authenticated
+          final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+          print('🔐 [AUTH CHECK] isFullyAuthenticated: $isAuthenticated');
+          
+          if (!isAuthenticated) {
+            if (attempt < maxRetries) {
+              print('⚠️ [AUTH CHECK] Authentication check failed, retrying in ${retryDelay.inMilliseconds}ms...');
+              await Future.delayed(retryDelay);
+              continue;
+            } else {
+              print('❌ [AUTH CHECK] User not authenticated after $maxRetries attempts, redirecting to login');
+              _redirectToLogin();
+              return;
+            }
+          }
+          
+          // Also check if token is not expired
+          final token = await AuthUtil().getAccessToken();
+          print('🔐 [AUTH CHECK] Access token exists: ${token != null}');
+          
+          if (token == null) {
+            if (attempt < maxRetries) {
+              print('⚠️ [AUTH CHECK] Token is null, retrying in ${retryDelay.inMilliseconds}ms...');
+              await Future.delayed(retryDelay);
+              continue;
+            } else {
+              print('❌ [AUTH CHECK] Token is null after $maxRetries attempts, redirecting to login');
+              _redirectToLogin();
+              return;
+            }
+          }
+          
+          if (JwtUtil.isTokenExpired(token)) {
+            print('❌ [AUTH CHECK] Token expired, redirecting to login');
+            print('🔐 [AUTH CHECK] Token expiration check: ${JwtUtil.isTokenExpired(token)}');
+            _redirectToLogin();
+            return;
+          }
+          
+          // Authentication successful
+          print('✅ [AUTH CHECK] User authenticated on attempt $attempt');
+          print('✅ [AUTH CHECK] Token is valid, connecting WebSocket...');
+          // User is authenticated, connect WebSocket
+          await _checkAuthAndConnectWebSocket();
+          
+          // If auto-start is requested, automatically start the call
+          if (autoStartCall.value) {
+            print('📞 [AUTO START] Auto-starting call after authentication...');
+            try {
+              // Small delay to ensure WebSocket is connected
+              await Future.delayed(const Duration(milliseconds: 500));
+              await requestCall();
+            } catch (e, stackTrace) {
+              print('❌ [AUTO START] Error auto-starting call: $e');
+              print('❌ [AUTO START] Stack trace: $stackTrace');
+              AppToasts.showError('Failed to auto-start call: ${e.toString()}');
+            }
+          }
           return;
+        } catch (e, stackTrace) {
+          print('❌ [AUTH CHECK] Error in attempt $attempt: $e');
+          print('❌ [AUTH CHECK] Stack trace: $stackTrace');
+          if (attempt == maxRetries) {
+            AppToasts.showError('Authentication check failed: ${e.toString()}');
+            rethrow;
+          }
+          await Future.delayed(retryDelay);
         }
       }
-      
-      // Also check if token is not expired
-      final token = await AuthUtil().getAccessToken();
-      print('🔐 [AUTH CHECK] Access token exists: ${token != null}');
-      
-      if (token == null) {
-        if (attempt < maxRetries) {
-          print('⚠️ [AUTH CHECK] Token is null, retrying in ${retryDelay.inMilliseconds}ms...');
-          await Future.delayed(retryDelay);
-          continue;
-        } else {
-          print('❌ [AUTH CHECK] Token is null after $maxRetries attempts, redirecting to login');
-          _redirectToLogin();
-          return;
-        }
-      }
-      
-      if (JwtUtil.isTokenExpired(token)) {
-        print('❌ [AUTH CHECK] Token expired, redirecting to login');
-        print('🔐 [AUTH CHECK] Token expiration check: ${JwtUtil.isTokenExpired(token)}');
-        _redirectToLogin();
-        return;
-      }
-      
-      // Authentication successful
-      print('✅ [AUTH CHECK] User authenticated on attempt $attempt');
-      print('✅ [AUTH CHECK] Token is valid, connecting WebSocket...');
-      // User is authenticated, connect WebSocket
-      await _checkAuthAndConnectWebSocket();
-      return;
+    } catch (e, stackTrace) {
+      print('❌ [AUTH CHECK] Fatal error in _checkAuthBeforeAccess: $e');
+      print('❌ [AUTH CHECK] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to initialize authentication: ${e.toString()}');
+      rethrow;
     }
   }
   
   /// Redirect to login page
   Future<void> _redirectToLogin() async {
-    print('🔐 [AUTH] Redirecting to login page...');
-    final result = await Get.toNamed('/login');
-    print('🔐 [AUTH] Login result: $result');
-    
-    // If login was successful, reconnect WebSocket and stay on call class view
-    if (result == true) {
-      print('✅ [AUTH] Login successful, reconnecting WebSocket...');
-      await _checkAuthAndConnectWebSocket();
-      print('✅ [AUTH] WebSocket reconnection completed - user is now on call class view');
-    } else {
-      // User cancelled login or login failed, go back to previous screen (home)
-      print('❌ [AUTH] Login cancelled or failed, going back to previous screen');
+    try {
+      print('🔐 [AUTH] Redirecting to login page...');
+      final result = await Get.toNamed('/login');
+      print('🔐 [AUTH] Login result: $result');
+      
+      // If login was successful, reconnect WebSocket and stay on call class view
+      if (result == true) {
+        print('✅ [AUTH] Login successful, reconnecting WebSocket...');
+        await _checkAuthAndConnectWebSocket();
+        print('✅ [AUTH] WebSocket reconnection completed - user is now on call class view');
+        
+        // If auto-start is requested, automatically start the call after login
+        if (autoStartCall.value) {
+          print('📞 [AUTO START] Auto-starting call after login...');
+          try {
+            // Small delay to ensure WebSocket is connected
+            await Future.delayed(const Duration(milliseconds: 500));
+            await requestCall();
+          } catch (e, stackTrace) {
+            print('❌ [AUTO START] Error auto-starting call after login: $e');
+            print('❌ [AUTO START] Stack trace: $stackTrace');
+            AppToasts.showError('Failed to auto-start call: ${e.toString()}');
+          }
+        }
+      } else {
+        // User cancelled login or login failed, go back to previous screen (home)
+        print('❌ [AUTH] Login cancelled or failed, going back to previous screen');
+        Get.back();
+      }
+    } catch (e, stackTrace) {
+      print('❌ [AUTH] Error in _redirectToLogin: $e');
+      print('❌ [AUTH] Stack trace: $stackTrace');
+      AppToasts.showError('Login navigation failed: ${e.toString()}');
       Get.back();
     }
   }
   
   /// Check authentication and connect WebSocket if authenticated
   Future<void> _checkAuthAndConnectWebSocket() async {
-    print('🔌 [WEBSOCKET] Checking authentication for WebSocket connection...');
-    final isAuthenticated = await AuthUtil().isFullyAuthenticated();
-    print('🔌 [WEBSOCKET] isAuthenticated: $isAuthenticated');
-    
-    if (isAuthenticated) {
-      // Also check if token is not expired
-      final token = await AuthUtil().getAccessToken();
-      print('🔌 [WEBSOCKET] Token exists: ${token != null}');
+    try {
+      print('🔌 [WEBSOCKET] Checking authentication for WebSocket connection...');
+      final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+      print('🔌 [WEBSOCKET] isAuthenticated: $isAuthenticated');
       
-      if (token != null && !JwtUtil.isTokenExpired(token)) {
-        print('✅ [WEBSOCKET] Token valid, connecting WebSocket...');
-        await _connectWebSocket();
-      } else {
-        print('❌ [WEBSOCKET] Token expired or null, user needs to login');
-        if (token != null) {
-          print('🔌 [WEBSOCKET] Token expired: ${JwtUtil.isTokenExpired(token)}');
+      if (isAuthenticated) {
+        // Also check if token is not expired
+        final token = await AuthUtil().getAccessToken();
+        print('🔌 [WEBSOCKET] Token exists: ${token != null}');
+        
+        if (token != null && !JwtUtil.isTokenExpired(token)) {
+          print('✅ [WEBSOCKET] Token valid, connecting WebSocket...');
+          await _connectWebSocket();
+        } else {
+          print('❌ [WEBSOCKET] Token expired or null, user needs to login');
+          if (token != null) {
+            print('🔌 [WEBSOCKET] Token expired: ${JwtUtil.isTokenExpired(token)}');
+          }
+          _showLoginRequiredDialog();
         }
-        _showLoginRequiredDialog();
+      } else {
+        print('❌ [WEBSOCKET] User not authenticated, WebSocket connection skipped');
       }
-    } else {
-      print('❌ [WEBSOCKET] User not authenticated, WebSocket connection skipped');
+    } catch (e, stackTrace) {
+      print('❌ [WEBSOCKET] Error in _checkAuthAndConnectWebSocket: $e');
+      print('❌ [WEBSOCKET] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to connect WebSocket: ${e.toString()}');
+      rethrow;
     }
   }
   
@@ -298,10 +376,14 @@ class CallClassController extends GetxController {
     } catch (e, stackTrace) {
       print('❌ [WEBSOCKET ERROR] Exception connecting WebSocket: $e');
       print('❌ [WEBSOCKET ERROR] Stack trace: $stackTrace');
-      if (e.toString().toLowerCase().contains('auth') || 
-          e.toString().toLowerCase().contains('token')) {
+      final errorMessage = e.toString();
+      AppToasts.showError('WebSocket connection failed: $errorMessage');
+      if (errorMessage.toLowerCase().contains('auth') || 
+          errorMessage.toLowerCase().contains('token') ||
+          errorMessage.toLowerCase().contains('unauthorized')) {
         _showLoginRequiredDialog();
       }
+      rethrow;
     }
   }
   
@@ -381,70 +463,76 @@ class CallClassController extends GetxController {
   }
 
   void _loadInitialData() {
-    messages.assignAll([
-      ChatMessage(
-        text:
-            "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-        isFromOP: true,
-        time: '8:00 PM',
-      ),
-      ChatMessage(
-        text:
-            "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-        isFromOP: false,
-        time: '8:00 PM',
-      ),
-      ChatMessage(
-        text:
-            "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-        isFromOP: true,
-        time: '8:00 PM',
-      ),
-      ChatMessage(
-        text:
-            "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-        isFromOP: false,
-        time: '8:00 PM',
-      ),
-    ]);
+    try {
+      messages.assignAll([
+        ChatMessage(
+          text:
+              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
+          isFromOP: true,
+          time: '8:00 PM',
+        ),
+        ChatMessage(
+          text:
+              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
+          isFromOP: false,
+          time: '8:00 PM',
+        ),
+        ChatMessage(
+          text:
+              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
+          isFromOP: true,
+          time: '8:00 PM',
+        ),
+        ChatMessage(
+          text:
+              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
+          isFromOP: false,
+          time: '8:00 PM',
+        ),
+      ]);
 
-    actionTiles.assignAll([
-      ActionTileConfig(
-        icon: Icons.document_scanner,
-        label: 'Scan Document',
-        onPressed: (context) => ScanningDocumentView.show(context),
-      ),
-      ActionTileConfig(
-        icon: Icons.person,
-        label: 'Take Photo',
-        onPressed: (_) => onTakePhoto(),
-      ),
-      ActionTileConfig(
-        icon: Icons.usb,
-        label: 'Flash  Documents',
-        onPressed: (_) => onFlashDocuments(),
-      ),
-      ActionTileConfig(
-        icon: Icons.receipt_long,
-        label: 'Payment Receipt',
-        onPressed: (_) => onPaymentReceipt(),
-      ),
-    ]);
+      actionTiles.assignAll([
+        ActionTileConfig(
+          icon: Icons.document_scanner,
+          label: 'Scan Document',
+          onPressed: (context) => ScanningDocumentView.show(context),
+        ),
+        ActionTileConfig(
+          icon: Icons.person,
+          label: 'Take Photo',
+          onPressed: (_) => onTakePhoto(),
+        ),
+        ActionTileConfig(
+          icon: Icons.usb,
+          label: 'Flash  Documents',
+          onPressed: (_) => onFlashDocuments(),
+        ),
+        ActionTileConfig(
+          icon: Icons.receipt_long,
+          label: 'Payment Receipt',
+          onPressed: (_) => onPaymentReceipt(),
+        ),
+      ]);
 
-    idInformation.assignAll(const [
-      InfoRow('ID Information', '1231235163'),
-      InfoRow('Name  Information', 'Abeba Shimeles Adera'),
-      InfoRow('Birth Date', 'Aug 12 , 2024'),
-      InfoRow('Email', 'abeba@gmail.com'),
-      InfoRow('Phone Number', '0913427553'),
-      InfoRow('Residence Address', '–'),
-    ]);
+      idInformation.assignAll(const [
+        InfoRow('ID Information', '1231235163'),
+        InfoRow('Name  Information', 'Abeba Shimeles Adera'),
+        InfoRow('Birth Date', 'Aug 12 , 2024'),
+        InfoRow('Email', 'abeba@gmail.com'),
+        InfoRow('Phone Number', '0913427553'),
+        InfoRow('Residence Address', '–'),
+      ]);
 
-    supportingDocuments.assignAll(const [
-      DocumentItem(label: 'Incident Document', fileName: 'Doc name.pdf'),
-      DocumentItem(label: 'Application', fileName: 'Doc name.pdf'),
-      DocumentItem(label: 'Others', fileName: 'Doc name.pdf'),
-    ]);
+      supportingDocuments.assignAll(const [
+        DocumentItem(label: 'Incident Document', fileName: 'Doc name.pdf'),
+        DocumentItem(label: 'Application', fileName: 'Doc name.pdf'),
+        DocumentItem(label: 'Others', fileName: 'Doc name.pdf'),
+      ]);
+    } catch (e, stackTrace) {
+      print('❌ [INIT ERROR] Error loading initial data: $e');
+      print('❌ [INIT ERROR] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to load initial data: ${e.toString()}');
+    }
   }
 
   @override

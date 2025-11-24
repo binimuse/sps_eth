@@ -142,12 +142,37 @@ class CallClassView extends GetView<CallClassController> {
                                 }),
                               ),
                             ),
-                            // Start Call buttons - Show when call is not active
+                            // Start Call buttons - Show when call is not active and NOT auto-starting
+                            // OR show close button when auto-starting but there's an error
                             Obx(() {
                               final callStatus = controller.callStatus.value;
                               final isCallActive = callStatus == 'active' || callStatus == 'connecting' || callStatus == 'pending';
+                              final isAutoStarting = controller.autoStartCall.value;
+                              final hasError = controller.callNetworkStatus.value == NetworkStatus.ERROR;
                               
-                              if (isCallActive) return const SizedBox.shrink();
+                              // Show close button if auto-starting and there's an error
+                              if (isAutoStarting && hasError && !isCallActive) {
+                                return Positioned(
+                                  bottom: 10,
+                                  left: 0,
+                                  right: 0,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () {
+                                          print('🔘 [BUTTONS] Close button pressed (error state)');
+                                          Get.back();
+                                        },
+                                        child: _roundCtrl(Icons.close, color: AppColors.danger),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                              
+                              // Hide buttons if call is active or if auto-starting (without error)
+                              if (isCallActive || (isAutoStarting && !hasError)) return const SizedBox.shrink();
                               
                               return Positioned(
                                 bottom: 10,
@@ -516,9 +541,91 @@ class _TermsAndActions extends StatelessWidget {
           const SizedBox(height: 8),
           Obx(() {
             final callStatus = controller.callStatus.value;
+            final isAutoStarting = controller.autoStartCall.value;
             print('🔘 [BUTTONS] Current call status: $callStatus');
+            print('🔘 [BUTTONS] Auto-starting: $isAutoStarting');
             final isCallActive = callStatus == 'active' || callStatus == 'connecting' || callStatus == 'pending';
             print('🔘 [BUTTONS] Is call active: $isCallActive');
+            
+            // Show error message with close button if auto-starting and there's an error
+            if (isAutoStarting && controller.callNetworkStatus.value == NetworkStatus.ERROR) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: AppColors.danger,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Connection Error',
+                      style: TextStyle(
+                        color: AppColors.danger,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Failed to connect. Please try again later.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.grayDark,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.danger,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        print('🔘 [BUTTONS] Close button pressed (error in terms card)');
+                        Get.back();
+                      },
+                      child: Text(
+                        'Close',
+                        style: TextStyle(
+                          color: AppColors.whiteOff,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            // Show loading if auto-starting without error
+            if (isAutoStarting) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: AppColors.primary),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Connecting...',
+                        style: TextStyle(
+                          color: AppColors.grayDark,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
             
             if (isCallActive) {
               // Show end call button when call is active

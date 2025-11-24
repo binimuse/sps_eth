@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:sps_eth_app/app/common/app_toasts.dart';
 
 class HomeController extends GetxController {
   final Rx<DateTime> now = DateTime.now().obs;
@@ -47,8 +48,14 @@ class HomeController extends GetxController {
   }
 
   Future<void> onSwipeToCallComplete() async {
-    Get.snackbar('Calling', 'Dialing...');
-    await Get.toNamed(Routes.CALL_CLASS);
+    try {
+      Get.snackbar('Calling', 'Dialing...');
+      await Get.toNamed(Routes.CALL_CLASS, arguments: {'autoStart': true});
+    } catch (e, stackTrace) {
+      print('❌ [HOME] Error navigating to call class: $e');
+      print('❌ [HOME] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to open call screen: ${e.toString()}');
+    }
   }
 
   void openRecentAlerts() {
