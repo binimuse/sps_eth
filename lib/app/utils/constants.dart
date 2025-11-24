@@ -28,6 +28,7 @@ class Constants {
   static const loginUrl = "/auth/login";
   static const requestOtpUrl = "/auth/request-otp";
   static const verifyOtpUrl = "/auth/verify-otp";
+  static const anonymousLoginUrl = "/auth/anonymous-login";
 
   //products
   static const getParentProducts = "/product-categories/parent";

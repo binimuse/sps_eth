@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -21,9 +22,21 @@ class CallClassView extends GetView<CallClassController> {
         SystemChannels.textInput.invokeMethod('TextInput.hide');
         FocusScope.of(context).unfocus();
       },
-      child: Scaffold(
-        backgroundColor: AppColors.backgroundLight,
-        body: SafeArea(
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, dynamic result) async {
+          if (!didPop) {
+            // Clear tokens and navigate back
+            await controller.onWillPop();
+            Get.back();
+          }
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.backgroundLight,
+          body: Stack(
+          children: [
+            // Main content - always visible
+            SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -98,7 +111,10 @@ class CallClassView extends GetView<CallClassController> {
                                     color: Colors.white,
                                   ),
                                   tooltip: 'Back',
-                                  onPressed: Get.back,
+                                  onPressed: () async {
+                                    await controller.onWillPop();
+                                    Get.back();
+                                  },
                                 ),
                               ),
                             ),
@@ -154,8 +170,9 @@ class CallClassView extends GetView<CallClassController> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       GestureDetector(
-                                        onTap: () {
+                                        onTap: () async {
                                           print('🔘 [BUTTONS] Close button pressed (error state)');
+                                          await controller.onWillPop();
                                           Get.back();
                                         },
                                         child: _roundCtrl(Icons.close, color: AppColors.danger),
@@ -176,8 +193,9 @@ class CallClassView extends GetView<CallClassController> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     GestureDetector(
-                                      onTap: () {
+                                      onTap: () async {
                                         print('🔘 [BUTTONS] Cancel button pressed');
+                                        await controller.onWillPop();
                                         Get.back();
                                       },
                                       child: _roundCtrl(Icons.close, color: AppColors.danger),
@@ -324,6 +342,52 @@ class CallClassView extends GetView<CallClassController> {
               ],
             ),
           ),
+            ),
+            // Blurred loading overlay - shown during anonymous login
+            Obx(() {
+              if (!controller.isAnonymousLoginLoading.value) {
+                return const SizedBox.shrink();
+              }
+              
+              return Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    color: AppColors.black.withOpacity(0.3),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            color: AppColors.primary,
+                            strokeWidth: 3,
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Authenticating...',
+                            style: TextStyle(
+                              color: AppColors.whiteOff,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Please wait while we set up your connection',
+                            style: TextStyle(
+                              color: AppColors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
         ),
       ),
     );
@@ -547,8 +611,9 @@ class _TermsAndActions extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      onPressed: () {
+                      onPressed: () async {
                         print('🔘 [BUTTONS] Close button pressed (error in terms card)');
+                        await controller.onWillPop();
                         Get.back();
                       },
                       child: Text(
@@ -659,8 +724,9 @@ class _TermsAndActions extends StatelessWidget {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 elevation: 4,
                               ),
-                              onPressed: () {
+                              onPressed: () async {
                                 print('🔘 [BUTTONS] Cancel button pressed');
+                                await controller.onWillPop();
                                 Get.back();
                               },
                               child: Text(

@@ -7,6 +7,7 @@ import 'package:sps_eth_app/app/modules/form_class/views/widget/scanning_documen
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocket_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
+import 'package:sps_eth_app/app/modules/Residence_id/services/auth_service.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:sps_eth_app/app/utils/dio_util.dart';
 import 'package:sps_eth_app/app/utils/enums.dart';
@@ -108,6 +109,12 @@ class CallClassController extends GetxController {
   
   // Connection timeout monitor
   Timer? _connectionTimeoutTimer;
+  
+  // Anonymous login state
+  final RxBool isAnonymousLoginLoading = false.obs;
+  
+  // Static device ID (will be fixed later)
+  static const String _staticDeviceId = 'device-12345-abcdef';
 
   @override
   void onInit() {
@@ -147,79 +154,20 @@ class CallClassController extends GetxController {
   }
   
   /// Check authentication before allowing access to video call
-  /// Redirects to login if not authenticated
-  /// Includes retry logic to handle timing issues after login
+  /// Uses anonymous login if not authenticated
   Future<void> _checkAuthBeforeAccess() async {
     try {
       print('🔐 [AUTH CHECK] Starting authentication check...');
       
-      // Retry logic: Sometimes secure storage needs a moment after login
-      const maxRetries = 5; // Increased retries for better handling after login
-      const retryDelay = Duration(milliseconds: 500);
+      // First check if user is already authenticated
+      final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+      print('🔐 [AUTH CHECK] isFullyAuthenticated: $isAuthenticated');
       
-      for (int attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          print('🔐 [AUTH CHECK] Attempt $attempt of $maxRetries...');
-          
-          // Check if user is authenticated
-          final isAuthenticated = await AuthUtil().isFullyAuthenticated();
-          print('🔐 [AUTH CHECK] isFullyAuthenticated: $isAuthenticated');
-          
-          if (!isAuthenticated) {
-            if (attempt < maxRetries) {
-              print('⚠️ [AUTH CHECK] Authentication check failed, retrying in ${retryDelay.inMilliseconds}ms...');
-              await Future.delayed(retryDelay);
-              continue;
-            } else {
-              print('❌ [AUTH CHECK] User not authenticated after $maxRetries attempts, redirecting to login');
-              // Show error dialog before redirecting
-              AppToasts.showErrorDialog(
-                title: 'Authentication Error',
-                message: 'User authentication failed after multiple attempts. Please login again.',
-                errorDetails: 'isFullyAuthenticated returned false after $maxRetries attempts',
-              );
-              _redirectToLogin();
-              return;
-            }
-          }
-          
-          // Also check if token is not expired
-          final token = await AuthUtil().getAccessToken();
-          print('🔐 [AUTH CHECK] Access token exists: ${token != null}');
-          
-          if (token == null) {
-            if (attempt < maxRetries) {
-              print('⚠️ [AUTH CHECK] Token is null, retrying in ${retryDelay.inMilliseconds}ms...');
-              await Future.delayed(retryDelay);
-              continue;
-            } else {
-              print('❌ [AUTH CHECK] Token is null after $maxRetries attempts, redirecting to login');
-              // Show error dialog before redirecting
-              AppToasts.showErrorDialog(
-                title: 'Token Error',
-                message: 'Access token is missing after multiple attempts. Please login again.',
-                errorDetails: 'Access token is null after $maxRetries attempts',
-              );
-              _redirectToLogin();
-              return;
-            }
-          }
-          
-          if (JwtUtil.isTokenExpired(token)) {
-            print('❌ [AUTH CHECK] Token expired, redirecting to login');
-            print('🔐 [AUTH CHECK] Token expiration check: ${JwtUtil.isTokenExpired(token)}');
-            // Show error dialog before redirecting
-            AppToasts.showErrorDialog(
-              title: 'Token Expired',
-              message: 'Your session has expired. Please login again.',
-              errorDetails: 'Token expiration check returned true',
-            );
-            _redirectToLogin();
-            return;
-          }
-          
-          // Authentication successful
-          print('✅ [AUTH CHECK] User authenticated on attempt $attempt');
+      if (isAuthenticated) {
+        // Check if token is not expired
+        final token = await AuthUtil().getAccessToken();
+        if (token != null && !JwtUtil.isTokenExpired(token)) {
+          print('✅ [AUTH CHECK] User already authenticated with valid token');
           print('✅ [AUTH CHECK] Token is valid, connecting WebSocket...');
           // User is authenticated, connect WebSocket
           await _checkAuthAndConnectWebSocket();
@@ -245,26 +193,17 @@ class CallClassController extends GetxController {
             }
           }
           return;
-        } catch (e, stackTrace) {
-          print('❌ [AUTH CHECK] Error in attempt $attempt: $e');
-          print('❌ [AUTH CHECK] Stack trace: $stackTrace');
-          if (attempt == maxRetries) {
-            AppToasts.showError('Authentication check failed: ${e.toString()}');
-            // Show detailed error dialog
-            AppToasts.showErrorDialog(
-              title: 'Authentication Check Error',
-              message: 'An error occurred during authentication check. Please try again.',
-              errorDetails: e.toString(),
-              stackTrace: stackTrace.toString(),
-            );
-            rethrow;
-          }
-          await Future.delayed(retryDelay);
         }
       }
+      
+      // User is not authenticated or token is expired, perform anonymous login
+      print('🔐 [ANONYMOUS LOGIN] User not authenticated, performing anonymous login...');
+      await _performAnonymousLogin();
+      
     } catch (e, stackTrace) {
       print('❌ [AUTH CHECK] Fatal error in _checkAuthBeforeAccess: $e');
       print('❌ [AUTH CHECK] Stack trace: $stackTrace');
+      isAnonymousLoginLoading.value = false;
       AppToasts.showError('Failed to initialize authentication: ${e.toString()}');
       // Show detailed error dialog
       AppToasts.showErrorDialog(
@@ -277,79 +216,120 @@ class CallClassController extends GetxController {
     }
   }
   
-  /// Redirect to login page
-  Future<void> _redirectToLogin() async {
+  /// Perform anonymous login using device ID
+  Future<void> _performAnonymousLogin() async {
     try {
-      print('🔐 [AUTH] Redirecting to login page...');
-      final result = await Get.toNamed('/login');
-      print('🔐 [AUTH] Login result: $result');
+      isAnonymousLoginLoading.value = true;
+      print('🔐 [ANONYMOUS LOGIN] Starting anonymous login with device ID: $_staticDeviceId');
       
-      // If login was successful, reconnect WebSocket and stay on call class view
-      if (result == true) {
-        print('✅ [AUTH] Login successful, reconnecting WebSocket...');
-        await _checkAuthAndConnectWebSocket();
-        print('✅ [AUTH] WebSocket reconnection completed - user is now on call class view');
-        
-        // If auto-start is requested, automatically start the call after login
-        if (autoStartCall.value) {
-          print('📞 [AUTO START] Auto-starting call after login...');
-          try {
-            // Small delay to ensure WebSocket is connected
-            await Future.delayed(const Duration(milliseconds: 500));
-            await requestCall();
-          } catch (e, stackTrace) {
-            print('❌ [AUTO START] Error auto-starting call after login: $e');
-            print('❌ [AUTO START] Stack trace: $stackTrace');
-            AppToasts.showError('Failed to auto-start call: ${e.toString()}');
-            // Show detailed error dialog
-            AppToasts.showErrorDialog(
-              title: 'Auto-Start Call Error',
-              message: 'Failed to automatically start the call after login. Please try manually.',
-              errorDetails: e.toString(),
-              stackTrace: stackTrace.toString(),
-            );
-          }
-        }
-      } else {
-        // User cancelled login or login failed, go back to previous screen (home)
-        // Note: result can be null if login was done via Get.offNamed, which is normal
-        print('⚠️ [AUTH] Login result is null or false. Result: $result');
-        // Don't go back if result is null - this might mean login was done via offNamed
-        // Only go back if explicitly false
-        if (result == false) {
-          print('❌ [AUTH] Login was explicitly cancelled, going back to previous screen');
-          Get.back();
-        } else {
-          print('ℹ️ [AUTH] Login result is null (likely from offNamed navigation), staying on call class');
-          // Try to check auth again in case login completed via offNamed
-          try {
-            await Future.delayed(const Duration(milliseconds: 1000));
-            final isAuth = await AuthUtil().isFullyAuthenticated();
-            if (isAuth) {
-              print('✅ [AUTH] User is authenticated, connecting WebSocket...');
-              await _checkAuthAndConnectWebSocket();
-            } else {
-              print('❌ [AUTH] User still not authenticated after login, going back');
-              Get.back();
-            }
-          } catch (e) {
-            print('❌ [AUTH] Error checking auth after null result: $e');
-            Get.back();
-          }
+      // Create Dio instance without access token (since we don't have one yet)
+      final dio = DioUtil().getDio(useAccessToken: false);
+      final authService = AuthService(dio);
+      
+      // Call anonymous login API
+      final response = await authService.anonymousLogin({
+        'deviceId': _staticDeviceId,
+      });
+      
+      print('🔐 [ANONYMOUS LOGIN] API response received');
+      print('  - success: ${response.success}');
+      print('  - accessToken: ${response.data?.accessToken != null ? "${response.data!.accessToken!.substring(0, 20)}..." : "null"}');
+      print('  - user: ${response.data?.user != null ? "exists" : "null"}');
+      
+      if (response.success != true || response.data == null) {
+        throw Exception('Anonymous login failed: Invalid response from server');
+      }
+      
+      final loginData = response.data!;
+      
+      if (loginData.accessToken == null || loginData.accessToken!.isEmpty) {
+        throw Exception('Anonymous login failed: Access token is missing');
+      }
+      
+      if (loginData.user == null) {
+        throw Exception('Anonymous login failed: User data is missing');
+      }
+      
+      // Convert user to Map for storage
+      final userMap = loginData.user!.toJson();
+      
+      // Save tokens and user info
+      print('💾 [ANONYMOUS LOGIN] Saving tokens and user data...');
+      await AuthUtil().saveTokenAndUserInfo(
+        accessToken: loginData.accessToken!,
+        refreshToken: loginData.refreshToken ?? '', // Anonymous login might not provide refresh token
+        user: userMap,
+      );
+      
+      // Verify token was saved
+      final savedToken = await AuthUtil().getAccessToken();
+      if (savedToken == null || savedToken != loginData.accessToken) {
+        throw Exception('Failed to save authentication token');
+      }
+      
+      print('✅ [ANONYMOUS LOGIN] Anonymous login successful');
+      print('✅ [ANONYMOUS LOGIN] Token saved, connecting WebSocket...');
+      
+      // Connect WebSocket
+      await _checkAuthAndConnectWebSocket();
+      
+      // If auto-start is requested, automatically start the call
+      if (autoStartCall.value) {
+        print('📞 [AUTO START] Auto-starting call after anonymous login...');
+        try {
+          // Small delay to ensure WebSocket is connected
+          await Future.delayed(const Duration(milliseconds: 500));
+          await requestCall();
+        } catch (e, stackTrace) {
+          print('❌ [AUTO START] Error auto-starting call: $e');
+          print('❌ [AUTO START] Stack trace: $stackTrace');
+          AppToasts.showError('Failed to auto-start call: ${e.toString()}');
+          // Show detailed error dialog
+          AppToasts.showErrorDialog(
+            title: 'Auto-Start Call Error',
+            message: 'Failed to automatically start the call. Please try manually.',
+            errorDetails: e.toString(),
+            stackTrace: stackTrace.toString(),
+          );
         }
       }
-    } catch (e, stackTrace) {
-      print('❌ [AUTH] Error in _redirectToLogin: $e');
-      print('❌ [AUTH] Stack trace: $stackTrace');
-      AppToasts.showError('Login navigation failed: ${e.toString()}');
-      // Show detailed error dialog
+    } on dio.DioException catch (e) {
+      print('❌ [ANONYMOUS LOGIN] DioException: ${e.response?.statusCode}');
+      print('❌ [ANONYMOUS LOGIN] Response: ${e.response?.data}');
+      
+      String errorMessage = 'Failed to authenticate. Please try again.';
+      if (e.response?.statusCode == 400 || e.response?.statusCode == 500) {
+        try {
+          final responseData = e.response?.data;
+          if (responseData is Map<String, dynamic>) {
+            final error = responseData['error'];
+            if (error is Map && error.containsKey('message')) {
+              errorMessage = error['message'] ?? errorMessage;
+            } else if (responseData.containsKey('message')) {
+              errorMessage = responseData['message'] ?? errorMessage;
+            }
+          }
+        } catch (_) {}
+      }
+      
       AppToasts.showErrorDialog(
-        title: 'Login Navigation Error',
-        message: 'An error occurred while navigating to login. Please try again.',
+        title: 'Authentication Error',
+        message: errorMessage,
+        errorDetails: 'Status Code: ${e.response?.statusCode}\nError: ${e.toString()}\nResponse: ${e.response?.data}',
+      );
+      rethrow;
+    } catch (e, stackTrace) {
+      print('❌ [ANONYMOUS LOGIN] Exception: $e');
+      print('❌ [ANONYMOUS LOGIN] Stack trace: $stackTrace');
+      AppToasts.showErrorDialog(
+        title: 'Authentication Error',
+        message: 'An unexpected error occurred during authentication. Please try again.',
         errorDetails: e.toString(),
         stackTrace: stackTrace.toString(),
       );
-      Get.back();
+      rethrow;
+    } finally {
+      isAnonymousLoginLoading.value = false;
     }
   }
   
@@ -369,11 +349,12 @@ class CallClassController extends GetxController {
           print('✅ [WEBSOCKET] Token valid, connecting WebSocket...');
           await _connectWebSocket();
         } else {
-          print('❌ [WEBSOCKET] Token expired or null, user needs to login');
+          print('❌ [WEBSOCKET] Token expired or null, performing anonymous login...');
           if (token != null) {
             print('🔌 [WEBSOCKET] Token expired: ${JwtUtil.isTokenExpired(token)}');
           }
-          _showLoginRequiredDialog();
+          // Perform anonymous login instead of showing login dialog
+          await _performAnonymousLogin();
         }
       } else {
         print('❌ [WEBSOCKET] User not authenticated, WebSocket connection skipped');
@@ -441,11 +422,14 @@ class CallClassController extends GetxController {
       
       _webSocketService!.onError = (error) {
         print('❌ [WEBSOCKET ERROR] Error: $error');
-        // Don't show error toast for auth errors, show login dialog instead
+        // Don't show error toast for auth errors, perform anonymous login instead
         if (error.toString().toLowerCase().contains('auth') || 
             error.toString().toLowerCase().contains('unauthorized')) {
-          print('🔐 [WEBSOCKET ERROR] Auth error detected, showing login dialog');
-          _showLoginRequiredDialog();
+          print('🔐 [WEBSOCKET ERROR] Auth error detected, performing anonymous login');
+          // Perform anonymous login
+          _performAnonymousLogin().catchError((authError) {
+            print('❌ [WEBSOCKET ERROR] Anonymous login failed: $authError');
+          });
         }
         // Only show critical WebSocket errors that affect functionality
         // Non-critical errors are logged but not shown to user
@@ -470,56 +454,43 @@ class CallClassController extends GetxController {
       if (errorMessage.toLowerCase().contains('auth') || 
           errorMessage.toLowerCase().contains('token') ||
           errorMessage.toLowerCase().contains('unauthorized')) {
-        _showLoginRequiredDialog();
+        // Try anonymous login
+        try {
+          await _performAnonymousLogin();
+        } catch (authError) {
+          print('❌ [WEBSOCKET] Anonymous login failed: $authError');
+        }
       }
       rethrow;
     }
   }
   
-  /// Show login required dialog
-  void _showLoginRequiredDialog() {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Login Required'),
-        content: const Text(
-          'You need to be logged in to use the video call feature. Please login to continue.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Get.back();
-              // Navigate to login screen
-              final result = await Get.toNamed('/login');
-              // If login was successful, reconnect WebSocket
-              if (result == true) {
-                await _checkAuthAndConnectWebSocket();
-              }
-            },
-            child: const Text('Go to Login'),
-          ),
-        ],
-      ),
-      barrierDismissible: false,
-    );
-  }
-  
   /// Check if user is authenticated before performing call operations
+  /// Performs anonymous login if not authenticated
   Future<bool> _checkAuthentication() async {
     final isAuthenticated = await AuthUtil().isFullyAuthenticated();
     if (!isAuthenticated) {
-      _showLoginRequiredDialog();
-      return false;
+      // Perform anonymous login
+      try {
+        await _performAnonymousLogin();
+        return true;
+      } catch (e) {
+        print('❌ [AUTH] Anonymous login failed: $e');
+        return false;
+      }
     }
     
     // Check if token is expired
     final token = await AuthUtil().getAccessToken();
     if (token == null || JwtUtil.isTokenExpired(token)) {
-      _showLoginRequiredDialog();
-      return false;
+      // Perform anonymous login
+      try {
+        await _performAnonymousLogin();
+        return true;
+      } catch (e) {
+        print('❌ [AUTH] Anonymous login failed: $e');
+        return false;
+      }
     }
     
     return true;
@@ -538,10 +509,16 @@ class CallClassController extends GetxController {
       pendingCalls.assignAll(calls);
     } catch (e) {
       print('Error loading pending calls: $e');
-      // If it's an auth error, show login dialog
+      // If it's an auth error, perform anonymous login
       if (e.toString().toLowerCase().contains('401') || 
           e.toString().toLowerCase().contains('unauthorized')) {
-        _showLoginRequiredDialog();
+        try {
+          await _performAnonymousLogin();
+          // Retry loading pending calls after anonymous login
+          await _loadPendingCalls();
+        } catch (authError) {
+          print('❌ [PENDING CALLS] Anonymous login failed: $authError');
+        }
       }
     }
   }
@@ -624,6 +601,24 @@ class CallClassController extends GetxController {
     }
   }
 
+  /// Clear authentication tokens when leaving the call class view
+  Future<void> clearTokensOnExit() async {
+    try {
+      print('🔐 [CLEAR TOKENS] Clearing authentication tokens on exit...');
+      await AuthUtil().logOut();
+      print('✅ [CLEAR TOKENS] Tokens cleared successfully');
+    } catch (e) {
+      print('❌ [CLEAR TOKENS] Error clearing tokens: $e');
+    }
+  }
+  
+  /// Handle back button press - clear tokens and navigate back
+  Future<bool> onWillPop() async {
+    print('🔙 [BACK BUTTON] Back button pressed, clearing tokens...');
+    await clearTokensOnExit();
+    return true; // Allow navigation
+  }
+
   @override
   void onClose() {
     _connectionTimeoutTimer?.cancel();
@@ -632,6 +627,8 @@ class CallClassController extends GetxController {
     messageController.dispose();
     keyboardController.dispose();
     focusedField?.dispose();
+    // Clear tokens when controller is closed
+    clearTokensOnExit();
     super.onClose();
   }
 
@@ -729,15 +726,29 @@ class CallClassController extends GetxController {
         roomName: response.roomName!,
       );
     } on dio.DioException catch (e) {
-      print('❌ [REQUEST CALL] DioException: ${e.response?.statusCode}');
+      print('❌ [REQUEST CALL] DioException: ${e.type}');
+      print('❌ [REQUEST CALL] Status Code: ${e.response?.statusCode}');
       print('❌ [REQUEST CALL] Response: ${e.response?.data}');
+      print('❌ [REQUEST CALL] Error: ${e.error}');
+      print('❌ [REQUEST CALL] Message: ${e.message}');
       
       callNetworkStatus.value = NetworkStatus.ERROR;
       callStatus.value = 'idle';
       
       String errorMessage = 'Failed to request call';
       
-      if (e.response?.statusCode == 403) {
+      // Handle network/connection errors
+      if (e.type == dio.DioExceptionType.connectionTimeout ||
+          e.type == dio.DioExceptionType.receiveTimeout ||
+          e.type == dio.DioExceptionType.sendTimeout) {
+        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
+      } else if (e.type == dio.DioExceptionType.connectionError ||
+                 e.error?.toString().toLowerCase().contains('connection closed') == true ||
+                 e.error?.toString().toLowerCase().contains('connection refused') == true ||
+                 e.message?.toLowerCase().contains('connection closed') == true) {
+        errorMessage = 'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
+        print('⚠️ [REQUEST CALL] This appears to be a backend/network issue. The server closed the connection unexpectedly.');
+      } else if (e.response?.statusCode == 403) {
         // Parse error message from response
         try {
           final responseData = e.response?.data;
@@ -779,12 +790,25 @@ class CallClassController extends GetxController {
       }
       
       print('❌ [REQUEST CALL] Error message: $errorMessage');
-      // Show detailed error dialog for debugging (toast is shown in dialog)
-      AppToasts.showErrorDialog(
-        title: 'Call Request Error',
-        message: errorMessage,
-        errorDetails: 'Status Code: ${e.response?.statusCode}\nError: ${e.toString()}\nResponse: ${e.response?.data}',
-      );
+      print('❌ [REQUEST CALL] Error type: ${e.type}');
+      
+      // Show user-friendly error message
+      AppToasts.showError(errorMessage);
+      
+      // Show detailed error dialog for debugging (only for non-network errors or in debug mode)
+      final isNetworkError = e.type == dio.DioExceptionType.connectionTimeout ||
+                             e.type == dio.DioExceptionType.receiveTimeout ||
+                             e.type == dio.DioExceptionType.sendTimeout ||
+                             e.type == dio.DioExceptionType.connectionError ||
+                             e.error?.toString().toLowerCase().contains('connection') == true;
+      
+      if (!isNetworkError) {
+        AppToasts.showErrorDialog(
+          title: 'Call Request Error',
+          message: errorMessage,
+          errorDetails: 'Status Code: ${e.response?.statusCode}\nError Type: ${e.type}\nError: ${e.toString()}\nResponse: ${e.response?.data}',
+        );
+      }
     } catch (e, stackTrace) {
       print('❌ [REQUEST CALL] Exception: $e');
       print('❌ [REQUEST CALL] Stack trace: $stackTrace');

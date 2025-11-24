@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart' hide Headers;
 import 'package:retrofit/retrofit.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/models/auth_model.dart';
+import 'package:sps_eth_app/app/modules/login/models/login_model.dart';
 import 'package:sps_eth_app/app/utils/constants.dart';
 
 part 'auth_service.g.dart';
@@ -92,5 +93,38 @@ abstract class AuthService {
   /// }
   @POST(Constants.verifyOtpUrl)
   Future<VerifyOtpResponse> verifyOtp(@Body() Map<String, dynamic> data);
+
+  /// Anonymous login for video calls
+  /// 
+  /// Request body:
+  /// {
+  ///   "deviceId": "device-12345-abcdef"
+  /// }
+  /// 
+  /// Expected backend response:
+  /// {
+  ///   "success": true,
+  ///   "data": {
+  ///     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  ///     "user": {
+  ///       "id": "3a52c97b-2bdc-4753-90c1-12447fa60c88",
+  ///       "phone": null,
+  ///       "email": null,
+  ///       "name": "Guest-1764012403693-5757",
+  ///       "role": {
+  ///         "id": "293b3459-ded3-4f81-bca8-ea602ffad049",
+  ///         "name": "USER"
+  ///       },
+  ///       "is2faEnabled": false,
+  ///       "isGuest": true
+  ///     }
+  ///   },
+  ///   "meta": {
+  ///     "timestamp": "2025-11-24T19:26:43.704Z",
+  ///     "requestId": "ee3ead3e-03ff-40f2-8063-37f1f4f8a3a8"
+  ///   }
+  /// }
+  @POST(Constants.anonymousLoginUrl)
+  Future<LoginResponse> anonymousLogin(@Body() Map<String, dynamic> data);
 }
 

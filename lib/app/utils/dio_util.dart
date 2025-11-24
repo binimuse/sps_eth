@@ -22,12 +22,10 @@ class DioUtil {
 
   dio.Dio getDio({bool? useAccessToken, bool? forFileUpload}) {
     dio.BaseOptions options = dio.BaseOptions(
-      connectTimeout: forFileUpload == true
-          ? const Duration(seconds: _timeoutInSeconds)
-          : null,
-      receiveTimeout: forFileUpload == true
-          ? const Duration(seconds: _timeoutInSeconds)
-          : null,
+      // Set timeouts for all requests (not just file uploads)
+      connectTimeout: const Duration(seconds: _timeoutInSeconds),
+      receiveTimeout: const Duration(seconds: _timeoutInSeconds),
+      sendTimeout: const Duration(seconds: _timeoutInSeconds),
       headers: {'Content-Type': _contentTypeJson},
     );
     dio.Dio dioInstance = dio.Dio(options);
