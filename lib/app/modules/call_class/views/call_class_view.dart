@@ -7,6 +7,7 @@ import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/app/utils/enums.dart';
 
 import '../controllers/call_class_controller.dart';
+import 'widgets/report_draft_view.dart';
 
 class CallClassView extends GetView<CallClassController> {
   const CallClassView({super.key});
@@ -330,6 +331,16 @@ class CallClassView extends GetView<CallClassController> {
                             Obx(() => _DocumentsCard(
                                   documents: controller.supportingDocuments.toList(),
                                 )),
+                            const SizedBox(height: 12),
+                            // Report Draft View - Show during active calls
+                            Obx(() {
+                              final isCallActive = controller.callStatus.value == 'active' || 
+                                                   controller.callStatus.value == 'connecting';
+                              if (!isCallActive) {
+                                return const SizedBox.shrink();
+                              }
+                              return const ReportDraftView();
+                            }),
                             const SizedBox(height: 8),
                             _TermsAndActions(controller: controller),
                             const Spacer(), // Push buttons to top if needed
@@ -381,6 +392,46 @@ class CallClassView extends GetView<CallClassController> {
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+            // Offline indicator - shown at the top when offline
+            Obx(() {
+              final isOnline = controller.connectivityUtil.isOnline.value;
+              if (isOnline) {
+                return const SizedBox.shrink();
+              }
+              
+              return Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    color: AppColors.danger,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.wifi_off,
+                          color: AppColors.whiteOff,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'No Internet Connection',
+                          style: TextStyle(
+                            color: AppColors.whiteOff,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

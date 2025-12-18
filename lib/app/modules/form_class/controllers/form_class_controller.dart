@@ -141,5 +141,25 @@ class FormClassController extends GetxController {
     keyboardController.text = focusedController!.text;
     keyboardController.selection = focusedController!.selection;
   }
+
+  /// Collect all form data into a map for PDF generation
+  Map<String, String> getAllFormData() {
+    return {
+      'clearanceFor': clearanceForController.text,
+      'email': emailController.text,
+      'phone': phoneController.text,
+      'address': addressController.text,
+      'maritalStatus': maritalStatusController.text,
+      'ethiopianOrForeigner': ethiopianOrForeignerController.text,
+      'region': regionController.text,
+      'subcity': subcityController.text,
+      'woreda': woredaController.text,
+      'kebele': kebeleController.text,
+      'houseNumber': houseNumberController.text,
+      'incidentSummary': incidentSummaryController.text,
+      'damageCaused': damageCausedController.text,
+      'incidentDetail': incidentDetailController.text,
+    };
+  }
 }
 

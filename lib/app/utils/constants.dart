@@ -124,4 +124,7 @@ class Constants {
   static const directCallReject = "/direct-call/reject/{sessionId}";
   static const directCallEnd = "/direct-call/end/{sessionId}";
   static const directCallPending = "/direct-call/pending";
+
+  // Report endpoints
+  static const reportDraft = "/reports/draft/{callSessionId}";
 }

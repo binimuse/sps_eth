@@ -5,6 +5,7 @@ import 'package:sps_eth_app/app/modules/form_class/views/widget/case_summary_vie
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
 import '../controllers/form_class_controller.dart';
+import '../services/pdf_service.dart';
 import 'widget/scanning_document_view.dart';
 
 class FormClassView extends GetView<FormClassController> {
@@ -105,6 +106,33 @@ class FormClassView extends GetView<FormClassController> {
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      side: const BorderSide(color: Color(0xFF0F3955)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () async {
+                      try {
+                        final formData = controller.getAllFormData();
+                        // Show dialog with print and share options
+                        _showPrintOptionsDialog(Get.context!, formData);
+                      } catch (e) {
+                        Get.snackbar(
+                          'Error',
+                          'Failed to generate PDF: ${e.toString()}',
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.print, color: Color(0xFF0F3955)),
+                    label: const Text('Print', style: TextStyle(color: Color(0xFF0F3955))),
                   ),
                 ],
               ),
@@ -633,6 +661,74 @@ class FormClassView extends GetView<FormClassController> {
           child: Text(showSubmit ? 'Submit' : 'Next'),
         ),
       ],
+    );
+  }
+
+  void _showPrintOptionsDialog(BuildContext context, Map<String, String> formData) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Print / Share PDF',
+            style: TextStyle(
+              color: Color(0xFF0F3955),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: const Text('Choose an option to print or share the form PDF'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await PdfService.directPrintPdf(formData);
+                } catch (e) {
+                  Get.snackbar(
+                    'Error',
+                    'Failed to print: ${e.toString()}',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+              icon: const Icon(Icons.print, size: 18),
+              label: const Text('Print'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F3955),
+                foregroundColor: Colors.white,
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await PdfService.generateAndPrintPdf(formData);
+                } catch (e) {
+                  Get.snackbar(
+                    'Error',
+                    'Failed to share: ${e.toString()}',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+              icon: const Icon(Icons.share, size: 18),
+              label: const Text('Share'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F3955),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

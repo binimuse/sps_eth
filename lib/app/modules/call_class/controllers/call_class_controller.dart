@@ -6,13 +6,17 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sps_eth_app/app/modules/form_class/views/widget/scanning_document_view.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocket_service.dart';
+import 'package:sps_eth_app/app/modules/call_class/services/report_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
+import 'package:sps_eth_app/app/modules/call_class/models/report_draft_model.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/services/auth_service.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:sps_eth_app/app/utils/dio_util.dart';
 import 'package:sps_eth_app/app/utils/enums.dart';
 import 'package:sps_eth_app/app/utils/auth_util.dart';
 import 'package:sps_eth_app/app/utils/jwt_util.dart';
+import 'package:sps_eth_app/app/utils/device_id_util.dart';
+import 'package:sps_eth_app/app/utils/connectivity_util.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
 
 class ChatMessage {
@@ -80,6 +84,9 @@ class CallClassController extends GetxController {
   final DirectCallService _directCallService = DirectCallService(
     DioUtil().getDio(useAccessToken: true),
   );
+  final ReportService _reportService = ReportService(
+    DioUtil().getDio(useAccessToken: true),
+  );
   DirectCallWebSocketService? _webSocketService;
 
   // LiveKit related
@@ -113,13 +120,28 @@ class CallClassController extends GetxController {
   // Anonymous login state
   final RxBool isAnonymousLoginLoading = false.obs;
   
-  // Static device ID (will be fixed later)
-  static const String _staticDeviceId = 'device-12345-abcdef';
+  // Connectivity monitoring
+  final ConnectivityUtil connectivityUtil = ConnectivityUtil();
+  
+  // Report draft polling
+  Timer? _draftPollingTimer;
+  final Rx<ReportDraftData?> reportDraft = Rx<ReportDraftData?>(null);
+  final RxBool isPollingDraft = false.obs;
+  final RxString pollingStatus = 'Waiting for officer to start form...'.obs;
+  Map<String, dynamic>? _previousFormData; // Track previous form data for highlighting updates
+  final RxSet<String> recentlyUpdatedFields = <String>{}.obs; // Track fields that were recently updated
+  int _consecutiveNoUpdatesCount = 0; // Track consecutive polls with no updates for adaptive polling
+  static const int _normalPollInterval = 3; // seconds
+  static const int _slowPollInterval = 5; // seconds (when no updates)
+  Timer? _fieldHighlightTimer; // Timer to clear field highlights after animation
 
   @override
   void onInit() {
     super.onInit();
     try {
+      // Initialize connectivity monitoring
+      connectivityUtil.initialize();
+      
       // Check if auto-start is requested from arguments
       final args = Get.arguments;
       if (args != null && args is Map && args['autoStart'] == true) {
@@ -143,13 +165,6 @@ class CallClassController extends GetxController {
       print('❌ [INIT ERROR] Error in onReady: $error');
       print('❌ [INIT ERROR] Stack trace: $stackTrace');
       AppToasts.showError('Failed to initialize call class: ${error.toString()}');
-      // Show detailed error dialog for debugging
-      AppToasts.showErrorDialog(
-        title: 'Initialization Error',
-        message: 'Failed to initialize call class. Please try again.',
-        errorDetails: error.toString(),
-        stackTrace: stackTrace.toString(),
-      );
     });
   }
   
@@ -183,13 +198,6 @@ class CallClassController extends GetxController {
               print('❌ [AUTO START] Error auto-starting call: $e');
               print('❌ [AUTO START] Stack trace: $stackTrace');
               AppToasts.showError('Failed to auto-start call: ${e.toString()}');
-              // Show detailed error dialog
-              AppToasts.showErrorDialog(
-                title: 'Auto-Start Call Error',
-                message: 'Failed to automatically start the call. Please try manually.',
-                errorDetails: e.toString(),
-                stackTrace: stackTrace.toString(),
-              );
             }
           }
           return;
@@ -205,13 +213,6 @@ class CallClassController extends GetxController {
       print('❌ [AUTH CHECK] Stack trace: $stackTrace');
       isAnonymousLoginLoading.value = false;
       AppToasts.showError('Failed to initialize authentication: ${e.toString()}');
-      // Show detailed error dialog
-      AppToasts.showErrorDialog(
-        title: 'Authentication Initialization Error',
-        message: 'Failed to initialize authentication. Please restart the app.',
-        errorDetails: e.toString(),
-        stackTrace: stackTrace.toString(),
-      );
       rethrow;
     }
   }
@@ -220,7 +221,10 @@ class CallClassController extends GetxController {
   Future<void> _performAnonymousLogin() async {
     try {
       isAnonymousLoginLoading.value = true;
-      print('🔐 [ANONYMOUS LOGIN] Starting anonymous login with device ID: $_staticDeviceId');
+      
+      // Get device ID from utility (for now returns common static ID)
+      final deviceId = await DeviceIdUtil.getDeviceId();
+      print('🔐 [ANONYMOUS LOGIN] Starting anonymous login with device ID: $deviceId');
       
       // Create Dio instance without access token (since we don't have one yet)
       final dio = DioUtil().getDio(useAccessToken: false);
@@ -228,7 +232,7 @@ class CallClassController extends GetxController {
       
       // Call anonymous login API
       final response = await authService.anonymousLogin({
-        'deviceId': _staticDeviceId,
+        'deviceId': deviceId,
       });
       
       print('🔐 [ANONYMOUS LOGIN] API response received');
@@ -284,21 +288,39 @@ class CallClassController extends GetxController {
           print('❌ [AUTO START] Error auto-starting call: $e');
           print('❌ [AUTO START] Stack trace: $stackTrace');
           AppToasts.showError('Failed to auto-start call: ${e.toString()}');
-          // Show detailed error dialog
-          AppToasts.showErrorDialog(
-            title: 'Auto-Start Call Error',
-            message: 'Failed to automatically start the call. Please try manually.',
-            errorDetails: e.toString(),
-            stackTrace: stackTrace.toString(),
-          );
         }
       }
     } on dio.DioException catch (e) {
-      print('❌ [ANONYMOUS LOGIN] DioException: ${e.response?.statusCode}');
+      print('❌ [ANONYMOUS LOGIN] DioException: ${e.type}');
+      print('❌ [ANONYMOUS LOGIN] Status Code: ${e.response?.statusCode}');
       print('❌ [ANONYMOUS LOGIN] Response: ${e.response?.data}');
+      print('❌ [ANONYMOUS LOGIN] Error: ${e.error}');
+      print('❌ [ANONYMOUS LOGIN] Message: ${e.message}');
       
       String errorMessage = 'Failed to authenticate. Please try again.';
-      if (e.response?.statusCode == 400 || e.response?.statusCode == 500) {
+      
+      // Detect network connectivity errors
+      if (e.type == dio.DioExceptionType.connectionTimeout ||
+          e.type == dio.DioExceptionType.receiveTimeout ||
+          e.type == dio.DioExceptionType.sendTimeout) {
+        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
+      } else if (e.type == dio.DioExceptionType.connectionError) {
+        // Check for specific network unreachable errors
+        final errorString = e.error?.toString().toLowerCase() ?? '';
+        final messageString = e.message?.toLowerCase() ?? '';
+        
+        if (errorString.contains('network is unreachable') ||
+            errorString.contains('connection failed') ||
+            errorString.contains('socketexception') ||
+            messageString.contains('network is unreachable') ||
+            messageString.contains('connection failed')) {
+          errorMessage = 'No internet connection. Please check your network settings and try again.';
+          print('⚠️ [ANONYMOUS LOGIN] Network connectivity issue detected - device cannot reach the server');
+        } else {
+          errorMessage = 'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
+        }
+      } else if (e.response?.statusCode == 400 || e.response?.statusCode == 500) {
+        // Backend validation errors
         try {
           final responseData = e.response?.data;
           if (responseData is Map<String, dynamic>) {
@@ -312,21 +334,13 @@ class CallClassController extends GetxController {
         } catch (_) {}
       }
       
-      AppToasts.showErrorDialog(
-        title: 'Authentication Error',
-        message: errorMessage,
-        errorDetails: 'Status Code: ${e.response?.statusCode}\nError: ${e.toString()}\nResponse: ${e.response?.data}',
-      );
+      // Show user-friendly error message
+      AppToasts.showError(errorMessage);
       rethrow;
     } catch (e, stackTrace) {
       print('❌ [ANONYMOUS LOGIN] Exception: $e');
       print('❌ [ANONYMOUS LOGIN] Stack trace: $stackTrace');
-      AppToasts.showErrorDialog(
-        title: 'Authentication Error',
-        message: 'An unexpected error occurred during authentication. Please try again.',
-        errorDetails: e.toString(),
-        stackTrace: stackTrace.toString(),
-      );
+      AppToasts.showError('An unexpected error occurred during authentication. Please try again.');
       rethrow;
     } finally {
       isAnonymousLoginLoading.value = false;
@@ -389,6 +403,8 @@ class CallClassController extends GetxController {
           print('✅ [WEBSOCKET EVENT] Session IDs match, updating call status to active');
           callStatus.value = 'active';
           connectionStatus.value = 'Connected';
+          // Start polling for report draft when call is accepted
+          _startDraftPolling();
         } else {
           print('⚠️ [WEBSOCKET EVENT] Session IDs do not match! Event: ${event.sessionId}, Current: ${currentSessionId.value}');
         }
@@ -444,13 +460,6 @@ class CallClassController extends GetxController {
       print('❌ [WEBSOCKET ERROR] Stack trace: $stackTrace');
       final errorMessage = e.toString();
       AppToasts.showError('WebSocket connection failed: $errorMessage');
-      // Show detailed error dialog for debugging
-      AppToasts.showErrorDialog(
-        title: 'WebSocket Connection Error',
-        message: 'Failed to connect to WebSocket. Please check your connection and try again.',
-        errorDetails: errorMessage,
-        stackTrace: stackTrace.toString(),
-      );
       if (errorMessage.toLowerCase().contains('auth') || 
           errorMessage.toLowerCase().contains('token') ||
           errorMessage.toLowerCase().contains('unauthorized')) {
@@ -622,11 +631,15 @@ class CallClassController extends GetxController {
   @override
   void onClose() {
     _connectionTimeoutTimer?.cancel();
+    _stopDraftPolling();
+    _fieldHighlightTimer?.cancel();
     disconnectFromRoom();
     _webSocketService?.disconnect();
     messageController.dispose();
     keyboardController.dispose();
     focusedField?.dispose();
+    // Dispose connectivity monitoring
+    connectivityUtil.dispose();
     // Clear tokens when controller is closed
     clearTokensOnExit();
     super.onClose();
@@ -794,33 +807,12 @@ class CallClassController extends GetxController {
       
       // Show user-friendly error message
       AppToasts.showError(errorMessage);
-      
-      // Show detailed error dialog for debugging (only for non-network errors or in debug mode)
-      final isNetworkError = e.type == dio.DioExceptionType.connectionTimeout ||
-                             e.type == dio.DioExceptionType.receiveTimeout ||
-                             e.type == dio.DioExceptionType.sendTimeout ||
-                             e.type == dio.DioExceptionType.connectionError ||
-                             e.error?.toString().toLowerCase().contains('connection') == true;
-      
-      if (!isNetworkError) {
-        AppToasts.showErrorDialog(
-          title: 'Call Request Error',
-          message: errorMessage,
-          errorDetails: 'Status Code: ${e.response?.statusCode}\nError Type: ${e.type}\nError: ${e.toString()}\nResponse: ${e.response?.data}',
-        );
-      }
     } catch (e, stackTrace) {
       print('❌ [REQUEST CALL] Exception: $e');
       print('❌ [REQUEST CALL] Stack trace: $stackTrace');
       callNetworkStatus.value = NetworkStatus.ERROR;
       callStatus.value = 'idle';
-      // Show detailed error dialog for debugging (toast is shown in dialog)
-      AppToasts.showErrorDialog(
-        title: 'Call Request Error',
-        message: 'An unexpected error occurred while requesting the call. Please try again.',
-        errorDetails: e.toString(),
-        stackTrace: stackTrace.toString(),
-      );
+      AppToasts.showError('An unexpected error occurred while requesting the call. Please try again.');
     }
   }
 
@@ -991,6 +983,9 @@ class CallClassController extends GetxController {
       callStatus.value = 'active';
       print('🎥 [LIVEKIT] Connection state updated - isConnected: ${isConnected.value}');
       print('🎥 [LIVEKIT] Room connection state: ${_room!.connectionState}');
+      
+      // Start polling for report draft when call becomes active
+      _startDraftPolling();
 
       // Enable camera and microphone
       print('🎥 [LIVEKIT] Enabling video...');
@@ -1031,12 +1026,7 @@ class CallClassController extends GetxController {
       isConnected.value = false;
       callStatus.value = 'idle';
       callNetworkStatus.value = NetworkStatus.ERROR;
-      // Show detailed error dialog (toast is shown in dialog)
-      AppToasts.showErrorDialog(
-        title: 'Connection Timeout',
-        message: 'Failed to connect to video call server. This may be due to slow internet connection or server issues.',
-        errorDetails: e.toString(),
-      );
+      AppToasts.showError('Failed to connect to video call server. This may be due to slow internet connection or server issues.');
       await _handleCallEnded();
     } catch (e, stackTrace) {
       print('❌ [LIVEKIT ERROR] Exception connecting to LiveKit: $e');
@@ -1057,13 +1047,7 @@ class CallClassController extends GetxController {
         errorMessage = 'Authentication error. Please try logging in again.';
       }
       
-      // Show detailed error dialog for debugging (toast is shown in dialog)
-      AppToasts.showErrorDialog(
-        title: 'LiveKit Connection Error',
-        message: errorMessage,
-        errorDetails: e.toString(),
-        stackTrace: stackTrace.toString(),
-      );
+      AppToasts.showError(errorMessage);
       _connectionTimeoutTimer?.cancel();
       _connectionTimeoutTimer = null;
       await _handleCallEnded();
@@ -1425,11 +1409,320 @@ class CallClassController extends GetxController {
 
   /// Handle call ended (cleanup)
   Future<void> _handleCallEnded() async {
+    // Stop polling when call ends
+    _stopDraftPolling();
+    
     await disconnectFromRoom();
     callStatus.value = 'ended';
     currentSessionId.value = '';
     currentRoomName.value = '';
     currentWsUrl.value = '';
+    
+    // Clear report draft data
+    reportDraft.value = null;
+    _previousFormData = null;
+    _consecutiveNoUpdatesCount = 0;
+    recentlyUpdatedFields.clear();
+    _fieldHighlightTimer?.cancel();
+    pollingStatus.value = 'Waiting for officer to start form...';
+  }
+  
+  /// Start polling for report draft updates
+  void _startDraftPolling() {
+    final sessionId = currentSessionId.value;
+    if (sessionId == null || sessionId.isEmpty) {
+      print('⚠️ [DRAFT POLLING] Cannot start polling: sessionId is empty');
+      return;
+    }
+    
+    // Stop any existing polling
+    _stopDraftPolling();
+    
+    // Reset polling state
+    _consecutiveNoUpdatesCount = 0;
+    _previousFormData = null;
+    
+    print('📋 [DRAFT POLLING] Starting draft polling for session: $sessionId');
+    isPollingDraft.value = true;
+    pollingStatus.value = 'Waiting for officer to start form...';
+    
+    // Poll immediately first time
+    _pollDraft(sessionId);
+    
+    // Start with normal polling interval (3 seconds)
+    _scheduleNextPoll(sessionId, _normalPollInterval);
+  }
+  
+  /// Schedule the next poll with adaptive interval
+  void _scheduleNextPoll(String sessionId, int intervalSeconds) {
+    _draftPollingTimer?.cancel();
+    
+    _draftPollingTimer = Timer(Duration(seconds: intervalSeconds), () {
+      final currentSessionId = this.currentSessionId.value;
+      if (currentSessionId == null || currentSessionId.isEmpty) {
+        _stopDraftPolling();
+        return;
+      }
+      
+      // Stop polling if call is not active
+      if (callStatus.value != 'active') {
+        _stopDraftPolling();
+        return;
+      }
+      
+      // Stop polling if report is submitted
+      if (reportDraft.value?.reportSubmitted == true) {
+        _stopDraftPolling();
+        pollingStatus.value = 'Report submitted successfully';
+        return;
+      }
+      
+      // Poll and schedule next one
+      _pollDraft(currentSessionId).then((_) {
+        // Determine next interval based on updates
+        final nextInterval = _consecutiveNoUpdatesCount >= 2 
+            ? _slowPollInterval 
+            : _normalPollInterval;
+        _scheduleNextPoll(currentSessionId, nextInterval);
+      });
+    });
+  }
+  
+  /// Stop polling for report draft updates
+  void _stopDraftPolling() {
+    if (_draftPollingTimer != null) {
+      _draftPollingTimer!.cancel();
+      _draftPollingTimer = null;
+      print('📋 [DRAFT POLLING] Stopped draft polling');
+    }
+    isPollingDraft.value = false;
+    _consecutiveNoUpdatesCount = 0; // Reset counter
+  }
+  
+  /// Poll for draft updates
+  Future<void> _pollDraft(String callSessionId) async {
+    // Validate sessionId before making request
+    if (callSessionId.isEmpty) {
+      print('⚠️ [DRAFT POLLING] Invalid callSessionId: empty string');
+      return;
+    }
+    
+    try {
+      print('📋 [DRAFT POLLING] Polling draft for session: $callSessionId');
+      
+      final response = await _reportService.getDraft(callSessionId);
+      
+      // Validate response structure
+      if (response.success != true) {
+        print('⚠️ [DRAFT POLLING] API returned success=false');
+        if (reportDraft.value == null) {
+          pollingStatus.value = 'Waiting for officer to start form...';
+        }
+        _consecutiveNoUpdatesCount++;
+        return;
+      }
+      
+      if (response.data == null) {
+        print('⚠️ [DRAFT POLLING] No draft data available yet');
+        if (reportDraft.value == null) {
+          pollingStatus.value = 'Waiting for officer to start form...';
+        }
+        _consecutiveNoUpdatesCount++;
+        return;
+      }
+      
+      final draftData = response.data!;
+      
+      // Validate that callSessionId matches (security check)
+      if (draftData.callSessionId != null && 
+          draftData.callSessionId != callSessionId) {
+        print('⚠️ [DRAFT POLLING] Session ID mismatch! Expected: $callSessionId, Got: ${draftData.callSessionId}');
+        // Continue anyway, but log the issue
+      }
+      
+      // Check if report is submitted
+      if (draftData.reportSubmitted == true) {
+        print('✅ [DRAFT POLLING] Report submitted!');
+        reportDraft.value = draftData;
+        _stopDraftPolling();
+        
+        if (draftData.caseNumber != null && draftData.caseNumber!.isNotEmpty) {
+          pollingStatus.value = 'Report submitted - Case: ${draftData.caseNumber}';
+          AppToasts.showSuccess('Report submitted successfully. Case number: ${draftData.caseNumber}');
+        } else if (draftData.reportId != null && draftData.reportId!.isNotEmpty) {
+          pollingStatus.value = 'Report submitted successfully';
+          AppToasts.showSuccess('Report submitted successfully');
+        } else {
+          pollingStatus.value = 'Report submitted successfully';
+          AppToasts.showSuccess('Report submitted successfully');
+        }
+        return;
+      }
+      
+      // Check if form data has updates
+      final currentFormData = draftData.formData;
+      bool hasNewUpdates = false;
+      
+      if (currentFormData != null && currentFormData.isNotEmpty) {
+        // Compare with previous form data to detect updates
+        if (_previousFormData == null) {
+          hasNewUpdates = true;
+          _consecutiveNoUpdatesCount = 0; // Reset counter on first data
+          print('📋 [DRAFT POLLING] First draft data received');
+        } else {
+          // Track which fields were updated
+          final updatedFields = <String>[];
+          
+          // Check if any field changed
+          for (var key in currentFormData.keys) {
+            final oldValue = _previousFormData![key];
+            final newValue = currentFormData[key];
+            
+            // Deep comparison for better accuracy
+            if (oldValue != newValue) {
+              hasNewUpdates = true;
+              updatedFields.add(key);
+              _consecutiveNoUpdatesCount = 0; // Reset counter on update
+              print('📋 [DRAFT POLLING] Field updated: $key (${oldValue} -> ${newValue})');
+            }
+          }
+          
+          // Also check for new fields that weren't in previous data
+          for (var key in currentFormData.keys) {
+            if (!_previousFormData!.containsKey(key)) {
+              hasNewUpdates = true;
+              updatedFields.add(key);
+              _consecutiveNoUpdatesCount = 0;
+              print('📋 [DRAFT POLLING] New field added: $key');
+            }
+          }
+          
+          // Update recently updated fields for UI highlighting
+          if (updatedFields.isNotEmpty) {
+            recentlyUpdatedFields.clear();
+            recentlyUpdatedFields.addAll(updatedFields);
+            // Clear highlights after 3 seconds
+            _fieldHighlightTimer?.cancel();
+            _fieldHighlightTimer = Timer(const Duration(seconds: 3), () {
+              recentlyUpdatedFields.clear();
+            });
+          }
+          
+          // If no updates detected but backend says there are updates, trust the backend
+          if (!hasNewUpdates && draftData.hasUpdates == true) {
+            hasNewUpdates = true;
+            _consecutiveNoUpdatesCount = 0;
+            print('📋 [DRAFT POLLING] Backend indicates updates (hasUpdates=true)');
+            // Mark all fields as updated if backend says so but we can't detect changes
+            recentlyUpdatedFields.clear();
+            recentlyUpdatedFields.addAll(currentFormData.keys);
+            _fieldHighlightTimer?.cancel();
+            _fieldHighlightTimer = Timer(const Duration(seconds: 3), () {
+              recentlyUpdatedFields.clear();
+            });
+          }
+        }
+        
+        // Update previous form data
+        _previousFormData = Map<String, dynamic>.from(currentFormData);
+      } else {
+        // No form data yet
+        _consecutiveNoUpdatesCount++;
+      }
+      
+      // If no updates, increment counter for adaptive polling
+      if (!hasNewUpdates) {
+        _consecutiveNoUpdatesCount++;
+      }
+      
+      // Update draft data
+      reportDraft.value = draftData;
+      
+      // Update status message
+      if (hasNewUpdates) {
+        print('📋 [DRAFT POLLING] Draft updated with new data');
+        pollingStatus.value = 'Form updated - ${draftData.lastUpdated != null ? _formatTimestamp(draftData.lastUpdated!) : "Just now"}';
+      } else if (currentFormData != null && currentFormData.isNotEmpty) {
+        pollingStatus.value = 'Viewing your report - Last updated: ${draftData.lastUpdated != null ? _formatTimestamp(draftData.lastUpdated!) : "Unknown"}';
+      } else {
+        pollingStatus.value = 'Waiting for officer to start form...';
+      }
+      
+    } on dio.DioException catch (e) {
+      // Handle different HTTP status codes
+      final statusCode = e.response?.statusCode;
+      
+      if (statusCode == 404) {
+        // No draft exists yet - this is normal
+        print('ℹ️ [DRAFT POLLING] No draft exists yet (404)');
+        if (reportDraft.value == null) {
+          pollingStatus.value = 'Waiting for officer to start form...';
+        }
+        _consecutiveNoUpdatesCount++;
+        return;
+      } else if (statusCode == 401) {
+        // Unauthorized - token might be expired
+        print('⚠️ [DRAFT POLLING] Unauthorized (401) - token may be expired');
+        // Don't stop polling, let it retry (token refresh should handle this)
+        _consecutiveNoUpdatesCount++;
+        return;
+      } else if (statusCode == 403) {
+        // Forbidden - user doesn't have permission
+        print('❌ [DRAFT POLLING] Forbidden (403) - insufficient permissions');
+        _stopDraftPolling();
+        pollingStatus.value = 'Unable to view report';
+        return;
+      } else if (statusCode == 400) {
+        // Bad request - invalid sessionId
+        print('❌ [DRAFT POLLING] Bad request (400) - invalid callSessionId: $callSessionId');
+        _stopDraftPolling();
+        pollingStatus.value = 'Invalid call session';
+        return;
+      } else if (statusCode != null && statusCode >= 500) {
+        // Server error - retry on next interval
+        print('⚠️ [DRAFT POLLING] Server error ($statusCode): ${e.message}');
+        _consecutiveNoUpdatesCount++;
+        return;
+      } else if (e.type == dio.DioExceptionType.connectionError ||
+                 e.type == dio.DioExceptionType.connectionTimeout ||
+                 e.type == dio.DioExceptionType.receiveTimeout) {
+        // Network errors - retry on next interval
+        print('⚠️ [DRAFT POLLING] Network error: ${e.type} - ${e.message}');
+        _consecutiveNoUpdatesCount++;
+        return;
+      } else {
+        // Other errors
+        print('❌ [DRAFT POLLING] Error polling draft: $statusCode - ${e.message}');
+        _consecutiveNoUpdatesCount++;
+        return;
+      }
+    } catch (e, stackTrace) {
+      print('❌ [DRAFT POLLING] Exception polling draft: $e');
+      print('❌ [DRAFT POLLING] Stack trace: $stackTrace');
+      _consecutiveNoUpdatesCount++;
+      // Don't show error toast for polling failures - polling will retry
+    }
+  }
+  
+  /// Format timestamp for display
+  String _formatTimestamp(String isoString) {
+    try {
+      final dateTime = DateTime.parse(isoString);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+      
+      if (difference.inSeconds < 60) {
+        return 'Just now';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+      } else {
+        return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+      }
+    } catch (e) {
+      return 'Unknown';
+    }
   }
 
   void confirmTerms() async {
