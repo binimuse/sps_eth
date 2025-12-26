@@ -5,9 +5,37 @@ import 'package:get/get.dart';
 import 'package:livekit_client/livekit_client.dart' hide ChatMessage;
 import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/app/utils/enums.dart';
+import 'package:sps_eth_app/app/routes/app_pages.dart';
 
 import '../controllers/call_class_controller.dart';
 import 'widgets/report_draft_view.dart';
+
+/// Helper class for safe navigation
+class _NavigationHelper {
+  /// Safely navigate back by going directly to home route
+  /// This avoids Get.back() which tries to close snackbars
+  static void safeNavigateBack() {
+    try {
+      // Use offAllNamed to navigate directly to home without going through back stack
+      // This avoids the snackbar cleanup issue in Get.back()
+      Get.offAllNamed(Routes.HOME);
+    } catch (e) {
+      print('⚠️ [NAVIGATION] Error navigating to home: $e');
+      // Last resort: try using Navigator directly
+      try {
+        final context = Get.context;
+        if (context != null) {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            Routes.HOME,
+            (route) => false,
+          );
+        }
+      } catch (e2) {
+        print('❌ [NAVIGATION] All navigation methods failed: $e2');
+      }
+    }
+  }
+}
 
 class CallClassView extends GetView<CallClassController> {
   const CallClassView({super.key});
@@ -29,7 +57,7 @@ class CallClassView extends GetView<CallClassController> {
           if (!didPop) {
             // Clear tokens and navigate back
             await controller.onWillPop();
-            Get.back();
+            _NavigationHelper.safeNavigateBack();
           }
         },
         child: Scaffold(
@@ -114,7 +142,7 @@ class CallClassView extends GetView<CallClassController> {
                                   tooltip: 'Back',
                                   onPressed: () async {
                                     await controller.onWillPop();
-                                    Get.back();
+                                    _NavigationHelper.safeNavigateBack();
                                   },
                                 ),
                               ),
@@ -174,7 +202,7 @@ class CallClassView extends GetView<CallClassController> {
                                         onTap: () async {
                                           print('🔘 [BUTTONS] Close button pressed (error state)');
                                           await controller.onWillPop();
-                                          Get.back();
+                                          _NavigationHelper.safeNavigateBack();
                                         },
                                         child: _roundCtrl(Icons.close, color: AppColors.danger),
                                       ),
@@ -197,7 +225,7 @@ class CallClassView extends GetView<CallClassController> {
                                       onTap: () async {
                                         print('🔘 [BUTTONS] Cancel button pressed');
                                         await controller.onWillPop();
-                                        Get.back();
+                                        _NavigationHelper.safeNavigateBack();
                                       },
                                       child: _roundCtrl(Icons.close, color: AppColors.danger),
                                     ),
@@ -665,7 +693,7 @@ class _TermsAndActions extends StatelessWidget {
                       onPressed: () async {
                         print('🔘 [BUTTONS] Close button pressed (error in terms card)');
                         await controller.onWillPop();
-                        Get.back();
+                        _NavigationHelper.safeNavigateBack();
                       },
                       child: Text(
                         'Close',
@@ -753,7 +781,7 @@ class _TermsAndActions extends StatelessWidget {
             } else {
               // Show start call buttons when call is not active
               print('🔘 [BUTTONS] Showing Start Call buttons');
-              return Container(
+              return SizedBox(
                 width: double.infinity,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -778,7 +806,7 @@ class _TermsAndActions extends StatelessWidget {
                               onPressed: () async {
                                 print('🔘 [BUTTONS] Cancel button pressed');
                                 await controller.onWillPop();
-                                Get.back();
+                                _NavigationHelper.safeNavigateBack();
                               },
                               child: Text(
                                 'Cancel', 

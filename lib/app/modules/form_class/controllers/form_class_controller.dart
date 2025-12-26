@@ -114,7 +114,7 @@ class FormClassController extends GetxController {
         focusedController!.selection = TextSelection.collapsed(offset: selection.start - 1);
       }
     } else if (key == 'space') {
-      final newText = text.substring(0, selection.start) + ' ' + text.substring(selection.end);
+      final newText = '${text.substring(0, selection.start)} ${text.substring(selection.end)}';
       focusedController!.text = newText;
       focusedController!.selection = TextSelection.collapsed(offset: selection.start + 1);
     } else if (key == 'left') {
@@ -127,7 +127,7 @@ class FormClassController extends GetxController {
       }
     } else if (key == 'enter') {
       // Move to next line or submit
-      final newText = text.substring(0, selection.start) + '\n' + text.substring(selection.end);
+      final newText = '${text.substring(0, selection.start)}\n${text.substring(selection.end)}';
       focusedController!.text = newText;
       focusedController!.selection = TextSelection.collapsed(offset: selection.start + 1);
     } else if (key == '123') {

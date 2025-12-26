@@ -52,8 +52,10 @@ class HomeController extends GetxController {
 
   Future<void> onSwipeToCallComplete() async {
     try {
-      Get.snackbar('Calling', 'Dialing...');
+      // Navigate first, then show snackbar if needed (avoid overlay issues)
       await Get.toNamed(Routes.CALL_CLASS, arguments: {'autoStart': true});
+      // Note: Snackbar removed to avoid overlay issues during navigation
+      // The call class will handle its own status messages
     } catch (e, stackTrace) {
       print('❌ [HOME] Error navigating to call class: $e');
       print('❌ [HOME] Stack trace: $stackTrace');

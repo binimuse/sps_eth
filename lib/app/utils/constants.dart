@@ -1,11 +1,11 @@
 class Constants {
   //base url
   ///URLS
-  static const baseUrl = "https://sps-admin.zorcloud.net/api/v1/";
+  static const baseUrl = "https://sps-api-test.aii.et/api/v1/";
   // static const String fileUploader =
   //     'http://5.75.142.45:3002/direct-single-file-upload';
 
-  static const String fileViewer = 'http://5.75.142.45:9000/';
+static const String fileViewer = 'http://5.75.142.45:9000/';
   //language
   static const String selectedLanguage = "SELECTED_LANGUAGE";
   static const String lanAm = "am";

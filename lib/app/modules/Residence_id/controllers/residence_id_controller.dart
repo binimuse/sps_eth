@@ -26,15 +26,7 @@ class ResidenceIdController extends GetxController {
   // OTP error message
   final RxString otpError = ''.obs;
 
-  @override
-  void onInit() {
-    super.onInit();
-  }
 
-  @override
-  void onReady() {
-    super.onReady();
-  }
 
   @override
   void onClose() {

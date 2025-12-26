@@ -39,7 +39,7 @@ class DirectCallWebSocketService {
       }
 
       final userId = JwtUtil.getUserIdFromToken(token);
-      print('🔌 [WS SERVICE] User ID extracted: ${userId != null ? userId : "null"}');
+      print('🔌 [WS SERVICE] User ID extracted: ${userId ?? "null"}');
       
       if (userId == null || userId.isEmpty) {
         print('❌ [WS SERVICE] Could not extract user ID from token');

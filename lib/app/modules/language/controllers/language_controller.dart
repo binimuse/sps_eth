@@ -8,20 +8,8 @@ class LanguageController extends GetxController {
   // Tracks the selected language index
   final RxInt selectedLanguageIndex = (-1).obs;
 
-  @override
-  void onInit() {
-    super.onInit();
-  }
 
-  @override
-  void onReady() {
-    super.onReady();
-  }
 
-  @override
-  void onClose() {
-    super.onClose();
-  }
 
   void increment() => count.value++;
 

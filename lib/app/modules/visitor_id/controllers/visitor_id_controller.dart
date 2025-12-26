@@ -11,15 +11,7 @@ class VisitorIdController extends GetxController {
   TextEditingController? focusedController;
   FocusNode? focusedField = FocusNode();
 
-  @override
-  void onInit() {
-    super.onInit();
-  }
 
-  @override
-  void onReady() {
-    super.onReady();
-  }
 
   @override
   void onClose() {

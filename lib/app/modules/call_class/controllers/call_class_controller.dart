@@ -1583,7 +1583,7 @@ class CallClassController extends GetxController {
               hasNewUpdates = true;
               updatedFields.add(key);
               _consecutiveNoUpdatesCount = 0; // Reset counter on update
-              print('📋 [DRAFT POLLING] Field updated: $key (${oldValue} -> ${newValue})');
+              print('📋 [DRAFT POLLING] Field updated: $key ($oldValue -> $newValue)');
             }
           }
           
@@ -1777,7 +1777,7 @@ class CallClassController extends GetxController {
       }
     } else if (key == 'space') {
       final newText =
-          text.substring(0, selection.start) + ' ' + text.substring(selection.end);
+          '${text.substring(0, selection.start)} ${text.substring(selection.end)}';
       controller
         ..text = newText
         ..selection = TextSelection.collapsed(offset: selection.start + 1);
@@ -1793,7 +1793,7 @@ class CallClassController extends GetxController {
       }
     } else if (key == 'enter') {
       final newText =
-          text.substring(0, selection.start) + '\n' + text.substring(selection.end);
+          '${text.substring(0, selection.start)}\n${text.substring(selection.end)}';
       controller
         ..text = newText
         ..selection = TextSelection.collapsed(offset: selection.start + 1);
