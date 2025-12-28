@@ -296,11 +296,24 @@ class CallClassView extends GetView<CallClassController> {
                                             : AppColors.grayDark,
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    GestureDetector(
-                                      onTap: () => controller.switchCamera(),
-                                      child: _roundCtrl(Icons.flip_camera_ios),
-                                    ),
+                                    // Show camera selector only if multiple cameras are available
+                                    Obx(() {
+                                      if (controller.hasMultipleCameras.value) {
+                                        return Row(
+                                          children: [
+                                            const SizedBox(width: 12),
+                                            GestureDetector(
+                                              onTap: () => controller.switchCamera(),
+                                              child: _roundCtrl(
+                                                Icons.cameraswitch,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    }),
                                   ],
                                 ),
                               );

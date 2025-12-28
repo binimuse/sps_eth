@@ -10,20 +10,21 @@ import '../controllers/language_controller.dart';
 class LanguageView extends GetView<LanguageController> {
   const LanguageView({super.key});
 
+  // All languages listed together
+  static final List<Map<String, dynamic>> allLanguages = [
+    // Local languages
+      {'name': 'አማርኛ', 'icon': Icons.translate}, // Amharic
+    {'name': 'Afaan Oromoo', 'icon': Icons.translate},
+  
+    {'name': 'ትግርኛ', 'icon': Icons.translate}, // Tigrigna
+    {'name': 'Afi Somali', 'icon': Icons.translate},
+    // Other languages
+    {'name': 'Arabic', 'icon': Icons.translate},
+    {'name': 'English', 'icon': Icons.language},
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final languages = [
-      {'name': 'English', 'image': Assets.images.english.path},
-        {'name': 'አማርኛ', 'image': Assets.images.amhric.path},
-          {'name': 'Afaan Oromoo', 'image': Assets.images.oromoo.path},
-      {'name': 'French', 'image': Assets.images.french.path},
-    
-      {'name': 'Arabic', 'image': Assets.images.arabic.path},
-    
-    
-      {'name': 'ትግርኛ', 'image': Assets.images.tigregna.path},
-   
-    ];
 
     final double viewportHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 32;
 
@@ -65,9 +66,10 @@ class LanguageView extends GetView<LanguageController> {
               Flexible(
                 flex: 7,
                 fit: FlexFit.loose,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     // Top info box
                     Row(
                       children: [
@@ -110,54 +112,70 @@ class LanguageView extends GetView<LanguageController> {
                       label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
                     ),
                     const SizedBox(height: 16),
-                    // Language grid
-                    Expanded(
+                    // Language grid - Show all languages
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height,
                       child: GridView.builder(
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
+                          crossAxisCount: 4,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.85,
                         ),
-                        itemCount: languages.length,
+                        itemCount: allLanguages.length,
                         itemBuilder: (context, index) {
-                          final language = languages[index];
-                          final isSelected = controller.selectedLanguageIndex == index;
-                          return GestureDetector(
-                            onTap: () {
-                              controller.selectLanguage(index);
-                              Get.toNamed(Routes.FIILING_CLASS);
-                            },
-                            child: Card(
-                              color: Colors.white.withOpacity(0.8), // Added white color with opacity
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: isSelected
-                                    ? BorderSide(color: Colors.blue, width: 2)
-                                    : BorderSide.none,
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(50),
-                                    child: Image.asset(
-                                      language['image']!,
-                                      width: 180, // Increased size
-                                      height: 180, // Increased size
-                                      fit: BoxFit.cover,
-                                    ),
+                          final language = allLanguages[index];
+                          return Obx(() {
+                            final isSelected = controller.selectedLanguageIndex.value == index;
+                            return GestureDetector(
+                              onTap: () {
+                                controller.selectLanguage(index);
+                                Get.toNamed(Routes.FIILING_CLASS);
+                              },
+                              child: Card(
+                                elevation: 2,
+                                color: Colors.white.withOpacity(0.8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: isSelected
+                                      ? const BorderSide(color: Color(0xFF0F3955), width: 2)
+                                      : BorderSide.none,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        language['icon'] as IconData,
+                                        size: 32,
+                                        color: const Color(0xFF0F3955),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Flexible(
+                                        child: Text(
+                                          language['name'] as String,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(language['name']!,
-                                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                                ],
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          });
                         },
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

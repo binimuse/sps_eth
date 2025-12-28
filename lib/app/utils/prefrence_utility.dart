@@ -33,4 +33,13 @@ class PreferenceUtils {
     var prefs = await _instance;
     return prefs.setStringList(key, value);
   }
+
+  static int getInt(String key, [int? defaultValue]) {
+    return _prefsInstance.getInt(key) ?? defaultValue ?? -1;
+  }
+
+  static Future<bool> setInt(String key, int value) async {
+    var prefs = await _instance;
+    return prefs.setInt(key, value);
+  }
 }

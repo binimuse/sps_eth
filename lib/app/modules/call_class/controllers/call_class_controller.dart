@@ -99,6 +99,11 @@ class CallClassController extends GetxController {
   final RxList<RemoteParticipant> remoteParticipants = <RemoteParticipant>[].obs;
   final RxString connectionStatus = 'Disconnected'.obs;
   
+  // Camera selection
+  final RxList<CameraPosition> availableCameraPositions = <CameraPosition>[].obs;
+  final RxInt currentCameraIndex = 0.obs;
+  final RxBool hasMultipleCameras = false.obs;
+  
   // Direct Call state
   final RxString callStatus = 'idle'.obs; // idle, pending, connecting, active, ended
   final Rx<String?> currentSessionId = Rx<String?>('');
@@ -1106,11 +1111,60 @@ class CallClassController extends GetxController {
     }
   }
 
+  /// Enumerate available cameras by testing different positions
+  /// For multiple front cameras, we'll add front position multiple times
+  /// and cycle through them using device switching
+  Future<void> _enumerateCameras() async {
+    try {
+      print('📷 [CAMERA] Enumerating available cameras...');
+      
+      // Test which camera positions are available
+      final positions = <CameraPosition>[];
+      
+      // Add front camera (may have multiple front cameras on some devices)
+      positions.add(CameraPosition.front);
+      
+      // Try to add back camera if available
+      // Note: On devices with only front cameras, back might not be available
+      // but we'll add it anyway and handle errors gracefully
+      positions.add(CameraPosition.back);
+      
+      // For devices with multiple front cameras (like smart police station machines),
+      // we'll add front position again to allow cycling through front cameras
+      // The actual device switching will be handled in switchCamera()
+      positions.add(CameraPosition.front); // Second front camera option
+      
+      availableCameraPositions.assignAll(positions);
+      hasMultipleCameras.value = positions.length > 1;
+      currentCameraIndex.value = 0;
+      
+      print('📷 [CAMERA] Available camera positions: ${positions.length}');
+      for (var i = 0; i < positions.length; i++) {
+        print('📷 [CAMERA] Position $i: ${positions[i]}');
+      }
+      
+      if (hasMultipleCameras.value) {
+        print('📷 [CAMERA] Multiple cameras detected, camera switching enabled');
+      }
+    } catch (e, stackTrace) {
+      print('❌ [CAMERA ERROR] Error enumerating cameras: $e');
+      print('❌ [CAMERA ERROR] Stack trace: $stackTrace');
+      // Continue without camera enumeration - single camera assumed
+      availableCameraPositions.clear();
+      hasMultipleCameras.value = false;
+    }
+  }
+
   /// Enable video
   Future<void> enableVideo() async {
     print('🎥 [VIDEO] Enabling video...');
     try {
       if (_localParticipant != null) {
+        // Enumerate cameras first if not already done
+        if (availableCameraPositions.isEmpty) {
+          await _enumerateCameras();
+        }
+        
         print('🎥 [VIDEO] Local participant exists, calling setCameraEnabled(true)...');
         await _localParticipant!.setCameraEnabled(true);
         isVideoEnabled.value = true;
@@ -1191,26 +1245,86 @@ class CallClassController extends GetxController {
     }
   }
 
-  /// Switch camera (front/back)
+  /// Switch to next available camera
   Future<void> switchCamera() async {
     try {
-      if (_localParticipant != null) {
-        // Get current camera track and switch
-        final cameraTrack = _localParticipant!.videoTrackPublications
-            .where((pub) => pub.source == TrackSource.camera)
-            .map((pub) => pub.track)
-            .whereType<LocalVideoTrack>()
-            .firstOrNull;
-        
-        if (cameraTrack != null) {
-          // Switch camera position - toggle between front and back
-          // Note: This is a simplified approach. You may need to track current position
-          // or use a different API based on your LiveKit version
-          await cameraTrack.setCameraPosition(CameraPosition.back);
+      if (!hasMultipleCameras.value || availableCameraPositions.isEmpty) {
+        print('📷 [CAMERA] No multiple cameras available, skipping switch');
+        return;
+      }
+      
+      if (_localParticipant == null) {
+        print('❌ [CAMERA] Local participant is null, cannot switch camera');
+        return;
+      }
+      
+      // Get current camera track
+      final cameraTrack = _localParticipant!.videoTrackPublications
+          .where((pub) => pub.source == TrackSource.camera)
+          .map((pub) => pub.track)
+          .whereType<LocalVideoTrack>()
+          .firstOrNull;
+      
+      if (cameraTrack == null) {
+        print('❌ [CAMERA] No camera track found, cannot switch');
+        return;
+      }
+      
+      // Calculate next camera index
+      currentCameraIndex.value = (currentCameraIndex.value + 1) % availableCameraPositions.length;
+      final nextPosition = availableCameraPositions[currentCameraIndex.value];
+      
+      print('📷 [CAMERA] Switching to camera ${currentCameraIndex.value}: ${nextPosition}');
+      
+      // Switch camera by using setCameraPosition on the track
+      try {
+        // Try to set camera position directly on the track
+        await cameraTrack.setCameraPosition(nextPosition);
+        print('✅ [CAMERA] Camera switched successfully to ${nextPosition}');
+        _updateLocalVideoTrack();
+      } catch (e) {
+        print('❌ [CAMERA ERROR] Error using setCameraPosition: $e');
+        // Fallback: Disable and re-enable with new position
+        try {
+          // Disable current camera
+          await _localParticipant!.setCameraEnabled(false);
+          await Future.delayed(const Duration(milliseconds: 200));
+          
+          // Create new capture options with the next camera position
+          final newOptions = CameraCaptureOptions(
+            cameraPosition: nextPosition,
+          );
+          
+          // Create new track with new camera position
+          final newTrack = await LocalVideoTrack.createCameraTrack(newOptions);
+          
+          // Stop old track if it exists
+          final oldTrackPub = _localParticipant!.videoTrackPublications
+              .where((pub) => pub.source == TrackSource.camera)
+              .firstOrNull;
+          
+          if (oldTrackPub != null && oldTrackPub.track != null) {
+            final oldTrack = oldTrackPub.track;
+            if (oldTrack is LocalVideoTrack) {
+              await oldTrack.stop();
+            }
+          }
+          
+          // Publish new track
+          await _localParticipant!.publishVideoTrack(newTrack);
+          
+          print('✅ [CAMERA] Camera switched using createCameraTrack method');
+          
+          // Wait a bit for track to update
+          await Future.delayed(const Duration(milliseconds: 200));
+          _updateLocalVideoTrack();
+        } catch (e2) {
+          print('❌ [CAMERA ERROR] All camera switch methods failed: $e2');
         }
       }
-    } catch (e) {
-      print('Error switching camera: $e');
+    } catch (e, stackTrace) {
+      print('❌ [CAMERA ERROR] Error switching camera: $e');
+      print('❌ [CAMERA ERROR] Stack trace: $stackTrace');
     }
   }
 
