@@ -51,11 +51,11 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 padding: const EdgeInsets.all(16),
-                                child: const Column(
+                                child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Select ID Type',
+                                      'Select ID Type'.tr,
                                       style: TextStyle(
                                         fontWeight: FontWeight.w800,
                                         color: Color(0xFF0F3955),
@@ -63,7 +63,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                     ),
                                     SizedBox(height: 4),
                                     Text(
-                                      'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
+                                      'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
                                       style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
                                     ),
                                   ],
@@ -85,7 +85,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                           ),
                           onPressed: () => Get.back(),
                           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                          label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                          label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                         ),
 
                                OutlinedButton.icon(
@@ -100,7 +100,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                             Get.toNamed(Routes.CALL_CLASS);
                           },
                           icon: const Icon(Icons.person_outline, color: Color(0xFF0F3955)),
-                          label: const Text('Continue as guest', style: TextStyle(color: Color(0xFF0F3955))),
+                          label: Text('Continue as guest'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                         ),
                         ],),
                       
@@ -133,13 +133,13 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      selectedType.isEmpty
-                                          ? 'Select Your ID Type'
+                                          selectedType.isEmpty
+                                          ? 'Select Your ID Type'.tr
                                           : selectedType == 'fayda'
-                                              ? 'Enter Phone Number'
+                                              ? 'Enter Phone Number'.tr
                                               : selectedType == 'residence'
-                                                  ? 'Enter Residence ID'
-                                                  : 'Enter TIN Number',
+                                                  ? 'Enter Residence ID'.tr
+                                                  : 'Enter TIN Number'.tr,
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -159,8 +159,8 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                 if (selectedType.isEmpty) ...[
                                   // Fayda ID Button
                                   _IdTypeButton(
-                                    title: 'Fayda ID',
-                                    subtitle: 'Use your Fayda ID to continue with the process',
+                                    title: 'Fayda ID'.tr,
+                                    subtitle: 'Use your Fayda ID to continue with the process'.tr,
                                     icon: Icons.credit_card,
                                     onTap: () {
                                       controller.selectIdType('fayda');
@@ -170,8 +170,8 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                   
                                   // Residence ID Button
                                   _IdTypeButton(
-                                    title: 'Residence ID',
-                                    subtitle: 'Use your Residence ID or National ID to continue',
+                                    title: 'Residence ID'.tr,
+                                    subtitle: 'Use your Residence ID or National ID to continue'.tr,
                                     icon: Icons.badge,
                                     onTap: () {
                                       controller.selectIdType('residence');
@@ -181,8 +181,8 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                   
                                   // TIN Number Button
                                   _IdTypeButton(
-                                    title: 'TIN Number',
-                                    subtitle: 'Use your Tax Identification Number to continue',
+                                    title: 'TIN Number'.tr,
+                                    subtitle: 'Use your Tax Identification Number to continue'.tr,
                                     icon: Icons.numbers,
                                     onTap: () {
                                       controller.selectIdType('tin');
@@ -196,7 +196,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                     controller: controller.phoneController,
                                     keyboardType: TextInputType.phone,
                                     decoration: InputDecoration(
-                                      hintText: 'Phone Number',
+                                      hintText: 'Phone Number'.tr,
                                       hintStyle: TextStyle(
                                         color: Colors.grey[600],
                                         fontSize: 14,
@@ -227,8 +227,8 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                         elevation: 0,
                                       ),
                                       onPressed: () => controller.submit(),
-                                      child: const Text(
-                                        'Continue',
+                                      child: Text(
+                                        'Continue'.tr,
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
@@ -242,7 +242,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                   TextField(
                                     controller: controller.idController,
                                     decoration: InputDecoration(
-                                      hintText: 'Residence ID / National ID',
+                                      hintText: 'Residence ID / National ID'.tr,
                                       hintStyle: TextStyle(
                                         color: Colors.grey[600],
                                         fontSize: 14,
@@ -273,8 +273,8 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                         elevation: 0,
                                       ),
                                       onPressed: () => controller.submit(),
-                                      child: const Text(
-                                        'Continue',
+                                      child: Text(
+                                        'Continue'.tr,
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
@@ -289,7 +289,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                     controller: controller.tinController,
                                     keyboardType: TextInputType.number,
                                     decoration: InputDecoration(
-                                      hintText: 'TIN Number',
+                                      hintText: 'TIN Number'.tr,
                                       hintStyle: TextStyle(
                                         color: Colors.grey[600],
                                         fontSize: 14,
@@ -320,8 +320,8 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                         elevation: 0,
                                       ),
                                       onPressed: () => controller.submit(),
-                                      child: const Text(
-                                        'Continue',
+                                      child: Text(
+                                        'Continue'.tr,
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,

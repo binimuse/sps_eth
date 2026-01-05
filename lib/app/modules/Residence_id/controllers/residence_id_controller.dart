@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:sps_eth_app/app/utils/enums.dart';
 
 class ResidenceIdController extends GetxController {
   // Selected ID type
   final RxString selectedIdType = ''.obs;
+  final RxString otpError = ''.obs;
+  final Rx<NetworkStatus> otpNetworkStatus = NetworkStatus.IDLE.obs;
 
   // Text controllers
   final phoneController = TextEditingController();
   final idController = TextEditingController();
   final tinController = TextEditingController();
+  final otpController = TextEditingController();
 
   @override
   void onClose() {
     phoneController.dispose();
     idController.dispose();
+    otpController.dispose();
     tinController.dispose();
     super.onClose();
   }
@@ -29,6 +34,7 @@ class ResidenceIdController extends GetxController {
     selectedIdType.value = '';
     phoneController.clear();
     idController.clear();
+    otpController.clear();
     tinController.clear();
   }
 

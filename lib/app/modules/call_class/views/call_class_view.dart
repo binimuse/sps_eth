@@ -117,8 +117,8 @@ class CallClassView extends GetView<CallClassController> {
                                           controller.connectionStatus.value.isNotEmpty
                                               ? controller.connectionStatus.value
                                               : (controller.isConnected.value 
-                                                  ? 'Waiting for participant...' 
-                                                  : 'Not connected'),
+                                                  ? 'Waiting for participant...'.tr 
+                                                  : 'Not connected'.tr),
                                           style: TextStyle(color: AppColors.white70),
                                         )),
                                       ],
@@ -423,7 +423,7 @@ class CallClassView extends GetView<CallClassController> {
                           ),
                           const SizedBox(height: 24),
                           Text(
-                            'Authenticating...',
+                            'Authenticating...'.tr,
                             style: TextStyle(
                               color: AppColors.whiteOff,
                               fontSize: 18,
@@ -432,7 +432,7 @@ class CallClassView extends GetView<CallClassController> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Please wait while we set up your connection',
+                            'Please wait while we set up your connection'.tr,
                             style: TextStyle(
                               color: AppColors.white70,
                               fontSize: 14,
@@ -474,7 +474,7 @@ class CallClassView extends GetView<CallClassController> {
                           ),
                           const SizedBox(height: 24),
                           Text(
-                            callStatus == 'connecting' ? 'Connecting...' : 'Waiting for agent...',
+                            callStatus == 'connecting' ? 'Connecting...'.tr : 'Waiting for agent...'.tr,
                             style: TextStyle(
                               color: AppColors.whiteOff,
                               fontSize: 18,
@@ -483,7 +483,7 @@ class CallClassView extends GetView<CallClassController> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Please wait while we connect your call',
+                            'Please wait while we connect your call'.tr,
                             style: TextStyle(
                               color: AppColors.white70,
                               fontSize: 14,
@@ -523,7 +523,7 @@ class CallClassView extends GetView<CallClassController> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'No Internet Connection',
+                          'No Internet Connection'.tr,
                           style: TextStyle(
                             color: AppColors.whiteOff,
                             fontSize: 14,
@@ -704,7 +704,7 @@ class _TermsAndActions extends StatelessWidget {
             children: [
               Icon(Icons.check_box, color: AppColors.grayDark),
               const SizedBox(width: 8),
-              Text('Terms and Condition',style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
+              Text('Terms and Condition'.tr,style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
             ],
           ),
           const SizedBox(height: 4),
@@ -738,7 +738,7 @@ class _TermsAndActions extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Connection Error',
+                      'Connection Error'.tr,
                       style: TextStyle(
                         color: AppColors.danger,
                         fontSize: 16,
@@ -747,7 +747,7 @@ class _TermsAndActions extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Failed to connect. Please try again later.',
+                      'Failed to connect. Please try again later.'.tr,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.grayDark,
@@ -767,7 +767,7 @@ class _TermsAndActions extends StatelessWidget {
                         _NavigationHelper.safeNavigateBack();
                       },
                       child: Text(
-                        'Close',
+                        'Close'.tr,
                         style: TextStyle(
                           color: AppColors.whiteOff,
                           fontWeight: FontWeight.bold,
@@ -791,7 +791,7 @@ class _TermsAndActions extends StatelessWidget {
                       CircularProgressIndicator(color: AppColors.primary),
                       const SizedBox(height: 12),
                       Text(
-                        'Connecting...',
+                        'Connecting...'.tr,
                         style: TextStyle(
                           color: AppColors.grayDark,
                           fontSize: 14,
@@ -834,17 +834,17 @@ class _TermsAndActions extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Ending call...',
+                              'Ending call...'.tr,
                               style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff),
                             ),
                           ],
                         )
                       : Text(
                           callStatus == 'connecting' 
-                              ? 'Connecting...' 
+                              ? 'Connecting...'.tr 
                               : callStatus == 'pending'
-                                  ? 'Waiting for agent...'
-                                  : 'End Call',
+                                  ? 'Waiting for agent...'.tr
+                                  : 'End Call'.tr,
                           style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff),
                         ),
                 );
@@ -918,7 +918,7 @@ class _TermsAndActions extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Connecting...',
+                                    'Connecting...'.tr,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold, 
                                       color: AppColors.whiteOff,
@@ -944,7 +944,7 @@ class _TermsAndActions extends StatelessWidget {
                     const SizedBox(height: 8),
                     // Status indicator
                     Obx(() => Text(
-                      'Status: ${controller.connectionStatus.value.isEmpty ? "Ready to call" : controller.connectionStatus.value}',
+                      '${'Status:'.tr} ${controller.connectionStatus.value.isEmpty ? 'Ready to call'.tr : controller.connectionStatus.value}',
                       style: TextStyle(
                         color: AppColors.grayDark,
                         fontSize: 12,

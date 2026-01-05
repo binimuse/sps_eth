@@ -235,7 +235,7 @@ class _HeroPanelState extends State<_HeroPanel> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'SPS',
+                          'SPS'.tr,
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.displayLarge?.copyWith(
                             fontWeight: FontWeight.w800,
@@ -254,7 +254,7 @@ class _HeroPanelState extends State<_HeroPanel> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
+                          'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white,
@@ -377,7 +377,7 @@ class _AlertsPanel extends StatelessWidget {
           Padding(
             padding: EdgeInsets.all(8),
             child: Text(
-              'RECENT ALERTS',
+              'RECENT ALERTS'.tr,
               style: TextStyle(
                 fontFamily: GoogleFonts.montserrat().fontFamily,
                 fontWeight: FontWeight.w800,
@@ -583,13 +583,13 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                       ],
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: const Row(
+                    child:  Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.phone, color: Colors.white, size: 28),
                         SizedBox(width: 8),
                         Text(
-                          'Swipe to Call',
+                          'Swipe to Call'.tr,
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
@@ -659,7 +659,7 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
               top: 8,
               right: 8,
               child: IconButton(
-                tooltip: 'Close',
+                tooltip: 'Close'.tr,
                 icon: const Icon(Icons.close, color: Colors.white),
                 onPressed: () {
                   Navigator.of(context).pop();
@@ -747,7 +747,7 @@ class _ContactCallCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Direct Call for Service',
+                                'Direct Call for Service'.tr,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.primary,
@@ -755,7 +755,7 @@ class _ContactCallCard extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                'These are the terms and conditions for in charge of planning ',
+                                'These are the terms and conditions for in charge of planning'.tr,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF4F6B7E),
@@ -825,7 +825,7 @@ class _StartFillingCard extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Start Filling and Insert ID',
+                'Start Filling and Insert ID'.tr,
                 textAlign: TextAlign.start,
                 style: TextStyle(
                   fontSize: 13.sp,
@@ -834,8 +834,8 @@ class _StartFillingCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'These are the terms and conditions for in charge of planning',
+              Text(
+                'These are the terms and conditions for in charge of planning'.tr,
                 textAlign: TextAlign.start,
                 style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
               ),

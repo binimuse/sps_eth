@@ -97,7 +97,7 @@ class HomeController extends GetxController {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Exit App?',
+                'Exit App?'.tr,
                 style: TextStyle(
                   color: AppColors.danger,
                   fontWeight: FontWeight.bold,
@@ -107,14 +107,14 @@ class HomeController extends GetxController {
           ],
         ),
         content: Text(
-          'Are you sure you want to close the app?',
+          'Are you sure you want to close the app?'.tr,
           style: TextStyle(color: AppColors.grayDark),
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Get.back(result: false),
             child: Text(
-              'Cancel',
+              'Cancel'.tr,
               style: TextStyle(color: AppColors.primary),
             ),
           ),
@@ -124,7 +124,7 @@ class HomeController extends GetxController {
               backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Exit'),
+            child: Text('Exit'.tr),
           ),
         ],
       ),

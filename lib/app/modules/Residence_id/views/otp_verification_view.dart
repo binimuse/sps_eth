@@ -29,8 +29,8 @@ class OtpVerificationView extends GetView<ResidenceIdController> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Verify OTP',
+                  Text(
+                    'Verify OTP'.tr,
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -48,7 +48,7 @@ class OtpVerificationView extends GetView<ResidenceIdController> {
               
               // Phone number display
               Text(
-                'Enter the OTP sent to',
+                'Enter the OTP sent to'.tr,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -101,7 +101,7 @@ class OtpVerificationView extends GetView<ResidenceIdController> {
                 onChanged: (value) {
                   if (value.length == 6) {
                     // Auto-submit when 6 digits are entered
-                    controller.verifyOtp(phoneNumber);
+                //    controller.verifyOtp(phoneNumber);
                   }
                 },
               ),
@@ -149,9 +149,11 @@ class OtpVerificationView extends GetView<ResidenceIdController> {
                           ),
                           elevation: 0,
                         ),
-                        onPressed: () => controller.verifyOtp(phoneNumber),
-                        child: const Text(
-                          'Verify',
+                        onPressed: () => {
+                          // controller.verisfyOtp(phoneNumber)
+                        },
+                        child: Text(
+                          'Verify'.tr,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -165,9 +167,11 @@ class OtpVerificationView extends GetView<ResidenceIdController> {
                     Obx(() => TextButton(
                       onPressed: controller.otpNetworkStatus.value == NetworkStatus.LOADING
                           ? null
-                          : () => controller.requestOtp(phoneNumber),
-                      child: const Text(
-                        'Resend OTP',
+                          : () => {
+                            // controller.requestOtp(phoneNumber)
+                          },
+                      child: Text(
+                        'Resend OTP'.tr,
                         style: TextStyle(
                           fontSize: 14,
                           color: Color(0xFF1976D2),

@@ -51,7 +51,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
                           ),
                           onPressed: () => Get.back(),
                           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                          label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                          label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                         ),
                         const SizedBox(height: 16),
                         // Main Card with Passport Scanner
@@ -106,8 +106,8 @@ class VisitorIdView extends GetView<VisitorIdController> {
           ),
           const SizedBox(height: 12),
           // "Scan Passport" Text
-          const Text(
-            'Scan Passport Document',
+          Text(
+            'Scan Passport Document'.tr,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -115,8 +115,8 @@ class VisitorIdView extends GetView<VisitorIdController> {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Place your passport within the frame',
+          Text(
+            'Place your passport within the frame'.tr,
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF9E9E9E),
@@ -228,13 +228,13 @@ class VisitorIdView extends GetView<VisitorIdController> {
                   ),
                 ),
                 // Center instruction text
-                const Positioned(
+                Positioned(
                   bottom: 20,
                   left: 0,
                   right: 0,
                   child: Center(
                     child: Text(
-                      'Align passport within the frame',
+                      'Align passport within the frame'.tr,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -257,8 +257,8 @@ class VisitorIdView extends GetView<VisitorIdController> {
                 Get.toNamed(Routes.CALL_CLASS);
               },
               icon: const Icon(Icons.camera_alt, size: 20),
-              label: const Text(
-                'Scan Passport',
+              label: Text(
+                'Scan Passport'.tr,
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -278,8 +278,8 @@ class VisitorIdView extends GetView<VisitorIdController> {
           const SizedBox(height: 20),
           
           // Separator: "or" text
-          const Text(
-            'or',
+          Text(
+            'or'.tr,
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF9E9E9E),
@@ -314,8 +314,8 @@ class VisitorIdView extends GetView<VisitorIdController> {
                     color: const Color(0xFF1976D2),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Continue as a Guest',
+                  Text(
+                    'Continue as a Guest'.tr,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
