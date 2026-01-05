@@ -39,9 +39,8 @@ class ServiceListView extends GetView<ServiceListController> {
                   height: viewportHeight,
                   child: SideInfoPanel(
                     title: 'SMART POLICE\nSTATION',
-                    description: 'Loreim re in charge of planning and managing marketing'
-                        'campaigns that promote a company\'s brand. marketing'
-                        'campaigns that promote a company\'s brand.',
+                    description: 'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'
+                       ,
                     logoAsset: Assets.images.efpLogo.path,
                     illustrationAsset: Assets.images.law.path,
                   ),

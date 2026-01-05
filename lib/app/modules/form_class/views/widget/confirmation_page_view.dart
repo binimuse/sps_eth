@@ -266,7 +266,7 @@ class ConfirmationPageView extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'These are the terms and conditions for Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand. marketing campaigns that promote a company\'s brand.',
+                                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[700],

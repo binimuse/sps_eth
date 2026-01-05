@@ -17,10 +17,9 @@ void main() async {
   print('This is a test print from main.dart');
 
   WidgetsFlutterBinding.ensureInitialized();
-  // Lock orientation to landscape for tablet mode
+  // Lock orientation to landscape - prevent rotation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
   ]);
   await PreferenceUtils.init();
 

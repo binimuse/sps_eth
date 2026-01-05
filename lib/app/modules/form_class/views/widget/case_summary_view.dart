@@ -37,7 +37,7 @@ class CaseSummaryView extends StatelessWidget {
                       SideInfoPanel(
                         title: 'SMART POLICE\nSTATION',
                         description:
-                            'Loreim re in charge of planning and managing marketing\ncampaigns that promote a company\'s brand. marketing\ncampaigns that promote a company\'s brand.',
+                            'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
                         logoAsset: Assets.images.efpLogo.path,
                         illustrationAsset: Assets.images.law.path,
                       ),
@@ -135,7 +135,7 @@ class CaseSummaryView extends StatelessWidget {
               ),
               Expanded(
                 child: Text(
-                  'These are the terms and conditions for Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand. marketing campaigns that promote a company\'s brand.',
+                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF4F6B7E),

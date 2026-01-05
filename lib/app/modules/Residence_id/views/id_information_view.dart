@@ -160,7 +160,7 @@ class IdInformationView extends StatelessWidget {
                           elevation: 0,
                         ),
                         onPressed: () {
-                       Get.toNamed(Routes.SERVICE_LIST);
+                       Get.toNamed(Routes.CALL_CLASS);
                         },
                         child: Row(
                           mainAxisSize: MainAxisSize.min,

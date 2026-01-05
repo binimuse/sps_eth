@@ -14,6 +14,14 @@ class HomeController extends GetxController {
 
   final RxList<String> alerts = <String>[].obs;
 
+  // Hero section images for carousel slider
+  final List<String> heroImages = [
+    'assets/images/bg4.jpg',
+    'assets/images/bg3.jpg',
+    'assets/images/bg5.jpg',
+    'assets/images/news.png',
+  ];
+
   String get heroVideoUrl =>
       'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
 

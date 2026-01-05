@@ -76,7 +76,7 @@ class CallClassController extends GetxController {
   final RxList<InfoRow> idInformation = <InfoRow>[].obs;
   final RxList<DocumentItem> supportingDocuments = <DocumentItem>[].obs;
   final RxString termsAndConditions =
-      'These are the terms and conditions for Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand.'
+      'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'
           .obs;
   final RxString discussionDate = 'June 12, 2024'.obs;
 

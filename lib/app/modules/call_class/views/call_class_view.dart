@@ -9,6 +9,8 @@ import 'package:sps_eth_app/app/routes/app_pages.dart';
 
 import '../controllers/call_class_controller.dart';
 import 'widgets/report_draft_view.dart';
+import 'package:sps_eth_app/app/common/widgets/pulsing_logo_loader.dart';
+import 'package:sps_eth_app/gen/assets.gen.dart';
 
 /// Helper class for safe navigation
 class _NavigationHelper {
@@ -410,9 +412,14 @@ class CallClassView extends GetView<CallClassController> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircularProgressIndicator(
-                            color: AppColors.primary,
-                            strokeWidth: 3,
+                          PulsingLogoLoader(
+                            logoPath: Assets.images.efpLogo.path,
+                            logoSize: 160.0,
+                            waveColor: AppColors.primary,
+                            logoBackgroundColor: AppColors.whiteOff,
+                            logoBorderColor: AppColors.primary,
+                            waveCount: 3,
+                            baseRadius: 100.0,
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -426,6 +433,57 @@ class CallClassView extends GetView<CallClassController> {
                           const SizedBox(height: 8),
                           Text(
                             'Please wait while we set up your connection',
+                            style: TextStyle(
+                              color: AppColors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+            // Full-page loading overlay - shown during call connecting/pending
+            Obx(() {
+              final callStatus = controller.callStatus.value;
+              final isConnecting = callStatus == 'connecting' || callStatus == 'pending';
+              
+              if (!isConnecting) {
+                return const SizedBox.shrink();
+              }
+              
+              return Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    color: AppColors.black.withOpacity(0.3),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          PulsingLogoLoader(
+                            logoPath: Assets.images.efpLogo.path,
+                            logoSize: 160.0,
+                            waveColor: AppColors.primary,
+                            logoBackgroundColor: AppColors.whiteOff,
+                            logoBorderColor: AppColors.primary,
+                            waveCount: 3,
+                            baseRadius: 100.0,
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            callStatus == 'connecting' ? 'Connecting...' : 'Waiting for agent...',
+                            style: TextStyle(
+                              color: AppColors.whiteOff,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Please wait while we connect your call',
                             style: TextStyle(
                               color: AppColors.white70,
                               fontSize: 14,

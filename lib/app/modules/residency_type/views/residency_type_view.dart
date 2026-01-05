@@ -39,7 +39,7 @@ class FiilingClassView extends GetView<FiilingClassController> {
                   height: viewportHeight,
                   child: SideInfoPanel(
                   title: 'SMART POLICE\nSTATION',
-                  description: 'Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand. marketing campaigns that promote a company\'s brand.',
+                  description: 'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
                   logoAsset: Assets.images.efpLogo.path,
                   illustrationAsset: Assets.images.law.path,
                   ),
@@ -73,8 +73,8 @@ class FiilingClassView extends GetView<FiilingClassController> {
                                     )),
                                 SizedBox(height: 4),
                                 Text(
-                                  'Loreim re in charge of planning and managing marketing\n'
-                                  'campaigns that promote a company\'s brand.',
+                                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.\n'
+                              ,
                                   style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
                                 ),
                               ],
@@ -115,7 +115,7 @@ class FiilingClassView extends GetView<FiilingClassController> {
                                   height: 320,
                                   width: double.infinity,
                                   child: _ServiceCard(
-                                    title: 'Residence ID',
+                                    title: 'Residence',
                                     subtitle: 'Please Start your process using your\nResidence id / National id',
                                     image: Assets.images.localResident.path,
                                   ),
@@ -135,7 +135,7 @@ class FiilingClassView extends GetView<FiilingClassController> {
                                   height: 320,
                                   width: double.infinity,
                                   child: _ServiceCard(
-                                    title: 'Visitor ID',
+                                    title: 'Visitor',
                                     subtitle: 'If you are foreigner you can start your process\nusing your passport id',
                                     image: Assets.images.visitor.path,
                                   ),

@@ -32,7 +32,7 @@ class PromoCard extends StatelessWidget {
                     const Expanded(
                       child: Center(
                         child: Text(
-                          'Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand. marketing campaigns that promote a company\'s brand.',
+                          'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
                           style: TextStyle(color: Colors.white70, height: 1.4),
                           textAlign: TextAlign.center,
                         ),
