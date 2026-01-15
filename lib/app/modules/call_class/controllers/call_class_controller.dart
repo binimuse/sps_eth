@@ -6,7 +6,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sps_eth_app/app/modules/form_class/views/widget/scanning_document_view.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocket_service.dart';
-import 'package:sps_eth_app/app/modules/call_class/services/report_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/services/auth_service.dart';
 import 'package:dio/dio.dart' as dio;
@@ -87,9 +86,6 @@ class CallClassController extends GetxController {
   final DirectCallService _directCallService = DirectCallService(
     DioUtil().getDio(useAccessToken: true),
   );
-  final ReportService _reportService = ReportService(
-    DioUtil().getDio(useAccessToken: true),
-  );
   DirectCallWebSocketService? _webSocketService;
 
   // LiveKit related
@@ -137,7 +133,7 @@ class CallClassController extends GetxController {
   
   // Call details polling
   Timer? _callDetailsPollingTimer;
-  static const int _callDetailsPollInterval = 10; // seconds
+  static const int _callDetailsPollInterval = 5; // seconds
 
   @override
   void onInit() {
@@ -1597,17 +1593,47 @@ class CallClassController extends GetxController {
         print('  - Status: ${response.data!.status}');
         
         // Extract report and statement info
-        reportInfo.value = response.data!.report;
-        statementInfo.value = response.data!.statement;
+        final newReport = response.data!.report;
+        final newStatement = response.data!.statement;
         
-        if (response.data!.report != null) {
-          print('✅ [CALL DETAILS] Report found: ${response.data!.report!.caseNumber ?? "No case number"}');
-          print('  - Report Type: ${response.data!.report!.reportType?.name ?? "Unknown"}');
+        // Check if statement text changed to detect updates
+        bool statementChanged = false;
+        if (newStatement != null && statementInfo.value != null) {
+          final oldStatementText = statementInfo.value!.statement ?? '';
+          final newStatementText = newStatement.statement ?? '';
+          if (oldStatementText != newStatementText) {
+            statementChanged = true;
+            print('🔄 [CALL DETAILS] Statement text changed detected');
+            print('  - Old length: ${oldStatementText.length}');
+            print('  - New length: ${newStatementText.length}');
+            print('  - Old preview: ${oldStatementText.substring(0, oldStatementText.length > 50 ? 50 : oldStatementText.length)}...');
+            print('  - New preview: ${newStatementText.substring(0, newStatementText.length > 50 ? 50 : newStatementText.length)}...');
+          }
         }
         
-        if (response.data!.statement != null) {
-          print('✅ [CALL DETAILS] Statement found: ${response.data!.statement!.id}');
-          print('  - Person: ${response.data!.statement!.person?.fullName ?? "Unknown"}');
+        // Always update values to trigger reactive updates
+        // Assigning new values will trigger GetX observers
+        reportInfo.value = newReport;
+        statementInfo.value = newStatement;
+        
+        // Force refresh to ensure UI updates (especially if statement text changed)
+        if (statementChanged || newStatement != null) {
+          statementInfo.refresh();
+          print('🔄 [CALL DETAILS] Forced statementInfo refresh');
+        }
+        if (newReport != null) {
+          reportInfo.refresh();
+        }
+        
+        if (newReport != null) {
+          print('✅ [CALL DETAILS] Report found: ${newReport.caseNumber ?? "No case number"}');
+          print('  - Report Type: ${newReport.reportType?.name ?? "Unknown"}');
+        }
+        
+        if (newStatement != null) {
+          print('✅ [CALL DETAILS] Statement found: ${newStatement.id}');
+          print('  - Person: ${newStatement.person?.fullName ?? "Unknown"}');
+          print('  - Statement length: ${newStatement.statement?.length ?? 0}');
         }
         
         // Update ID Information from call details
@@ -1673,56 +1699,24 @@ class CallClassController extends GetxController {
   void _updateIdInformationFromCallDetails(CallDetailsResponse details) {
     final infoRows = <InfoRow>[];
     
-    // Add report type information if available
-    if (details.report?.reportType != null) {
-      final reportType = details.report!.reportType!;
-      if (reportType.name != null && reportType.name!.isNotEmpty) {
-        infoRows.add(InfoRow('Report Type (English)', reportType.name!));
-      }
-      if (reportType.nameAmharic != null && reportType.nameAmharic!.isNotEmpty) {
-        infoRows.add(InfoRow('Report Type (Amharic)', reportType.nameAmharic!));
-      }
-      if (reportType.code != null && reportType.code!.isNotEmpty) {
-        infoRows.add(InfoRow('Report Code', reportType.code!));
-      }
-    }
-    
-    // Add report date if available
-    if (details.report?.createdAt != null) {
-      final date = details.report!.createdAt!;
-      final dateStr = '${date.day}/${date.month}/${date.year}';
-      infoRows.add(InfoRow('Report Date', dateStr));
-    }
-    
-    // Add case number if available
-    if (details.report?.caseNumber != null && details.report!.caseNumber!.isNotEmpty) {
-      infoRows.add(InfoRow('Case Number', details.report!.caseNumber!));
-    }
-    
     // Determine which user info to show (caller or receiver)
-    // For USER role, show receiver (employee) info
+    // For USER role, show receiver (employee/officer) info
     // For EMPLOYEE role, show caller (user) info
     final userInfo = details.receiver ?? details.caller;
     
+    // Only add officer name
     if (userInfo != null) {
       if (userInfo.name != null && userInfo.name!.isNotEmpty) {
-        infoRows.add(InfoRow('Name Information', userInfo.name!));
-      }
-      if (userInfo.phone != null && userInfo.phone!.isNotEmpty) {
-        infoRows.add(InfoRow('Phone Number', userInfo.phone!));
-      }
-      if (userInfo.email != null && userInfo.email!.isNotEmpty) {
-        infoRows.add(InfoRow('Email', userInfo.email!));
-      }
-      if (userInfo.id != null && userInfo.id!.isNotEmpty) {
-        infoRows.add(InfoRow('ID Information', userInfo.id!));
+        infoRows.add(InfoRow('Officer Name', userInfo.name!));
       }
     }
     
-    // Add call status and dates
+    // Add call status
     if (details.status != null) {
       infoRows.add(InfoRow('Call Status', details.status!));
     }
+    
+    // Add call date
     if (details.createdAt != null) {
       final dateStr = '${details.createdAt!.day}/${details.createdAt!.month}/${details.createdAt!.year}';
       infoRows.add(InfoRow('Call Date', dateStr));
@@ -1751,27 +1745,6 @@ class CallClassController extends GetxController {
   
   // Removed draft polling - now using call details endpoint which includes report and statement
   // Old draft polling methods removed - data comes from call details every 10 seconds
-  
-  /// Format timestamp for display (kept for potential future use)
-  String _formatTimestamp(String isoString) {
-    try {
-      final dateTime = DateTime.parse(isoString);
-      final now = DateTime.now();
-      final difference = now.difference(dateTime);
-      
-      if (difference.inSeconds < 60) {
-        return 'Just now';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-      } else {
-        return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-      }
-    } catch (e) {
-      return 'Unknown';
-    }
-  }
   
   // Removed: _startDraftPolling, _stopDraftPolling, _scheduleNextPoll, _pollDraft methods
   // These are no longer needed as we get report and statement data from call details endpoint

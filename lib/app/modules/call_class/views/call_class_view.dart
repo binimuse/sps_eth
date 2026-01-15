@@ -361,7 +361,7 @@ class CallClassView extends GetView<CallClassController> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'ID Information',
+                                        'Report Info',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: AppColors.primary,
@@ -381,7 +381,7 @@ class CallClassView extends GetView<CallClassController> {
                               }
                               
                               return _InfoCard(
-                                title: 'ID Information',
+                                title: 'Report Info',
                                 rows: controller.idInformation.toList(),
                               );
                             }),
