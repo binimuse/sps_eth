@@ -124,6 +124,7 @@ static const String fileViewer = 'http://5.75.142.45:9000/';
   static const directCallReject = "/direct-call/reject/{sessionId}";
   static const directCallEnd = "/direct-call/end/{sessionId}";
   static const directCallPending = "/direct-call/pending";
+  static const directCallDetails = "/direct-call/{sessionId}";
 
   // Report endpoints
   static const reportDraft = "/reports/draft/{callSessionId}";

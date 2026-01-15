@@ -213,3 +213,163 @@ class CallEndedEvent {
   Map<String, dynamic> toJson() => _$CallEndedEventToJson(this);
 }
 
+// Report Type in Call Details
+@JsonSerializable()
+class ReportTypeInfo {
+  const ReportTypeInfo({
+    this.id,
+    this.name,
+    this.nameAmharic,
+    this.code,
+  });
+
+  factory ReportTypeInfo.fromJson(Map<String, dynamic> json) =>
+      _$ReportTypeInfoFromJson(json);
+
+  final String? id;
+  final String? name;
+  final String? nameAmharic;
+  final String? code;
+
+  Map<String, dynamic> toJson() => _$ReportTypeInfoToJson(this);
+}
+
+// Report in Call Details
+@JsonSerializable()
+class ReportInfo {
+  const ReportInfo({
+    this.id,
+    this.caseNumber,
+    this.reportType,
+    this.submitted,
+    this.submittedAt,
+    this.createdAt,
+  });
+
+  factory ReportInfo.fromJson(Map<String, dynamic> json) =>
+      _$ReportInfoFromJson(json);
+
+  final String? id;
+  final String? caseNumber;
+  final ReportTypeInfo? reportType;
+  final bool? submitted;
+  final DateTime? submittedAt;
+  final DateTime? createdAt;
+
+  Map<String, dynamic> toJson() => _$ReportInfoToJson(this);
+}
+
+// Person in Statement
+@JsonSerializable()
+class PersonInfo {
+  const PersonInfo({
+    this.id,
+    this.fullName,
+    this.sex,
+    this.age,
+    this.dateOfBirth,
+    this.phoneMobile,
+    this.nationality,
+  });
+
+  factory PersonInfo.fromJson(Map<String, dynamic> json) =>
+      _$PersonInfoFromJson(json);
+
+  final String? id;
+  final String? fullName;
+  final String? sex;
+  final int? age;
+  final DateTime? dateOfBirth;
+  final String? phoneMobile;
+  final String? nationality;
+
+  Map<String, dynamic> toJson() => _$PersonInfoToJson(this);
+}
+
+// Statement in Call Details
+@JsonSerializable()
+class StatementInfo {
+  const StatementInfo({
+    this.id,
+    this.reportId,
+    this.statementTakerName,
+    this.person,
+    this.applicantType,
+    this.statement,
+    this.statementDate,
+    this.statementTime,
+    this.status,
+    this.createdAt,
+  });
+
+  factory StatementInfo.fromJson(Map<String, dynamic> json) =>
+      _$StatementInfoFromJson(json);
+
+  final String? id;
+  final String? reportId;
+  final String? statementTakerName;
+  final PersonInfo? person;
+  final String? applicantType;
+  final String? statement;
+  final DateTime? statementDate;
+  final String? statementTime;
+  final String? status;
+  final DateTime? createdAt;
+
+  Map<String, dynamic> toJson() => _$StatementInfoToJson(this);
+}
+
+// Call Details Response
+@JsonSerializable()
+class CallDetailsResponse {
+  const CallDetailsResponse({
+    this.id,
+    this.caller,
+    this.receiver,
+    this.report,
+    this.statement,
+    this.roomName,
+    this.status,
+    this.startedAt,
+    this.endedAt,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory CallDetailsResponse.fromJson(Map<String, dynamic> json) =>
+      _$CallDetailsResponseFromJson(json);
+
+  final String? id;
+  final CallerInfo? caller;
+  final CallerInfo? receiver;
+  final ReportInfo? report;
+  final StatementInfo? statement;
+  final String? roomName;
+  final String? status;
+  final DateTime? startedAt;
+  final DateTime? endedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  Map<String, dynamic> toJson() => _$CallDetailsResponseToJson(this);
+}
+
+// Wrapper for Call Details API response
+@JsonSerializable()
+class CallDetailsResponseWrapper {
+  const CallDetailsResponseWrapper({
+    this.success,
+    this.data,
+    this.meta,
+  });
+
+  factory CallDetailsResponseWrapper.fromJson(Map<String, dynamic> json) =>
+      _$CallDetailsResponseWrapperFromJson(json);
+
+  final bool? success;
+  final CallDetailsResponse? data;
+  final DirectCallMeta? meta;
+
+  Map<String, dynamic> toJson() => _$CallDetailsResponseWrapperToJson(this);
+}
+

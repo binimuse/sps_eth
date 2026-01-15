@@ -14,7 +14,6 @@ class ReportDraftView extends StatelessWidget {
     return Obx(() {
       final draftData = controller.reportDraft.value;
       final pollingStatus = controller.pollingStatus.value;
-      final isPolling = controller.isPollingDraft.value;
       
       // Show status message when no draft exists yet
       if (draftData == null || draftData.formData == null || draftData.formData!.isEmpty) {
@@ -28,21 +27,11 @@ class ReportDraftView extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (isPolling)
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                )
-              else
-                Icon(
-                  Icons.description_outlined,
-                  color: AppColors.grayDefault,
-                  size: 24,
-                ),
+              Icon(
+                Icons.description_outlined,
+                color: AppColors.grayDefault,
+                size: 24,
+              ),
               const SizedBox(height: 12),
               Text(
                 pollingStatus,
@@ -182,15 +171,6 @@ class ReportDraftView extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (isPolling)
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary,
-                      ),
-                    ),
                 ],
               ),
             ),
