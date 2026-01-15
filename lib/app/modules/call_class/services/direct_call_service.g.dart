@@ -157,9 +157,13 @@ class _DirectCallService implements DirectCallService {
   }
 
   @override
-  Future<CallDetailsResponseWrapper> getCallDetails(String sessionId) async {
+  Future<CallDetailsResponseWrapper> getCallDetails(
+    String sessionId,
+    int? timestamp,
+  ) async {
     final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'_t': timestamp};
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<CallDetailsResponseWrapper>(

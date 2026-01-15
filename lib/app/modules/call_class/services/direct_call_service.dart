@@ -114,6 +114,9 @@ abstract class DirectCallService {
   ///   "meta": { ... }
   /// }
   @GET(Constants.directCallDetails)
-  Future<CallDetailsResponseWrapper> getCallDetails(@Path('sessionId') String sessionId);
+  Future<CallDetailsResponseWrapper> getCallDetails(
+    @Path('sessionId') String sessionId,
+    @Query('_t') int? timestamp, // Cache-busting parameter
+  );
 }
 

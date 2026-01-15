@@ -133,7 +133,8 @@ class CallClassController extends GetxController {
   
   // Call details polling
   Timer? _callDetailsPollingTimer;
-  static const int _callDetailsPollInterval = 5; // seconds
+  static const int _callDetailsPollInterval = 3; // seconds (reduced for faster updates)
+  bool _isLoadingCallDetails = false; // Prevent overlapping requests
 
   @override
   void onInit() {
@@ -1580,10 +1581,20 @@ class CallClassController extends GetxController {
       return;
     }
     
+    // Prevent overlapping requests
+    if (_isLoadingCallDetails) {
+      print('⏳ [CALL DETAILS] Request already in progress, skipping...');
+      return;
+    }
+    
+    _isLoadingCallDetails = true;
+    
     try {
       print('📋 [CALL DETAILS] Loading call details for session: $sessionId');
       
-      final response = await _directCallService.getCallDetails(sessionId);
+      // Add timestamp for cache-busting to ensure fresh data in release mode
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final response = await _directCallService.getCallDetails(sessionId, timestamp);
       
       if (response.success == true && response.data != null) {
         callDetails.value = response.data;
@@ -1598,31 +1609,61 @@ class CallClassController extends GetxController {
         
         // Check if statement text changed to detect updates
         bool statementChanged = false;
+        bool reportChanged = false;
+        
         if (newStatement != null && statementInfo.value != null) {
           final oldStatementText = statementInfo.value!.statement ?? '';
           final newStatementText = newStatement.statement ?? '';
-          if (oldStatementText != newStatementText) {
+          final oldStatementId = statementInfo.value!.id ?? '';
+          final newStatementId = newStatement.id ?? '';
+          
+          if (oldStatementText != newStatementText || oldStatementId != newStatementId) {
             statementChanged = true;
-            print('🔄 [CALL DETAILS] Statement text changed detected');
+            print('🔄 [CALL DETAILS] Statement changed detected');
             print('  - Old length: ${oldStatementText.length}');
             print('  - New length: ${newStatementText.length}');
-            print('  - Old preview: ${oldStatementText.substring(0, oldStatementText.length > 50 ? 50 : oldStatementText.length)}...');
-            print('  - New preview: ${newStatementText.substring(0, newStatementText.length > 50 ? 50 : newStatementText.length)}...');
+            if (oldStatementText != newStatementText) {
+              print('  - Text changed!');
+            }
+            if (oldStatementId != newStatementId) {
+              print('  - ID changed: $oldStatementId -> $newStatementId');
+            }
           }
+        } else if (newStatement != null && statementInfo.value == null) {
+          // First time statement appears
+          statementChanged = true;
+          print('🔄 [CALL DETAILS] Statement appeared for the first time');
         }
         
-        // Always update values to trigger reactive updates
-        // Assigning new values will trigger GetX observers
+        if (newReport != null && reportInfo.value != null) {
+          final oldReportId = reportInfo.value!.id ?? '';
+          final newReportId = newReport.id ?? '';
+          if (oldReportId != newReportId) {
+            reportChanged = true;
+            print('🔄 [CALL DETAILS] Report changed detected');
+          }
+        } else if (newReport != null && reportInfo.value == null) {
+          reportChanged = true;
+          print('🔄 [CALL DETAILS] Report appeared for the first time');
+        }
+        
+        // Always update values - create new references to ensure GetX detects changes
+        // This is important in release mode where object references might be optimized
         reportInfo.value = newReport;
         statementInfo.value = newStatement;
         
-        // Force refresh to ensure UI updates (especially if statement text changed)
+        // Force refresh to ensure UI updates immediately
+        // Use update() method which is more reliable in release mode
         if (statementChanged || newStatement != null) {
           statementInfo.refresh();
-          print('🔄 [CALL DETAILS] Forced statementInfo refresh');
+          // Also trigger update on the observable
+          statementInfo.value = newStatement; // Re-assign to trigger change
+          print('🔄 [CALL DETAILS] Forced statementInfo refresh and update');
         }
-        if (newReport != null) {
+        
+        if (reportChanged || newReport != null) {
           reportInfo.refresh();
+          reportInfo.value = newReport; // Re-assign to trigger change
         }
         
         if (newReport != null) {
@@ -1645,6 +1686,8 @@ class CallClassController extends GetxController {
       print('❌ [CALL DETAILS] Error loading call details: $e');
       print('❌ [CALL DETAILS] Stack trace: $stackTrace');
       // Don't show error toast - this is a background operation
+    } finally {
+      _isLoadingCallDetails = false;
     }
   }
   
