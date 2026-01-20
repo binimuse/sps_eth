@@ -38,6 +38,23 @@ class DirectCallMeta {
   Map<String, dynamic> toJson() => _$DirectCallMetaToJson(this);
 }
 
+// Request Call Request (request body)
+@JsonSerializable()
+class RequestCallRequest {
+  const RequestCallRequest({
+    this.isVisitor,
+    this.preferredLanguage,
+  });
+
+  factory RequestCallRequest.fromJson(Map<String, dynamic> json) =>
+      _$RequestCallRequestFromJson(json);
+
+  final bool? isVisitor;
+  final String? preferredLanguage;
+
+  Map<String, dynamic> toJson() => _$RequestCallRequestToJson(this);
+}
+
 // Request Call Response (data field)
 @JsonSerializable()
 class RequestCallResponse {

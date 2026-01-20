@@ -10,6 +10,7 @@ part 'report_service.g.dart';
 @RestApi(baseUrl: Constants.baseUrl)
 abstract class ReportService {
   factory ReportService(Dio dio) = _ReportService;
+  
 
   /// Get draft report for a call session
   /// 

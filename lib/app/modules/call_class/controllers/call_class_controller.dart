@@ -7,6 +7,8 @@ import 'package:sps_eth_app/app/modules/form_class/views/widget/scanning_documen
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocket_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
+import 'package:sps_eth_app/app/modules/call_class/models/report_response_model.dart';
+import 'package:sps_eth_app/app/modules/call_class/views/widgets/confirmation_page_view.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/services/auth_service.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:sps_eth_app/app/utils/dio_util.dart';
@@ -17,6 +19,8 @@ import 'package:sps_eth_app/app/utils/device_id_util.dart';
 import 'package:sps_eth_app/app/utils/connectivity_util.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:sps_eth_app/app/modules/language/controllers/language_controller.dart';
+import 'package:sps_eth_app/app/modules/language/views/language_view.dart';
 
 class ChatMessage {
   final String text;
@@ -135,6 +139,10 @@ class CallClassController extends GetxController {
   Timer? _callDetailsPollingTimer;
   static const int _callDetailsPollInterval = 3; // seconds (reduced for faster updates)
   bool _isLoadingCallDetails = false; // Prevent overlapping requests
+  
+  // Call request parameters
+  bool _isVisitor = false; // Default to false (residence/home)
+  String? _preferredLanguage; // Will be set if language was selected
 
   @override
   void onInit() {
@@ -143,12 +151,33 @@ class CallClassController extends GetxController {
       // Initialize connectivity monitoring
       connectivityUtil.initialize();
       
-      // Check if auto-start is requested from arguments
+      // Read arguments to determine call source and get preferred language
       final args = Get.arguments;
-      if (args != null && args is Map && args['autoStart'] == true) {
-        autoStartCall.value = true;
-        print('📞 [AUTO START] Auto-start call requested from home swipe');
+      if (args != null && args is Map) {
+        // Check if auto-start is requested
+        if (args['autoStart'] == true) {
+          autoStartCall.value = true;
+          print('📞 [AUTO START] Auto-start call requested from home swipe');
+        }
+        
+        // Get isVisitor flag (default to false if not provided)
+        _isVisitor = args['isVisitor'] == true;
+        print('📞 [INIT] isVisitor: $_isVisitor');
+        
+        // Get preferred language from LanguageController if available
+        _preferredLanguage = _getPreferredLanguage();
+        if (_preferredLanguage != null) {
+          print('📞 [INIT] preferredLanguage: $_preferredLanguage');
+        } else {
+          print('📞 [INIT] preferredLanguage: null (no language selected)');
+        }
+      } else {
+        // No arguments, default values
+        _isVisitor = false;
+        _preferredLanguage = _getPreferredLanguage();
+        print('📞 [INIT] No arguments provided, using defaults - isVisitor: $_isVisitor');
       }
+      
       _loadInitialData();
     } catch (e, stackTrace) {
       print('❌ [INIT ERROR] Error in onInit: $e');
@@ -417,7 +446,7 @@ class CallClassController extends GetxController {
         print('❌ [WEBSOCKET EVENT] callRejected: sessionId=${event.sessionId}, message=${event.message}');
         if (event.sessionId == currentSessionId.value) {
           callStatus.value = 'ended';
-          _handleCallEnded();
+          _handleCallEnded(shouldNavigate: false);
           AppToasts.showError(event.message ?? 'Call rejected');
         }
       };
@@ -426,16 +455,10 @@ class CallClassController extends GetxController {
         print('🔚 [WEBSOCKET EVENT] callEnded: sessionId=${event.sessionId}, duration=${event.duration}, message=${event.message}');
         if (event.sessionId == currentSessionId.value) {
           callStatus.value = 'ended';
-          _handleCallEnded();
-          // Navigate back to home after a short delay to allow cleanup
-          Future.delayed(const Duration(milliseconds: 500), () {
-            try {
-              Get.offAllNamed(Routes.HOME); // Navigate to home when admin ends call
-              print('🏠 [NAVIGATION] Navigated to home after call ended by admin');
-            } catch (e) {
-              print('❌ [NAVIGATION] Error navigating to home: $e');
-            }
-          });
+          // Clear ending call loading state when WebSocket confirms call ended
+          isEndingCall.value = false;
+          // _handleCallEnded will handle navigation based on whether report exists
+          _handleCallEnded(shouldNavigate: true);
         }
       };
       
@@ -685,8 +708,37 @@ class CallClassController extends GetxController {
       print('✅ [REQUEST CALL] Permissions granted');
       print('📞 [REQUEST CALL] Calling Direct Call API...');
       
+      // Create request payload with isVisitor and preferredLanguage
+      final requestPayload = RequestCallRequest(
+        isVisitor: _isVisitor,
+        preferredLanguage: _preferredLanguage,
+      );
+      
+      // Print request payload details
+      final accessToken = await AuthUtil().getAccessToken();
+      final baseUrl = 'https://sps-api-test.aii.et/api/v1';
+      final endpoint = '/direct-call/request';
+      final fullUrl = '$baseUrl$endpoint';
+      
+      print('📤 [REQUEST CALL] ========== REQUEST PAYLOAD ==========');
+      print('📤 [REQUEST CALL] Method: POST');
+      print('📤 [REQUEST CALL] URL: $fullUrl');
+      print('📤 [REQUEST CALL] Headers:');
+      print('📤 [REQUEST CALL]   - Content-Type: application/json');
+      if (accessToken != null) {
+        print('📤 [REQUEST CALL]   - Authorization: Bearer $accessToken');
+      } else {
+        print('📤 [REQUEST CALL]   - Authorization: null');
+      }
+      print('📤 [REQUEST CALL] Body:');
+      print('📤 [REQUEST CALL] {');
+      print('📤 [REQUEST CALL]   "isVisitor": ${requestPayload.isVisitor}');
+      print('📤 [REQUEST CALL]   "preferredLanguage": ${requestPayload.preferredLanguage != null ? "\"${requestPayload.preferredLanguage}\"" : "null"}');
+      print('📤 [REQUEST CALL] }');
+      print('📤 [REQUEST CALL] ======================================');
+      
       // Request call via Direct Call API
-      final responseWrapper = await _directCallService.requestCall();
+      final responseWrapper = await _directCallService.requestCall(requestPayload);
       
       // Extract data from wrapper
       if (responseWrapper.success != true || responseWrapper.data == null) {
@@ -701,11 +753,25 @@ class CallClassController extends GetxController {
       
       final response = responseWrapper.data!;
       
-      print('📞 [REQUEST CALL] API Response received:');
-      print('  - token: ${response.token != null ? "${response.token!.substring(0, 20)}..." : "null"}');
-      print('  - roomName: ${response.roomName}');
-      print('  - sessionId: ${response.sessionId}');
-      print('  - wsUrl: ${response.wsUrl}');
+      print('📥 [REQUEST CALL] ========== RESPONSE PAYLOAD ==========');
+      print('📥 [REQUEST CALL] Status: Success');
+      print('📥 [REQUEST CALL] Response Body:');
+      print('📥 [REQUEST CALL] {');
+      print('📥 [REQUEST CALL]   "success": ${responseWrapper.success}');
+      print('📥 [REQUEST CALL]   "data": {');
+      print('📥 [REQUEST CALL]     "token": "${response.token != null ? "${response.token!.substring(0, 20)}..." : "null"}"');
+      print('📥 [REQUEST CALL]     "roomName": "${response.roomName ?? "null"}"');
+      print('📥 [REQUEST CALL]     "sessionId": "${response.sessionId ?? "null"}"');
+      print('📥 [REQUEST CALL]     "wsUrl": "${response.wsUrl ?? "null"}"');
+      print('📥 [REQUEST CALL]   }');
+      if (responseWrapper.meta != null) {
+        print('📥 [REQUEST CALL]   "meta": {');
+        print('📥 [REQUEST CALL]     "timestamp": "${responseWrapper.meta!.timestamp ?? "null"}"');
+        print('📥 [REQUEST CALL]     "requestId": "${responseWrapper.meta!.requestId ?? "null"}"');
+        print('📥 [REQUEST CALL]   }');
+      }
+      print('📥 [REQUEST CALL] }');
+      print('📥 [REQUEST CALL] ======================================');
 
       if (response.token == null || 
           response.roomName == null || 
@@ -1031,7 +1097,7 @@ class CallClassController extends GetxController {
       callStatus.value = 'idle';
       callNetworkStatus.value = NetworkStatus.ERROR;
       AppToasts.showError('Failed to connect to video call server. This may be due to slow internet connection or server issues.');
-      await _handleCallEnded();
+      await _handleCallEnded(shouldNavigate: false);
     } catch (e, stackTrace) {
       print('❌ [LIVEKIT ERROR] Exception connecting to LiveKit: $e');
       print('❌ [LIVEKIT ERROR] Stack trace: $stackTrace');
@@ -1054,7 +1120,7 @@ class CallClassController extends GetxController {
       AppToasts.showError(errorMessage);
       _connectionTimeoutTimer?.cancel();
       _connectionTimeoutTimer = null;
-      await _handleCallEnded();
+      await _handleCallEnded(shouldNavigate: false);
     }
   }
   
@@ -1072,7 +1138,7 @@ class CallClassController extends GetxController {
         callNetworkStatus.value = NetworkStatus.ERROR;
         callStatus.value = 'idle';
         connectionStatus.value = 'Connection timeout';
-        _handleCallEnded();
+        _handleCallEnded(shouldNavigate: false);
       }
     });
   }
@@ -1447,7 +1513,7 @@ class CallClassController extends GetxController {
           print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
         }
         callStatus.value = 'idle';
-        _handleCallEnded();
+        _handleCallEnded(shouldNavigate: false);
       }
     } else if (_room!.connectionState == ConnectionState.connecting) {
       print('🔄 [ROOM EVENT] Room connecting...');
@@ -1530,18 +1596,27 @@ class CallClassController extends GetxController {
 
   /// End the current call
   Future<void> endCall() async {
+    // Prevent multiple simultaneous end calls
+    if (isEndingCall.value) {
+      print('⚠️ [END CALL] Call ending already in progress, ignoring duplicate request');
+      return;
+    }
+    
     final sessionId = currentSessionId.value;
     if (sessionId == null || sessionId.isEmpty) {
       await disconnectFromRoom();
       return;
     }
 
-    // Set loading state
+    // Set loading state - will be cleared when WebSocket confirms call ended
     isEndingCall.value = true;
+    print('📞 [END CALL] Ending call, showing loading indicator...');
 
     try {
       await _directCallService.endCall(sessionId);
-      await _handleCallEnded();
+      // Don't clear loading state here - wait for WebSocket confirmation
+      // The loading state will be cleared when onCallEnded WebSocket event is received
+      // or when navigation happens in _handleCallEnded
     } catch (e) {
       // Check if it's a DioException with 400 status about PENDING call
       bool isPendingCallError = false;
@@ -1560,20 +1635,53 @@ class CallClassController extends GetxController {
         }
       }
       
-      // Even if API call fails, disconnect from LiveKit
-      await _handleCallEnded();
+      // Even if API call fails, disconnect from LiveKit and handle call ended
+      // Don't clear loading state yet - wait for WebSocket or navigation
+      await _handleCallEnded(shouldNavigate: true);
       
       // Only show error if it's not a PENDING call error (which is expected)
       if (!isPendingCallError) {
         AppToasts.showError('Error ending call. Please try again.');
       }
       // For pending calls, just clean up silently
-    } finally {
-      // Always clear loading state
-      isEndingCall.value = false;
+      
+      // If navigation happens immediately (no report), clear loading state
+      // Otherwise it will be cleared when WebSocket receives callEnded event
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (isEndingCall.value) {
+          isEndingCall.value = false;
+        }
+      });
     }
   }
 
+  /// Get preferred language from LanguageController if available
+  String? _getPreferredLanguage() {
+    try {
+      // Try to get LanguageController instance
+      if (Get.isRegistered<LanguageController>()) {
+        final languageController = Get.find<LanguageController>();
+        final selectedIndex = languageController.selectedLanguageIndex.value;
+        
+        // Check if a language was actually selected (index >= 0)
+        if (selectedIndex >= 0 && selectedIndex < LanguageView.allLanguages.length) {
+          final languageName = LanguageView.allLanguages[selectedIndex]['name'] as String;
+          print('🌐 [LANGUAGE] Found selected language: $languageName (index: $selectedIndex)');
+          return languageName;
+        } else {
+          print('🌐 [LANGUAGE] No language selected (index: $selectedIndex)');
+          return null;
+        }
+      } else {
+        print('🌐 [LANGUAGE] LanguageController not registered');
+        return null;
+      }
+    } catch (e) {
+      print('⚠️ [LANGUAGE] Error getting preferred language: $e');
+      return null;
+    }
+  }
+  
   /// Load call details from backend
   Future<void> _loadCallDetails(String sessionId) async {
     if (sessionId.isEmpty) {
@@ -1770,20 +1878,260 @@ class CallClassController extends GetxController {
   }
 
   /// Handle call ended (cleanup)
-  Future<void> _handleCallEnded() async {
+  Future<void> _handleCallEnded({bool shouldNavigate = true}) async {
     // Stop polling when call ends
     _stopCallDetailsPolling();
     
+    // Save report ID before clearing call details
+    final reportId = reportInfo.value?.id;
+    print('📋 [CALL ENDED] Report ID: ${reportId ?? "null"}');
+    
     await disconnectFromRoom();
     callStatus.value = 'ended';
+    
+    // Clear call details (but keep reportId for fetching)
+    final savedReportId = reportId;
+    callDetails.value = null;
+    reportInfo.value = null;
+    statementInfo.value = null;
+    
     currentSessionId.value = '';
     currentRoomName.value = '';
     currentWsUrl.value = '';
     
-    // Clear call details
-    callDetails.value = null;
-    reportInfo.value = null;
-    statementInfo.value = null;
+    // If there's a report ID and we should navigate, fetch and show report
+    if (shouldNavigate && savedReportId != null && savedReportId.isNotEmpty) {
+      try {
+        print('📋 [CALL ENDED] Fetching report with ID: $savedReportId');
+        // Clear loading state when navigation happens
+        isEndingCall.value = false;
+        await _fetchAndShowReport(savedReportId);
+      } catch (e, stackTrace) {
+        print('❌ [CALL ENDED] Error fetching report: $e');
+        print('❌ [CALL ENDED] Stack trace: $stackTrace');
+        // Clear loading state when navigation happens
+        isEndingCall.value = false;
+        // If report fetch fails, just navigate to home
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Get.offAllNamed(Routes.HOME);
+        });
+      }
+    } else if (shouldNavigate) {
+      // No report, just navigate to home
+      print('📋 [CALL ENDED] No report found, navigating to home');
+      // Clear loading state when navigation happens
+      isEndingCall.value = false;
+      Future.delayed(const Duration(milliseconds: 500), () {
+        Get.offAllNamed(Routes.HOME);
+      });
+    }
+  }
+  
+  /// Fetch report by ID and show in confirmation page view
+  Future<void> _fetchAndShowReport(String reportId) async {
+    try {
+      print('📋 [REPORT FETCH] Fetching report from admin API...');
+      // Use Dio directly for admin API since it has a different base URL
+      final dio = DioUtil().getDio(useAccessToken: true);
+      final adminBaseUrl = 'https://sps-admin.zorcloud.net/api/v1';
+      final response = await dio.get('$adminBaseUrl/reports/$reportId');
+      
+      if (response.statusCode == 200 && response.data != null) {
+        final responseData = response.data as Map<String, dynamic>;
+        print('✅ [REPORT FETCH] Report fetched successfully');
+        
+        // Parse response using model
+        final reportWrapper = ReportResponseWrapper.fromJson(responseData);
+        
+        if (reportWrapper.data == null) {
+          print('⚠️ [REPORT FETCH] Report data is null');
+          Future.delayed(const Duration(milliseconds: 500), () {
+            Get.offAllNamed(Routes.HOME);
+          });
+          return;
+        }
+        
+        final reportData = reportWrapper.data!;
+        print('📋 [REPORT FETCH] Report ID: ${reportData.id}');
+        print('📋 [REPORT FETCH] Case Number: ${reportData.caseNumber}');
+        print('📋 [REPORT FETCH] Report Type: ${reportData.reportType?.name}');
+        print('📋 [REPORT FETCH] Statements count: ${reportData.statements?.length ?? 0}');
+      
+        // Convert report data to formData format for ConfirmationPageView
+        final formData = _convertReportToFormData(reportData);
+        
+        // Navigate directly to confirmation page view
+        print('📋 [REPORT FETCH] Navigating to confirmation page view');
+        Future.delayed(const Duration(milliseconds: 500), () {
+          ConfirmationPageView.show(Get.context!, formData);
+        });
+      } else {
+        print('⚠️ [REPORT FETCH] Invalid response from report API');
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Get.offAllNamed(Routes.HOME);
+        });
+      }
+    } catch (e, stackTrace) {
+      print('❌ [REPORT FETCH] Error fetching report: $e');
+      print('❌ [REPORT FETCH] Stack trace: $stackTrace');
+      // If report fetch fails, navigate to home
+      Future.delayed(const Duration(milliseconds: 500), () {
+        Get.offAllNamed(Routes.HOME);
+      });
+    }
+  }
+  
+  /// Convert report data from API to formData format for ConfirmationPageView
+  /// Only extracts necessary fields for the confirmation page
+  Map<String, String> _convertReportToFormData(ReportData reportData) {
+    final formData = <String, String>{};
+    
+    try {
+      print('📋 [REPORT CONVERT] Converting report data...');
+      
+      // Extract ID - use caseNumber if available, otherwise use id
+      if (reportData.caseNumber != null && reportData.caseNumber!.isNotEmpty) {
+        formData['id'] = reportData.caseNumber!;
+        formData['caseNumber'] = reportData.caseNumber!;
+      } else if (reportData.id != null) {
+        formData['id'] = reportData.id!;
+      }
+      
+      // Extract Category - use reportType.code
+      if (reportData.reportType?.code != null && reportData.reportType!.code!.isNotEmpty) {
+        formData['category'] = reportData.reportType!.code!;
+      }
+      
+      // Extract Type - use reportType.name
+      if (reportData.reportType?.name != null && reportData.reportType!.name!.isNotEmpty) {
+        formData['incidentType'] = reportData.reportType!.name!;
+      }
+      
+      // Extract information from first statement
+      if (reportData.statements != null && reportData.statements!.isNotEmpty) {
+        final statement = reportData.statements!.first;
+        
+        // Extract full name
+        if (statement.fullName != null && statement.fullName!.trim().isNotEmpty) {
+          formData['fullName'] = statement.fullName!.trim();
+        }
+        
+        // Extract phone number
+        if (statement.phoneMobile != null && statement.phoneMobile!.trim().isNotEmpty) {
+          formData['phoneNumber'] = statement.phoneMobile!.trim();
+        }
+        
+        // Extract age
+        if (statement.age != null) {
+          formData['age'] = statement.age.toString();
+        }
+        
+        // Extract sex
+        if (statement.sex != null && statement.sex!.trim().isNotEmpty) {
+          formData['sex'] = statement.sex!.trim();
+        }
+        
+        // Extract nationality
+        if (statement.nationality != null && statement.nationality!.trim().isNotEmpty) {
+          formData['nationality'] = statement.nationality!.trim();
+        }
+        
+        // Extract date of birth
+        if (statement.dateOfBirth != null) {
+          try {
+            final dob = statement.dateOfBirth!;
+            formData['dateOfBirth'] = '${dob.day} ${_getMonthName(dob.month)}, ${dob.year}';
+          } catch (e) {
+            print('⚠️ [REPORT CONVERT] Error formatting date of birth: $e');
+          }
+        }
+        
+        // Extract statement text
+        if (statement.statement != null && statement.statement!.trim().isNotEmpty) {
+          formData['statement'] = statement.statement!.trim();
+        }
+        
+        // Extract statement date
+        if (statement.statementDate != null) {
+          try {
+            final stmtDate = statement.statementDate!;
+            formData['statementDate'] = '${stmtDate.day} ${_getMonthName(stmtDate.month)}, ${stmtDate.year}';
+          } catch (e) {
+            print('⚠️ [REPORT CONVERT] Error formatting statement date: $e');
+          }
+        }
+        
+        // Extract statement time
+        if (statement.statementTime != null && statement.statementTime!.trim().isNotEmpty) {
+          formData['statementTime'] = statement.statementTime!.trim();
+        }
+        
+        // Build address from available fields
+        final addressParts = <String>[];
+        
+        if (statement.specificAddress != null && statement.specificAddress!.trim().isNotEmpty) {
+          addressParts.add(statement.specificAddress!.trim());
+        }
+        if (statement.currentSubCity != null && statement.currentSubCity!.trim().isNotEmpty) {
+          addressParts.add(statement.currentSubCity!.trim());
+        }
+        if (statement.currentKebele != null && statement.currentKebele!.trim().isNotEmpty) {
+          addressParts.add(statement.currentKebele!.trim());
+        }
+        if (statement.currentHouseNumber != null && statement.currentHouseNumber!.trim().isNotEmpty) {
+          addressParts.add('House: ${statement.currentHouseNumber!.trim()}');
+        }
+        if (statement.otherAddress != null && statement.otherAddress!.trim().isNotEmpty) {
+          addressParts.add(statement.otherAddress!.trim());
+        }
+        
+        if (addressParts.isNotEmpty) {
+          formData['address'] = addressParts.join(', ');
+        }
+      }
+      
+      // Extract Schedule Time - use createdAt
+      if (reportData.createdAt != null) {
+        try {
+          final createdAt = reportData.createdAt!;
+          formData['submitTime'] = '${createdAt.day} ${_getMonthName(createdAt.month)}, ${createdAt.year}';
+          formData['scheduleTime'] = formData['submitTime']!;
+        } catch (e) {
+          print('⚠️ [REPORT CONVERT] Error formatting date: $e');
+        }
+      }
+      
+      print('✅ [REPORT CONVERT] Converted report data:');
+      print('  - ID: ${formData['id'] ?? 'N/A'}');
+      print('  - Category: ${formData['category'] ?? 'N/A'}');
+      print('  - Type: ${formData['incidentType'] ?? 'N/A'}');
+      print('  - Full Name: ${formData['fullName'] ?? 'N/A'}');
+      print('  - Phone Number: ${formData['phoneNumber'] ?? 'N/A'}');
+      print('  - Age: ${formData['age'] ?? 'N/A'}');
+      print('  - Sex: ${formData['sex'] ?? 'N/A'}');
+      print('  - Nationality: ${formData['nationality'] ?? 'N/A'}');
+      print('  - Date of Birth: ${formData['dateOfBirth'] ?? 'N/A'}');
+      print('  - Address: ${formData['address'] ?? 'N/A'}');
+      print('  - Statement: ${formData['statement'] != null ? "${formData['statement']!.substring(0, formData['statement']!.length > 50 ? 50 : formData['statement']!.length)}..." : 'N/A'}');
+      print('  - Statement Date: ${formData['statementDate'] ?? 'N/A'}');
+      print('  - Statement Time: ${formData['statementTime'] ?? 'N/A'}');
+      print('  - Schedule Time: ${formData['scheduleTime'] ?? 'N/A'}');
+      
+    } catch (e, stackTrace) {
+      print('⚠️ [REPORT CONVERT] Error converting report data: $e');
+      print('⚠️ [REPORT CONVERT] Stack trace: $stackTrace');
+    }
+    
+    return formData;
+  }
+  
+  /// Helper to get month name
+  String _getMonthName(int month) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return months[month - 1];
   }
   
   // Removed draft polling - now using call details endpoint which includes report and statement

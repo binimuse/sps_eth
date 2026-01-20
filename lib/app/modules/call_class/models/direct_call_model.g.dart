@@ -38,6 +38,18 @@ Map<String, dynamic> _$DirectCallMetaToJson(DirectCallMeta instance) =>
       'requestId': instance.requestId,
     };
 
+RequestCallRequest _$RequestCallRequestFromJson(Map<String, dynamic> json) =>
+    RequestCallRequest(
+      isVisitor: json['isVisitor'] as bool?,
+      preferredLanguage: json['preferredLanguage'] as String?,
+    );
+
+Map<String, dynamic> _$RequestCallRequestToJson(RequestCallRequest instance) =>
+    <String, dynamic>{
+      'isVisitor': instance.isVisitor,
+      'preferredLanguage': instance.preferredLanguage,
+    };
+
 RequestCallResponse _$RequestCallResponseFromJson(Map<String, dynamic> json) =>
     RequestCallResponse(
       token: json['token'] as String?,

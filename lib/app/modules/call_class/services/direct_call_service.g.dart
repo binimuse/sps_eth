@@ -20,11 +20,15 @@ class _DirectCallService implements DirectCallService {
   final ParseErrorLogger? errorLogger;
 
   @override
-  Future<DirectCallResponseWrapper> requestCall() async {
+  Future<DirectCallResponseWrapper> requestCall(
+    RequestCallRequest? request,
+  ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
-    const Map<String, dynamic>? _data = null;
+    final _data = <String, dynamic>{};
+    _data.addAll(request?.toJson() ?? <String, dynamic>{});
     final _options = _setStreamType<DirectCallResponseWrapper>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(

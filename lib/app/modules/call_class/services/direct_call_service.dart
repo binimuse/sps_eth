@@ -13,7 +13,10 @@ abstract class DirectCallService {
 
   /// Request a call (Client/User role)
   /// 
-  /// Request body: {} (empty)
+  /// Request body: {
+  ///   "isVisitor": boolean (optional),
+  ///   "preferredLanguage": string (optional)
+  /// }
   /// 
   /// Response:
   /// {
@@ -27,7 +30,7 @@ abstract class DirectCallService {
   ///   "meta": { ... }
   /// }
   @POST(Constants.directCallRequest)
-  Future<DirectCallResponseWrapper> requestCall();
+  Future<DirectCallResponseWrapper> requestCall(@Body() RequestCallRequest? request);
 
   /// Accept a call (Employee role)
   /// 

@@ -255,10 +255,34 @@ class CallClassView extends GetView<CallClassController> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    GestureDetector(
-                                      onTap: () => controller.endCall(),
-                                      child: _roundCtrl(Icons.call_end, color: AppColors.danger),
-                                    ),
+                                    Obx(() {
+                                      final isEnding = controller.isEndingCall.value;
+                                      return GestureDetector(
+                                        onTap: isEnding ? null : () => controller.endCall(),
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            _roundCtrl(
+                                              Icons.call_end, 
+                                              color: isEnding 
+                                                  ? AppColors.grayDark 
+                                                  : AppColors.danger,
+                                            ),
+                                            if (isEnding)
+                                              SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                                    AppColors.danger,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
                                     const SizedBox(width: 12),
                                     GestureDetector(
                                       onTap: () => controller.toggleVideo(),

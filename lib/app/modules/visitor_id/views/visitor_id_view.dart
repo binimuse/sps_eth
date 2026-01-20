@@ -249,32 +249,55 @@ class VisitorIdView extends GetView<VisitorIdController> {
           const SizedBox(height: 20),
           
           // Scan Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                // Handle scan action
-                Get.toNamed(Routes.CALL_CLASS);
-              },
-              icon: const Icon(Icons.camera_alt, size: 20),
-              label: Text(
-                'Scan Passport'.tr,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1976D2),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
+          Obx(() => SizedBox(
+  width: double.infinity,
+  child: ElevatedButton.icon(
+    onPressed: controller.isScanning.value
+        ? null
+        : () async {
+          //  await controller.scanPassport();
+          Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': true});
+            if (controller.scanError.isEmpty) {
+              print('UI received passport data: ${controller.passportData}');
+            } else {
+              Get.snackbar(
+                'Scan Failed',
+                controller.scanError.value,
+                snackPosition: SnackPosition.BOTTOM,
+              );
+            }
+          },
+    icon: controller.isScanning.value
+        ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
             ),
-          ),
+          )
+        : const Icon(Icons.camera_alt, size: 20),
+    label: Text(
+      controller.isScanning.value
+          ? 'Scanning...'.tr
+          : 'Scan Passport'.tr,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF1976D2),
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      elevation: 0,
+    ),
+  ),
+)),
+
           const SizedBox(height: 20),
           
           // Separator: "or" text
@@ -290,7 +313,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
           // Continue as a Guest Button
           GestureDetector(
             onTap: () {
-              Get.toNamed(Routes.CALL_CLASS);
+              Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
             },
             child: Container(
               width: double.infinity,

@@ -97,7 +97,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                             ),
                           ),
                           onPressed: () {
-                            Get.toNamed(Routes.CALL_CLASS);
+                            Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
                           },
                           icon: const Icon(Icons.person_outline, color: Color(0xFF0F3955)),
                           label: Text('Continue as guest'.tr, style: TextStyle(color: Color(0xFF0F3955))),

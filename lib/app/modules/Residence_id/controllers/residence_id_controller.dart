@@ -59,6 +59,6 @@ class ResidenceIdController extends GetxController {
     }
     
     // Navigate to service list
-    Get.toNamed(Routes.CALL_CLASS);
+    Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
   }
 }

@@ -198,7 +198,7 @@ class LoginController extends GetxController {
             }
             
             print('✅ [LOGIN] Token verified, navigating to call-class route...');
-            Get.offNamed(Routes.CALL_CLASS);
+            Get.offNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
             print('✅ [LOGIN] Navigation completed');
           } catch (e, stackTrace) {
             print('❌ [LOGIN] Error during navigation: $e');
@@ -213,7 +213,7 @@ class LoginController extends GetxController {
             // Fallback: navigate directly to call-class route
             print('⚠️ [LOGIN] Using fallback navigation to call-class');
             try {
-              Get.offNamed(Routes.CALL_CLASS);
+              Get.offNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
             } catch (e2) {
               print('❌ [LOGIN] Fallback navigation also failed: $e2');
               AppToasts.showErrorDialog(
