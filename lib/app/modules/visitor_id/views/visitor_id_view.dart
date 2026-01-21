@@ -122,9 +122,21 @@ class VisitorIdView extends GetView<VisitorIdController> {
               color: Color(0xFF9E9E9E),
             ),
           ),
-          const SizedBox(height: 20),
-          
-          // Scanner View Area
+                        const SizedBox(height: 20),
+                        
+                        // Check SDK Status Button (for testing)
+                        TextButton.icon(
+                          onPressed: () async {
+                            await controller.checkSDKStatus();
+                          },
+                          icon: const Icon(Icons.info_outline, size: 16),
+                          label: Text('Check SDK Status'.tr, style: const TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.blue[700],
+                          ),
+                        ),
+                        
+                        // Scanner View Area
           Container(
             height: 250,
             width: double.infinity,
@@ -248,6 +260,53 @@ class VisitorIdView extends GetView<VisitorIdController> {
           ),
           const SizedBox(height: 20),
           
+          // SDK Status Info (for debugging)
+          Obx(() {
+            if (controller.sdkStatus.isNotEmpty) {
+              final status = Map<String, dynamic>.from(controller.sdkStatus);
+              return Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SDK Status:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: Colors.blue[900],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'SDK Loaded: ${status['sdkLoaded'] ?? 'Unknown'}',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    Text(
+                      'Assets: ${status['assetsCopied'] ?? 'Unknown'}',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    Text(
+                      'Hardware: ${status['hardwareDetected'] == true ? '✅ Detected' : '❌ Not Detected (Expected on tablet)'}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: status['hardwareDetected'] == true ? Colors.green : Colors.orange,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
+          
           // Scan Button
           Obx(() => SizedBox(
   width: double.infinity,
@@ -255,17 +314,28 @@ class VisitorIdView extends GetView<VisitorIdController> {
     onPressed: controller.isScanning.value
         ? null
         : () async {
-          //  await controller.scanPassport();
-          Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': true});
-            if (controller.scanError.isEmpty) {
-              print('UI received passport data: ${controller.passportData}');
-            } else {
-              Get.snackbar(
-                'Scan Failed',
-                controller.scanError.value,
-                snackPosition: SnackPosition.BOTTOM,
-              );
-            }
+          // Call passport scanner
+          await controller.scanPassport();
+          
+          // If scan successful and we have passport data, navigate to next screen
+          if (controller.scanError.value.isEmpty && 
+              (controller.passportNumber.value.isNotEmpty || 
+               controller.fullName.value.isNotEmpty)) {
+            // Pass passport data to next screen
+            Get.toNamed(
+              Routes.CALL_CLASS, 
+              arguments: {
+                'isVisitor': true,
+                'passportData': Map<String, dynamic>.from(controller.passportData),
+                'passportNumber': controller.passportNumber.value,
+                'fullName': controller.fullName.value,
+                'nationality': controller.nationality.value,
+                'dateOfBirth': controller.dateOfBirth.value,
+                'expiryDate': controller.expiryDate.value,
+              }
+            );
+          }
+          // Error handling is done in controller via snackbar
           },
     icon: controller.isScanning.value
         ? const SizedBox(
