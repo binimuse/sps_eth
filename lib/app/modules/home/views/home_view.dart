@@ -6,6 +6,7 @@ import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:video_player/video_player.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 
 import '../controllers/home_controller.dart';
 
@@ -101,10 +102,18 @@ class HomeView extends GetView<HomeController> {
   }
 }
 
-class _HeroPanel extends StatelessWidget {
+class _HeroPanel extends StatefulWidget {
   const _HeroPanel({required this.controller});
 
   final HomeController controller;
+
+  @override
+  State<_HeroPanel> createState() => _HeroPanelState();
+}
+
+class _HeroPanelState extends State<_HeroPanel> {
+  int _currentIndex = 0;
+  final CarouselSliderController _carouselController = CarouselSliderController();
 
   @override
   Widget build(BuildContext context) {
@@ -113,8 +122,35 @@ class _HeroPanel extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(Assets.images.news.path, fit: BoxFit.cover),
+          // Image carousel slider
+          CarouselSlider.builder(
+            carouselController: _carouselController,
+            itemCount: widget.controller.heroImages.length,
+            options: CarouselOptions(
+              height: double.infinity,
+              viewportFraction: 1.0,
+              autoPlay: true,
+              autoPlayInterval: const Duration(seconds: 4),
+              autoPlayAnimationDuration: const Duration(milliseconds: 800),
+              autoPlayCurve: Curves.fastOutSlowIn,
+              enlargeCenterPage: false,
+              onPageChanged: (index, reason) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+            ),
+            itemBuilder: (context, index, realIndex) {
+              return Image.asset(
+                widget.controller.heroImages[index],
+                fit: BoxFit.cover,
+                width: double.infinity,
+              );
+            },
+          ),
+          // Dark overlay
           Container(color: Colors.black.withOpacity(0.25)),
+          // SPS Logo
           Positioned(
             top: 16,
             left: 16,
@@ -123,7 +159,32 @@ class _HeroPanel extends StatelessWidget {
               child: Image.asset(Assets.images.sps.path, fit: BoxFit.contain),
             ),
           ),
-
+          // Carousel indicators
+          Positioned(
+            bottom: 16,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: widget.controller.heroImages.asMap().entries.map((entry) {
+                return GestureDetector(
+                  onTap: () => _carouselController.animateToPage(entry.key),
+                  child: Container(
+                    width: _currentIndex == entry.key ? 24.0 : 8.0,
+                    height: 8.0,
+                    margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      color: _currentIndex == entry.key
+                          ? AppColors.secondary
+                          : Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          // Center content
           Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -137,7 +198,7 @@ class _HeroPanel extends StatelessWidget {
                         context: context,
                         barrierDismissible: true,
                         builder: (_) => _VideoPlayerDialog(
-                          videoUrl: controller.heroVideoUrl,
+                          videoUrl: widget.controller.heroVideoUrl,
                         ),
                       );
                     },
@@ -160,26 +221,56 @@ class _HeroPanel extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    'SPS',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontFamily: GoogleFonts.sintony().fontFamily,
-                      color: AppColors.secondary,
-                      letterSpacing: 4,
-                      fontSize: 29.sp,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.secondary.withOpacity(0.3),
+                        width: 1,
+                      ),
                     ),
-                  ),
-                  Text(
-                    'Loreim re in charge of planning and managing marketing\n'
-                    'campaigns that promote a company\'s brand. marketing\n'
-                    'campaigns that promote a company\'s brand.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      height: 1.4,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'SPS'.tr,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontFamily: GoogleFonts.sintony().fontFamily,
+                            color: AppColors.secondary,
+                            letterSpacing: 4,
+                            fontSize: 29.sp,
+                            shadows: [
+                              Shadow(
+                                offset: const Offset(0, 2),
+                                blurRadius: 4,
+                                color: Colors.black.withOpacity(0.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                            shadows: [
+                              Shadow(
+                                offset: const Offset(0, 1),
+                                blurRadius: 3,
+                                color: Colors.black.withOpacity(0.7),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -286,7 +377,7 @@ class _AlertsPanel extends StatelessWidget {
           Padding(
             padding: EdgeInsets.all(8),
             child: Text(
-              'RECENT ALERTS',
+              'RECENT ALERTS'.tr,
               style: TextStyle(
                 fontFamily: GoogleFonts.montserrat().fontFamily,
                 fontWeight: FontWeight.w800,
@@ -365,7 +456,7 @@ class _AlertTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'managing marketing campaigns that Loreim re in charge of',
+                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
@@ -492,13 +583,13 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                       ],
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: const Row(
+                    child:  Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.phone, color: Colors.white, size: 28),
                         SizedBox(width: 8),
                         Text(
-                          'Swipe to Call',
+                          'Swipe to Call'.tr,
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
@@ -568,7 +659,7 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
               top: 8,
               right: 8,
               child: IconButton(
-                tooltip: 'Close',
+                tooltip: 'Close'.tr,
                 icon: const Icon(Icons.close, color: Colors.white),
                 onPressed: () {
                   Navigator.of(context).pop();
@@ -656,7 +747,7 @@ class _ContactCallCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Direct Call for Service',
+                                'Direct Call for Service'.tr,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.primary,
@@ -664,7 +755,7 @@ class _ContactCallCard extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                'These are the terms and conditions for in charge of planning ',
+                                'These are the terms and conditions for in charge of planning'.tr,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF4F6B7E),
@@ -734,7 +825,7 @@ class _StartFillingCard extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Start Filling and Insert ID',
+                'Start Filling and Insert ID'.tr,
                 textAlign: TextAlign.start,
                 style: TextStyle(
                   fontSize: 13.sp,
@@ -743,8 +834,8 @@ class _StartFillingCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'These are the terms and conditions for in charge of planning',
+              Text(
+                'These are the terms and conditions for in charge of planning'.tr,
                 textAlign: TextAlign.start,
                 style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
               ),

@@ -20,11 +20,15 @@ class _DirectCallService implements DirectCallService {
   final ParseErrorLogger? errorLogger;
 
   @override
-  Future<DirectCallResponseWrapper> requestCall() async {
+  Future<DirectCallResponseWrapper> requestCall(
+    RequestCallRequest? request,
+  ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
-    const Map<String, dynamic>? _data = null;
+    final _data = <String, dynamic>{};
+    _data.addAll(request?.toJson() ?? <String, dynamic>{});
     final _options = _setStreamType<DirectCallResponseWrapper>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
@@ -149,6 +153,37 @@ class _DirectCallService implements DirectCallService {
       _value = _result.data!
           .map((dynamic i) => PendingCall.fromJson(i as Map<String, dynamic>))
           .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<CallDetailsResponseWrapper> getCallDetails(
+    String sessionId,
+    int? timestamp,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'_t': timestamp};
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<CallDetailsResponseWrapper>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            '/direct-call/${sessionId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late CallDetailsResponseWrapper _value;
+    try {
+      _value = CallDetailsResponseWrapper.fromJson(_result.data!);
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options);
       rethrow;

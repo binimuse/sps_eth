@@ -8,7 +8,8 @@ import 'package:sps_eth_app/app/utils/enums.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 
 import '../controllers/call_class_controller.dart';
-import 'widgets/report_draft_view.dart';
+import 'package:sps_eth_app/app/common/widgets/pulsing_logo_loader.dart';
+import 'package:sps_eth_app/gen/assets.gen.dart';
 
 /// Helper class for safe navigation
 class _NavigationHelper {
@@ -115,8 +116,8 @@ class CallClassView extends GetView<CallClassController> {
                                           controller.connectionStatus.value.isNotEmpty
                                               ? controller.connectionStatus.value
                                               : (controller.isConnected.value 
-                                                  ? 'Waiting for participant...' 
-                                                  : 'Not connected'),
+                                                  ? 'Waiting for participant...'.tr 
+                                                  : 'Not connected'.tr),
                                           style: TextStyle(color: AppColors.white70),
                                         )),
                                       ],
@@ -254,24 +255,34 @@ class CallClassView extends GetView<CallClassController> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    // GestureDetector(
-                                    //   onTap: () => Get.back(),
-                                    //   child: _roundCtrl(Icons.home),
-                                    // ),
-                                    // const SizedBox(width: 12),
-                                    // GestureDetector(
-                                    //   onTap: () {
-                                    //     // Scroll to bottom of chat or focus on message input
-                                    //     // This can be enhanced with a scroll controller if needed
-                                    //     FocusScope.of(context).requestFocus(controller.focusedField);
-                                    //   },
-                                    //   child: _roundCtrl(Icons.message),
-                                    // ),
-                                    // const SizedBox(width: 12),
-                                    GestureDetector(
-                                      onTap: () => controller.endCall(),
-                                      child: _roundCtrl(Icons.call_end, color: AppColors.danger),
-                                    ),
+                                    Obx(() {
+                                      final isEnding = controller.isEndingCall.value;
+                                      return GestureDetector(
+                                        onTap: isEnding ? null : () => controller.endCall(),
+                                        child: Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            _roundCtrl(
+                                              Icons.call_end, 
+                                              color: isEnding 
+                                                  ? AppColors.grayDark 
+                                                  : AppColors.danger,
+                                            ),
+                                            if (isEnding)
+                                              SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                                    AppColors.danger,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
                                     const SizedBox(width: 12),
                                     GestureDetector(
                                       onTap: () => controller.toggleVideo(),
@@ -362,25 +373,89 @@ class CallClassView extends GetView<CallClassController> {
                         child: Column(
                           children: [
                             Obx(() {
+                              if (controller.idInformation.isEmpty) {
+                                return Container(
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.whiteOff,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Report Info',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'No information available yet',
+                                        style: TextStyle(
+                                          color: AppColors.grayDark,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                              
                               return _InfoCard(
-                                title: 'ID Information',
+                                title: 'Report Info',
                                 rows: controller.idInformation.toList(),
                               );
                             }),
                             const SizedBox(height: 12),
                          
-                            Obx(() => _DocumentsCard(
-                                  documents: controller.supportingDocuments.toList(),
-                                )),
+                            Obx(() {
+                              if (controller.supportingDocuments.isEmpty) {
+                                return Container(
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.whiteOff,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Supporting Document',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'No documents available',
+                                        style: TextStyle(
+                                          color: AppColors.grayDark,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                              
+                              return _DocumentsCard(
+                                documents: controller.supportingDocuments.toList(),
+                              );
+                            }),
                             const SizedBox(height: 12),
-                            // Report Draft View - Show during active calls
+                            // Statement Details View - Show during active calls
                             Obx(() {
                               final isCallActive = controller.callStatus.value == 'active' || 
                                                    controller.callStatus.value == 'connecting';
                               if (!isCallActive) {
                                 return const SizedBox.shrink();
                               }
-                              return const ReportDraftView();
+                              return _StatementDetailsView(controller: controller);
                             }),
                             const SizedBox(height: 8),
                             _TermsAndActions(controller: controller),
@@ -410,13 +485,18 @@ class CallClassView extends GetView<CallClassController> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircularProgressIndicator(
-                            color: AppColors.primary,
-                            strokeWidth: 3,
+                          PulsingLogoLoader(
+                            logoPath: Assets.images.efpLogo.path,
+                            logoSize: 160.0,
+                            waveColor: AppColors.primary,
+                            logoBackgroundColor: AppColors.whiteOff,
+                            logoBorderColor: AppColors.primary,
+                            waveCount: 3,
+                            baseRadius: 100.0,
                           ),
                           const SizedBox(height: 24),
                           Text(
-                            'Authenticating...',
+                            'Authenticating...'.tr,
                             style: TextStyle(
                               color: AppColors.whiteOff,
                               fontSize: 18,
@@ -425,7 +505,58 @@ class CallClassView extends GetView<CallClassController> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Please wait while we set up your connection',
+                            'Please wait while we set up your connection'.tr,
+                            style: TextStyle(
+                              color: AppColors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+            // Full-page loading overlay - shown during call connecting/pending
+            Obx(() {
+              final callStatus = controller.callStatus.value;
+              final isConnecting = callStatus == 'connecting' || callStatus == 'pending';
+              
+              if (!isConnecting) {
+                return const SizedBox.shrink();
+              }
+              
+              return Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    color: AppColors.black.withOpacity(0.3),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          PulsingLogoLoader(
+                            logoPath: Assets.images.efpLogo.path,
+                            logoSize: 160.0,
+                            waveColor: AppColors.primary,
+                            logoBackgroundColor: AppColors.whiteOff,
+                            logoBorderColor: AppColors.primary,
+                            waveCount: 3,
+                            baseRadius: 100.0,
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            callStatus == 'connecting' ? 'Connecting...'.tr : 'Waiting for agent...'.tr,
+                            style: TextStyle(
+                              color: AppColors.whiteOff,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Please wait while we connect your call'.tr,
                             style: TextStyle(
                               color: AppColors.white70,
                               fontSize: 14,
@@ -465,7 +596,7 @@ class CallClassView extends GetView<CallClassController> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'No Internet Connection',
+                          'No Internet Connection'.tr,
                           style: TextStyle(
                             color: AppColors.whiteOff,
                             fontSize: 14,
@@ -646,7 +777,7 @@ class _TermsAndActions extends StatelessWidget {
             children: [
               Icon(Icons.check_box, color: AppColors.grayDark),
               const SizedBox(width: 8),
-              Text('Terms and Condition',style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
+              Text('Terms and Condition'.tr,style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
             ],
           ),
           const SizedBox(height: 4),
@@ -680,7 +811,7 @@ class _TermsAndActions extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Connection Error',
+                      'Connection Error'.tr,
                       style: TextStyle(
                         color: AppColors.danger,
                         fontSize: 16,
@@ -689,7 +820,7 @@ class _TermsAndActions extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Failed to connect. Please try again later.',
+                      'Failed to connect. Please try again later.'.tr,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.grayDark,
@@ -709,7 +840,7 @@ class _TermsAndActions extends StatelessWidget {
                         _NavigationHelper.safeNavigateBack();
                       },
                       child: Text(
-                        'Close',
+                        'Close'.tr,
                         style: TextStyle(
                           color: AppColors.whiteOff,
                           fontWeight: FontWeight.bold,
@@ -721,8 +852,8 @@ class _TermsAndActions extends StatelessWidget {
               );
             }
             
-            // Show loading if auto-starting without error
-            if (isAutoStarting) {
+            // Show loading if auto-starting without error AND call is not yet active
+            if (isAutoStarting && !isCallActive) {
               return Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -733,7 +864,7 @@ class _TermsAndActions extends StatelessWidget {
                       CircularProgressIndicator(color: AppColors.primary),
                       const SizedBox(height: 12),
                       Text(
-                        'Connecting...',
+                        'Connecting...'.tr,
                         style: TextStyle(
                           color: AppColors.grayDark,
                           fontSize: 14,
@@ -746,158 +877,304 @@ class _TermsAndActions extends StatelessWidget {
               );
             }
             
-            if (isCallActive) {
-              // Show end call button when call is active
-              print('🔘 [BUTTONS] Showing End Call button');
-              return Obx(() {
-                final isEnding = controller.isEndingCall.value;
-                return ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.danger,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    minimumSize: const Size(double.infinity, 0),
+            if (callStatus == 'ended') {
+              // Show "Go Back" button when call is ended
+              print('🔘 [BUTTONS] Showing Go Back button (call ended)');
+              return ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  minimumSize: const Size(double.infinity, 0),
+                ),
+                onPressed: () async {
+                  print('🔘 [BUTTONS] Go Back button pressed (call ended)');
+                  await controller.onWillPop();
+                  _NavigationHelper.safeNavigateBack();
+                },
+                child: Text(
+                  'Go Back to Home'.tr,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.whiteOff,
                   ),
-                  onPressed: isEnding ? null : () {
-                    print('🔘 [BUTTONS] End Call button pressed');
-                    controller.endCall();
-                  },
-                  child: isEnding
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.whiteOff),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Ending call...',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff),
-                            ),
-                          ],
-                        )
-                      : Text(
-                          callStatus == 'connecting' 
-                              ? 'Connecting...' 
-                              : callStatus == 'pending'
-                                  ? 'Waiting for agent...'
-                                  : 'End Call',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.whiteOff),
-                        ),
-                );
-              });
-            } else {
-              // Show start call buttons when call is not active
-              print('🔘 [BUTTONS] Showing Start Call buttons');
-              return SizedBox(
-                width: double.infinity,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Make buttons more visible with a border
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.danger,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                elevation: 4,
-                              ),
-                              onPressed: () async {
-                                print('🔘 [BUTTONS] Cancel button pressed');
-                                await controller.onWillPop();
-                                _NavigationHelper.safeNavigateBack();
-                              },
-                              child: Text(
-                                'Cancel', 
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold, 
-                                  color: AppColors.whiteOff,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                  Expanded(
-                    child: Obx(() {
-                      final isLoading = controller.callNetworkStatus.value == NetworkStatus.LOADING;
-                      return ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.success,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          elevation: 4,
-                        ),
-                        onPressed: isLoading ? null : () {
-                          print('🔘 [BUTTONS] Confirm / Agree button pressed');
-                          controller.confirmTerms();
-                        },
-                        child: isLoading
-                            ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.whiteOff),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Connecting...',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold, 
-                                      color: AppColors.whiteOff,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Text(
-                                'Confirm / Agree', 
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold, 
-                                  color: AppColors.whiteOff,
-                                  fontSize: 16,
-                                ),
-                              ),
-                      );
-                    }),
-                  ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Status indicator
-                    Obx(() => Text(
-                      'Status: ${controller.connectionStatus.value.isEmpty ? "Ready to call" : controller.connectionStatus.value}',
-                      style: TextStyle(
-                        color: AppColors.grayDark,
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    )),
-                  ],
                 ),
               );
             }
+            
+            // No buttons shown when call is not active (user already used slide button to get here)
+            return const SizedBox.shrink();
           }),
+        ],
+      ),
+    );
+  }
+}
+
+/// Widget to display statement details from call details
+class _StatementDetailsView extends StatelessWidget {
+  const _StatementDetailsView({required this.controller});
+
+  final CallClassController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final statement = controller.statementInfo.value;
+      final report = controller.reportInfo.value;
+      
+      // Show message if no statement yet
+      if (statement == null && report == null) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundDark,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.grayLight, width: 1),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.description_outlined,
+                color: AppColors.grayDefault,
+                size: 24,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Report and statement will appear here once created',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.grayDark,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      }
+      
+      return Container(
+        decoration: BoxDecoration(
+          color: AppColors.whiteOff,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.grayLight, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.description, color: AppColors.primary, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (report?.reportType != null) ...[
+                          Text(
+                            report!.reportType!.name ?? 'Report',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          if (report.reportType!.nameAmharic != null && report.reportType!.nameAmharic!.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              report.reportType!.nameAmharic!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.grayDark,
+                              ),
+                            ),
+                          ],
+                        ] else
+                          Text(
+                            'Statement Details',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        if (report?.caseNumber != null && report!.caseNumber!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Case: ${report.caseNumber}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.grayDark,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Person Information
+                  if (statement?.person != null) ...[
+                    Text(
+                      'Person Information',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoRow('Full Name', statement!.person!.fullName ?? 'N/A'),
+                    if (statement.person!.age != null)
+                      _buildInfoRow('Age', '${statement.person!.age}'),
+                    if (statement.person!.sex != null)
+                      _buildInfoRow('Gender', statement.person!.sex!),
+                    if (statement.person!.phoneMobile != null && statement.person!.phoneMobile!.isNotEmpty)
+                      _buildInfoRow('Phone', statement.person!.phoneMobile!),
+                    if (statement.person!.nationality != null && statement.person!.nationality!.isNotEmpty)
+                      _buildInfoRow('Nationality', statement.person!.nationality!),
+                    const SizedBox(height: 16),
+                  ],
+                  
+                  // Statement Details
+                  if (statement?.statement != null && statement!.statement!.isNotEmpty) ...[
+                    Text(
+                      'Statement',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundLight,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.grayLight, width: 1),
+                      ),
+                      child: Text(
+                        statement.statement!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.black,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  
+                  // Statement Metadata
+                  if (statement != null) ...[
+                    Text(
+                      'Statement Details',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (statement.statementTakerName != null && statement.statementTakerName!.isNotEmpty)
+                      _buildInfoRow('Statement Taker', statement.statementTakerName!),
+                    if (statement.applicantType != null)
+                      _buildInfoRow('Applicant Type', statement.applicantType!),
+                    if (statement.statementDate != null)
+                      _buildInfoRow('Statement Date', '${statement.statementDate!.day}/${statement.statementDate!.month}/${statement.statementDate!.year}'),
+                    if (statement.statementTime != null && statement.statementTime!.isNotEmpty)
+                      _buildInfoRow('Statement Time', statement.statementTime!),
+                    if (statement.status != null)
+                      _buildInfoRow('Status', statement.status!),
+                  ],
+                  
+                  // Report Submission Status
+                  if (report?.submitted == true) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.successLight,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.success, width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Report Submitted',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.successDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+  
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.grayDark,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.black,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
         ],
       ),
     );

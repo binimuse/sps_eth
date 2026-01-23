@@ -6,9 +6,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sps_eth_app/app/modules/form_class/views/widget/scanning_document_view.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocket_service.dart';
-import 'package:sps_eth_app/app/modules/call_class/services/report_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
-import 'package:sps_eth_app/app/modules/call_class/models/report_draft_model.dart';
+import 'package:sps_eth_app/app/modules/call_class/models/report_response_model.dart';
+import 'package:sps_eth_app/app/modules/call_class/views/widgets/confirmation_page_view.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/services/auth_service.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:sps_eth_app/app/utils/dio_util.dart';
@@ -18,6 +18,9 @@ import 'package:sps_eth_app/app/utils/jwt_util.dart';
 import 'package:sps_eth_app/app/utils/device_id_util.dart';
 import 'package:sps_eth_app/app/utils/connectivity_util.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
+import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:sps_eth_app/app/modules/language/controllers/language_controller.dart';
+import 'package:sps_eth_app/app/modules/language/views/language_view.dart';
 
 class ChatMessage {
   final String text;
@@ -76,15 +79,15 @@ class CallClassController extends GetxController {
   final RxList<InfoRow> idInformation = <InfoRow>[].obs;
   final RxList<DocumentItem> supportingDocuments = <DocumentItem>[].obs;
   final RxString termsAndConditions =
-      'These are the terms and conditions for Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand.'
+      'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'
           .obs;
   final RxString discussionDate = 'June 12, 2024'.obs;
+  
+  // Call details from backend
+  final Rx<CallDetailsResponse?> callDetails = Rx<CallDetailsResponse?>(null);
 
   // Direct Call services
   final DirectCallService _directCallService = DirectCallService(
-    DioUtil().getDio(useAccessToken: true),
-  );
-  final ReportService _reportService = ReportService(
     DioUtil().getDio(useAccessToken: true),
   );
   DirectCallWebSocketService? _webSocketService;
@@ -128,17 +131,18 @@ class CallClassController extends GetxController {
   // Connectivity monitoring
   final ConnectivityUtil connectivityUtil = ConnectivityUtil();
   
-  // Report draft polling
-  Timer? _draftPollingTimer;
-  final Rx<ReportDraftData?> reportDraft = Rx<ReportDraftData?>(null);
-  final RxBool isPollingDraft = false.obs;
-  final RxString pollingStatus = 'Waiting for officer to start form...'.obs;
-  Map<String, dynamic>? _previousFormData; // Track previous form data for highlighting updates
-  final RxSet<String> recentlyUpdatedFields = <String>{}.obs; // Track fields that were recently updated
-  int _consecutiveNoUpdatesCount = 0; // Track consecutive polls with no updates for adaptive polling
-  static const int _normalPollInterval = 3; // seconds
-  static const int _slowPollInterval = 5; // seconds (when no updates)
-  Timer? _fieldHighlightTimer; // Timer to clear field highlights after animation
+  // Report and statement data from call details
+  final Rx<ReportInfo?> reportInfo = Rx<ReportInfo?>(null);
+  final Rx<StatementInfo?> statementInfo = Rx<StatementInfo?>(null);
+  
+  // Call details polling
+  Timer? _callDetailsPollingTimer;
+  static const int _callDetailsPollInterval = 3; // seconds (reduced for faster updates)
+  bool _isLoadingCallDetails = false; // Prevent overlapping requests
+  
+  // Call request parameters
+  bool _isVisitor = false; // Default to false (residence/home)
+  String? _preferredLanguage; // Will be set if language was selected
 
   @override
   void onInit() {
@@ -147,12 +151,33 @@ class CallClassController extends GetxController {
       // Initialize connectivity monitoring
       connectivityUtil.initialize();
       
-      // Check if auto-start is requested from arguments
+      // Read arguments to determine call source and get preferred language
       final args = Get.arguments;
-      if (args != null && args is Map && args['autoStart'] == true) {
-        autoStartCall.value = true;
-        print('📞 [AUTO START] Auto-start call requested from home swipe');
+      if (args != null && args is Map) {
+        // Check if auto-start is requested
+        if (args['autoStart'] == true) {
+          autoStartCall.value = true;
+          print('📞 [AUTO START] Auto-start call requested from home swipe');
+        }
+        
+        // Get isVisitor flag (default to false if not provided)
+        _isVisitor = args['isVisitor'] == true;
+        print('📞 [INIT] isVisitor: $_isVisitor');
+        
+        // Get preferred language from LanguageController if available
+        _preferredLanguage = _getPreferredLanguage();
+        if (_preferredLanguage != null) {
+          print('📞 [INIT] preferredLanguage: $_preferredLanguage');
+        } else {
+          print('📞 [INIT] preferredLanguage: null (no language selected)');
+        }
+      } else {
+        // No arguments, default values
+        _isVisitor = false;
+        _preferredLanguage = _getPreferredLanguage();
+        print('📞 [INIT] No arguments provided, using defaults - isVisitor: $_isVisitor');
       }
+      
       _loadInitialData();
     } catch (e, stackTrace) {
       print('❌ [INIT ERROR] Error in onInit: $e');
@@ -408,8 +433,10 @@ class CallClassController extends GetxController {
           print('✅ [WEBSOCKET EVENT] Session IDs match, updating call status to active');
           callStatus.value = 'active';
           connectionStatus.value = 'Connected';
-          // Start polling for report draft when call is accepted
-          _startDraftPolling();
+          // Start polling for call details when call is accepted (this includes report and statement)
+          if (event.sessionId != null && event.sessionId!.isNotEmpty) {
+            _startCallDetailsPolling();
+          }
         } else {
           print('⚠️ [WEBSOCKET EVENT] Session IDs do not match! Event: ${event.sessionId}, Current: ${currentSessionId.value}');
         }
@@ -419,7 +446,7 @@ class CallClassController extends GetxController {
         print('❌ [WEBSOCKET EVENT] callRejected: sessionId=${event.sessionId}, message=${event.message}');
         if (event.sessionId == currentSessionId.value) {
           callStatus.value = 'ended';
-          _handleCallEnded();
+          _handleCallEnded(shouldNavigate: false);
           AppToasts.showError(event.message ?? 'Call rejected');
         }
       };
@@ -428,7 +455,10 @@ class CallClassController extends GetxController {
         print('🔚 [WEBSOCKET EVENT] callEnded: sessionId=${event.sessionId}, duration=${event.duration}, message=${event.message}');
         if (event.sessionId == currentSessionId.value) {
           callStatus.value = 'ended';
-          _handleCallEnded();
+          // Clear ending call loading state when WebSocket confirms call ended
+          isEndingCall.value = false;
+          // _handleCallEnded will handle navigation based on whether report exists
+          _handleCallEnded(shouldNavigate: true);
         }
       };
       
@@ -594,20 +624,10 @@ class CallClassController extends GetxController {
         ),
       ]);
 
-      idInformation.assignAll(const [
-        InfoRow('ID Information', '1231235163'),
-        InfoRow('Name  Information', 'Abeba Shimeles Adera'),
-        InfoRow('Birth Date', 'Aug 12 , 2024'),
-        InfoRow('Email', 'abeba@gmail.com'),
-        InfoRow('Phone Number', '0913427553'),
-        InfoRow('Residence Address', '–'),
-      ]);
-
-      supportingDocuments.assignAll(const [
-        DocumentItem(label: 'Incident Document', fileName: 'Doc name.pdf'),
-        DocumentItem(label: 'Application', fileName: 'Doc name.pdf'),
-        DocumentItem(label: 'Others', fileName: 'Doc name.pdf'),
-      ]);
+      // ID Information and documents will be loaded from call details when call is active
+      // Keep empty initially, will be populated when call details are fetched
+      idInformation.clear();
+      supportingDocuments.clear();
     } catch (e, stackTrace) {
       print('❌ [INIT ERROR] Error loading initial data: $e');
       print('❌ [INIT ERROR] Stack trace: $stackTrace');
@@ -636,8 +656,7 @@ class CallClassController extends GetxController {
   @override
   void onClose() {
     _connectionTimeoutTimer?.cancel();
-    _stopDraftPolling();
-    _fieldHighlightTimer?.cancel();
+    _stopCallDetailsPolling();
     disconnectFromRoom();
     _webSocketService?.disconnect();
     messageController.dispose();
@@ -689,8 +708,37 @@ class CallClassController extends GetxController {
       print('✅ [REQUEST CALL] Permissions granted');
       print('📞 [REQUEST CALL] Calling Direct Call API...');
       
+      // Create request payload with isVisitor and preferredLanguage
+      final requestPayload = RequestCallRequest(
+        isVisitor: _isVisitor,
+        preferredLanguage: _preferredLanguage,
+      );
+      
+      // Print request payload details
+      final accessToken = await AuthUtil().getAccessToken();
+      final baseUrl = 'https://sps-api-test.aii.et/api/v1';
+      final endpoint = '/direct-call/request';
+      final fullUrl = '$baseUrl$endpoint';
+      
+      print('📤 [REQUEST CALL] ========== REQUEST PAYLOAD ==========');
+      print('📤 [REQUEST CALL] Method: POST');
+      print('📤 [REQUEST CALL] URL: $fullUrl');
+      print('📤 [REQUEST CALL] Headers:');
+      print('📤 [REQUEST CALL]   - Content-Type: application/json');
+      if (accessToken != null) {
+        print('📤 [REQUEST CALL]   - Authorization: Bearer $accessToken');
+      } else {
+        print('📤 [REQUEST CALL]   - Authorization: null');
+      }
+      print('📤 [REQUEST CALL] Body:');
+      print('📤 [REQUEST CALL] {');
+      print('📤 [REQUEST CALL]   "isVisitor": ${requestPayload.isVisitor}');
+      print('📤 [REQUEST CALL]   "preferredLanguage": ${requestPayload.preferredLanguage != null ? "\"${requestPayload.preferredLanguage}\"" : "null"}');
+      print('📤 [REQUEST CALL] }');
+      print('📤 [REQUEST CALL] ======================================');
+      
       // Request call via Direct Call API
-      final responseWrapper = await _directCallService.requestCall();
+      final responseWrapper = await _directCallService.requestCall(requestPayload);
       
       // Extract data from wrapper
       if (responseWrapper.success != true || responseWrapper.data == null) {
@@ -705,11 +753,25 @@ class CallClassController extends GetxController {
       
       final response = responseWrapper.data!;
       
-      print('📞 [REQUEST CALL] API Response received:');
-      print('  - token: ${response.token != null ? "${response.token!.substring(0, 20)}..." : "null"}');
-      print('  - roomName: ${response.roomName}');
-      print('  - sessionId: ${response.sessionId}');
-      print('  - wsUrl: ${response.wsUrl}');
+      print('📥 [REQUEST CALL] ========== RESPONSE PAYLOAD ==========');
+      print('📥 [REQUEST CALL] Status: Success');
+      print('📥 [REQUEST CALL] Response Body:');
+      print('📥 [REQUEST CALL] {');
+      print('📥 [REQUEST CALL]   "success": ${responseWrapper.success}');
+      print('📥 [REQUEST CALL]   "data": {');
+      print('📥 [REQUEST CALL]     "token": "${response.token != null ? "${response.token!.substring(0, 20)}..." : "null"}"');
+      print('📥 [REQUEST CALL]     "roomName": "${response.roomName ?? "null"}"');
+      print('📥 [REQUEST CALL]     "sessionId": "${response.sessionId ?? "null"}"');
+      print('📥 [REQUEST CALL]     "wsUrl": "${response.wsUrl ?? "null"}"');
+      print('📥 [REQUEST CALL]   }');
+      if (responseWrapper.meta != null) {
+        print('📥 [REQUEST CALL]   "meta": {');
+        print('📥 [REQUEST CALL]     "timestamp": "${responseWrapper.meta!.timestamp ?? "null"}"');
+        print('📥 [REQUEST CALL]     "requestId": "${responseWrapper.meta!.requestId ?? "null"}"');
+        print('📥 [REQUEST CALL]   }');
+      }
+      print('📥 [REQUEST CALL] }');
+      print('📥 [REQUEST CALL] ======================================');
 
       if (response.token == null || 
           response.roomName == null || 
@@ -989,8 +1051,11 @@ class CallClassController extends GetxController {
       print('🎥 [LIVEKIT] Connection state updated - isConnected: ${isConnected.value}');
       print('🎥 [LIVEKIT] Room connection state: ${_room!.connectionState}');
       
-      // Start polling for report draft when call becomes active
-      _startDraftPolling();
+      // Start polling for call details when call becomes active (this includes report and statement)
+      final sessionId = currentSessionId.value;
+      if (sessionId != null && sessionId.isNotEmpty) {
+        _startCallDetailsPolling();
+      }
 
       // Enable camera and microphone
       print('🎥 [LIVEKIT] Enabling video...');
@@ -1032,7 +1097,7 @@ class CallClassController extends GetxController {
       callStatus.value = 'idle';
       callNetworkStatus.value = NetworkStatus.ERROR;
       AppToasts.showError('Failed to connect to video call server. This may be due to slow internet connection or server issues.');
-      await _handleCallEnded();
+      await _handleCallEnded(shouldNavigate: false);
     } catch (e, stackTrace) {
       print('❌ [LIVEKIT ERROR] Exception connecting to LiveKit: $e');
       print('❌ [LIVEKIT ERROR] Stack trace: $stackTrace');
@@ -1055,7 +1120,7 @@ class CallClassController extends GetxController {
       AppToasts.showError(errorMessage);
       _connectionTimeoutTimer?.cancel();
       _connectionTimeoutTimer = null;
-      await _handleCallEnded();
+      await _handleCallEnded(shouldNavigate: false);
     }
   }
   
@@ -1073,7 +1138,7 @@ class CallClassController extends GetxController {
         callNetworkStatus.value = NetworkStatus.ERROR;
         callStatus.value = 'idle';
         connectionStatus.value = 'Connection timeout';
-        _handleCallEnded();
+        _handleCallEnded(shouldNavigate: false);
       }
     });
   }
@@ -1083,6 +1148,45 @@ class CallClassController extends GetxController {
     print('🔌 [DISCONNECT] Disconnecting from LiveKit room...');
     try {
       if (_room != null) {
+        // Stop and cleanup tracks before disconnecting
+        if (_localParticipant != null) {
+          print('🔌 [DISCONNECT] Cleaning up local tracks...');
+          
+          // Get and stop local video track
+          try {
+            final videoTrackPub = _localParticipant!.videoTrackPublications
+                .where((pub) => pub.track != null)
+                .map((pub) => pub.track)
+                .whereType<LocalVideoTrack>()
+                .firstOrNull;
+            
+            if (videoTrackPub != null) {
+              print('🔌 [DISCONNECT] Stopping local video track...');
+              await videoTrackPub.stop();
+              print('✅ [DISCONNECT] Local video track stopped');
+            }
+          } catch (e) {
+            print('⚠️ [DISCONNECT] Error stopping video track: $e');
+          }
+          
+          // Get and stop local audio track
+          try {
+            final audioTrackPub = _localParticipant!.audioTrackPublications
+                .where((pub) => pub.track != null)
+                .map((pub) => pub.track)
+                .whereType<LocalAudioTrack>()
+                .firstOrNull;
+            
+            if (audioTrackPub != null) {
+              print('🔌 [DISCONNECT] Stopping local audio track...');
+              await audioTrackPub.stop();
+              print('✅ [DISCONNECT] Local audio track stopped');
+            }
+          } catch (e) {
+            print('⚠️ [DISCONNECT] Error stopping audio track: $e');
+          }
+        }
+        
         print('🔌 [DISCONNECT] Room exists, calling disconnect()...');
         await _room!.disconnect();
         print('🔌 [DISCONNECT] Room disconnected');
@@ -1391,15 +1495,25 @@ class CallClassController extends GetxController {
       connectionStatus.value = 'Connected';
       isConnected.value = true;
       callStatus.value = 'active';
+      // Start polling for call details if we have a session ID
+      final sessionId = currentSessionId.value;
+      if (sessionId != null && sessionId.isNotEmpty && callDetails.value == null) {
+        _startCallDetailsPolling();
+      }
     } else if (_room!.connectionState == ConnectionState.disconnected) {
       print('❌ [ROOM EVENT] Room disconnected');
       connectionStatus.value = 'Disconnected';
       isConnected.value = false;
       // Only show error if we were previously connected (not if we're just starting)
       if (previousState == 'Connected') {
-        AppToasts.showError('Connection lost. Please try again.');
+        // Only show toast if we have a valid context (avoid overlay errors)
+        try {
+          AppToasts.showError('Connection lost. Please try again.');
+        } catch (e) {
+          print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
+        }
         callStatus.value = 'idle';
-        _handleCallEnded();
+        _handleCallEnded(shouldNavigate: false);
       }
     } else if (_room!.connectionState == ConnectionState.connecting) {
       print('🔄 [ROOM EVENT] Room connecting...');
@@ -1414,7 +1528,12 @@ class CallClassController extends GetxController {
     if (_room!.connectionState == ConnectionState.disconnected && 
         (previousState == 'Connecting...' || previousState == 'Reconnecting...')) {
       print('❌ [ROOM EVENT] Connection failed during connect/reconnect');
-      AppToasts.showError('Failed to connect. Please check your internet and try again.');
+      // Only show toast if we have a valid context (avoid overlay errors)
+      try {
+        AppToasts.showError('Failed to connect. Please check your internet and try again.');
+      } catch (e) {
+        print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
+      }
       callStatus.value = 'idle';
       callNetworkStatus.value = NetworkStatus.ERROR;
     }
@@ -1477,18 +1596,27 @@ class CallClassController extends GetxController {
 
   /// End the current call
   Future<void> endCall() async {
+    // Prevent multiple simultaneous end calls
+    if (isEndingCall.value) {
+      print('⚠️ [END CALL] Call ending already in progress, ignoring duplicate request');
+      return;
+    }
+    
     final sessionId = currentSessionId.value;
     if (sessionId == null || sessionId.isEmpty) {
       await disconnectFromRoom();
       return;
     }
 
-    // Set loading state
+    // Set loading state - will be cleared when WebSocket confirms call ended
     isEndingCall.value = true;
+    print('📞 [END CALL] Ending call, showing loading indicator...');
 
     try {
       await _directCallService.endCall(sessionId);
-      await _handleCallEnded();
+      // Don't clear loading state here - wait for WebSocket confirmation
+      // The loading state will be cleared when onCallEnded WebSocket event is received
+      // or when navigation happens in _handleCallEnded
     } catch (e) {
       // Check if it's a DioException with 400 status about PENDING call
       bool isPendingCallError = false;
@@ -1507,337 +1635,510 @@ class CallClassController extends GetxController {
         }
       }
       
-      // Even if API call fails, disconnect from LiveKit
-      await _handleCallEnded();
+      // Even if API call fails, disconnect from LiveKit and handle call ended
+      // Don't clear loading state yet - wait for WebSocket or navigation
+      await _handleCallEnded(shouldNavigate: true);
       
       // Only show error if it's not a PENDING call error (which is expected)
       if (!isPendingCallError) {
         AppToasts.showError('Error ending call. Please try again.');
       }
       // For pending calls, just clean up silently
-    } finally {
-      // Always clear loading state
-      isEndingCall.value = false;
+      
+      // If navigation happens immediately (no report), clear loading state
+      // Otherwise it will be cleared when WebSocket receives callEnded event
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (isEndingCall.value) {
+          isEndingCall.value = false;
+        }
+      });
     }
   }
 
-  /// Handle call ended (cleanup)
-  Future<void> _handleCallEnded() async {
-    // Stop polling when call ends
-    _stopDraftPolling();
-    
-    await disconnectFromRoom();
-    callStatus.value = 'ended';
-    currentSessionId.value = '';
-    currentRoomName.value = '';
-    currentWsUrl.value = '';
-    
-    // Clear report draft data
-    reportDraft.value = null;
-    _previousFormData = null;
-    _consecutiveNoUpdatesCount = 0;
-    recentlyUpdatedFields.clear();
-    _fieldHighlightTimer?.cancel();
-    pollingStatus.value = 'Waiting for officer to start form...';
+  /// Get preferred language from LanguageController if available
+  String? _getPreferredLanguage() {
+    try {
+      // Try to get LanguageController instance
+      if (Get.isRegistered<LanguageController>()) {
+        final languageController = Get.find<LanguageController>();
+        final selectedIndex = languageController.selectedLanguageIndex.value;
+        
+        // Check if a language was actually selected (index >= 0)
+        if (selectedIndex >= 0 && selectedIndex < LanguageView.allLanguages.length) {
+          final languageName = LanguageView.allLanguages[selectedIndex]['name'] as String;
+          print('🌐 [LANGUAGE] Found selected language: $languageName (index: $selectedIndex)');
+          return languageName;
+        } else {
+          print('🌐 [LANGUAGE] No language selected (index: $selectedIndex)');
+          return null;
+        }
+      } else {
+        print('🌐 [LANGUAGE] LanguageController not registered');
+        return null;
+      }
+    } catch (e) {
+      print('⚠️ [LANGUAGE] Error getting preferred language: $e');
+      return null;
+    }
   }
   
-  /// Start polling for report draft updates
-  void _startDraftPolling() {
+  /// Load call details from backend
+  Future<void> _loadCallDetails(String sessionId) async {
+    if (sessionId.isEmpty) {
+      print('⚠️ [CALL DETAILS] Cannot load call details: sessionId is empty');
+      return;
+    }
+    
+    // Prevent overlapping requests
+    if (_isLoadingCallDetails) {
+      print('⏳ [CALL DETAILS] Request already in progress, skipping...');
+      return;
+    }
+    
+    _isLoadingCallDetails = true;
+    
+    try {
+      print('📋 [CALL DETAILS] Loading call details for session: $sessionId');
+      
+      // Add timestamp for cache-busting to ensure fresh data in release mode
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final response = await _directCallService.getCallDetails(sessionId, timestamp);
+      
+      if (response.success == true && response.data != null) {
+        callDetails.value = response.data;
+        print('✅ [CALL DETAILS] Call details loaded successfully');
+        print('  - Caller: ${response.data!.caller?.name ?? "Unknown"}');
+        print('  - Receiver: ${response.data!.receiver?.name ?? "Unknown"}');
+        print('  - Status: ${response.data!.status}');
+        
+        // Extract report and statement info
+        final newReport = response.data!.report;
+        final newStatement = response.data!.statement;
+        
+        // Check if statement text changed to detect updates
+        bool statementChanged = false;
+        bool reportChanged = false;
+        
+        if (newStatement != null && statementInfo.value != null) {
+          final oldStatementText = statementInfo.value!.statement ?? '';
+          final newStatementText = newStatement.statement ?? '';
+          final oldStatementId = statementInfo.value!.id ?? '';
+          final newStatementId = newStatement.id ?? '';
+          
+          if (oldStatementText != newStatementText || oldStatementId != newStatementId) {
+            statementChanged = true;
+            print('🔄 [CALL DETAILS] Statement changed detected');
+            print('  - Old length: ${oldStatementText.length}');
+            print('  - New length: ${newStatementText.length}');
+            if (oldStatementText != newStatementText) {
+              print('  - Text changed!');
+            }
+            if (oldStatementId != newStatementId) {
+              print('  - ID changed: $oldStatementId -> $newStatementId');
+            }
+          }
+        } else if (newStatement != null && statementInfo.value == null) {
+          // First time statement appears
+          statementChanged = true;
+          print('🔄 [CALL DETAILS] Statement appeared for the first time');
+        }
+        
+        if (newReport != null && reportInfo.value != null) {
+          final oldReportId = reportInfo.value!.id ?? '';
+          final newReportId = newReport.id ?? '';
+          if (oldReportId != newReportId) {
+            reportChanged = true;
+            print('🔄 [CALL DETAILS] Report changed detected');
+          }
+        } else if (newReport != null && reportInfo.value == null) {
+          reportChanged = true;
+          print('🔄 [CALL DETAILS] Report appeared for the first time');
+        }
+        
+        // Always update values - create new references to ensure GetX detects changes
+        // This is important in release mode where object references might be optimized
+        reportInfo.value = newReport;
+        statementInfo.value = newStatement;
+        
+        // Force refresh to ensure UI updates immediately
+        // Use update() method which is more reliable in release mode
+        if (statementChanged || newStatement != null) {
+          statementInfo.refresh();
+          // Also trigger update on the observable
+          statementInfo.value = newStatement; // Re-assign to trigger change
+          print('🔄 [CALL DETAILS] Forced statementInfo refresh and update');
+        }
+        
+        if (reportChanged || newReport != null) {
+          reportInfo.refresh();
+          reportInfo.value = newReport; // Re-assign to trigger change
+        }
+        
+        if (newReport != null) {
+          print('✅ [CALL DETAILS] Report found: ${newReport.caseNumber ?? "No case number"}');
+          print('  - Report Type: ${newReport.reportType?.name ?? "Unknown"}');
+        }
+        
+        if (newStatement != null) {
+          print('✅ [CALL DETAILS] Statement found: ${newStatement.id}');
+          print('  - Person: ${newStatement.person?.fullName ?? "Unknown"}');
+          print('  - Statement length: ${newStatement.statement?.length ?? 0}');
+        }
+        
+        // Update ID Information from call details
+        _updateIdInformationFromCallDetails(response.data!);
+      } else {
+        print('⚠️ [CALL DETAILS] API returned success=false or data is null');
+      }
+    } catch (e, stackTrace) {
+      print('❌ [CALL DETAILS] Error loading call details: $e');
+      print('❌ [CALL DETAILS] Stack trace: $stackTrace');
+      // Don't show error toast - this is a background operation
+    } finally {
+      _isLoadingCallDetails = false;
+    }
+  }
+  
+  /// Start polling for call details updates
+  void _startCallDetailsPolling() {
     final sessionId = currentSessionId.value;
     if (sessionId == null || sessionId.isEmpty) {
-      print('⚠️ [DRAFT POLLING] Cannot start polling: sessionId is empty');
+      print('⚠️ [CALL DETAILS POLLING] Cannot start polling: sessionId is empty');
       return;
     }
     
     // Stop any existing polling
-    _stopDraftPolling();
+    _stopCallDetailsPolling();
     
-    // Reset polling state
-    _consecutiveNoUpdatesCount = 0;
-    _previousFormData = null;
+    print('📋 [CALL DETAILS POLLING] Starting call details polling for session: $sessionId');
     
-    print('📋 [DRAFT POLLING] Starting draft polling for session: $sessionId');
-    isPollingDraft.value = true;
-    pollingStatus.value = 'Waiting for officer to start form...';
+    // Load immediately first time
+    _loadCallDetails(sessionId);
     
-    // Poll immediately first time
-    _pollDraft(sessionId);
-    
-    // Start with normal polling interval (3 seconds)
-    _scheduleNextPoll(sessionId, _normalPollInterval);
+    // Schedule periodic polling every 10 seconds
+    _callDetailsPollingTimer = Timer.periodic(
+      const Duration(seconds: _callDetailsPollInterval),
+      (timer) {
+        final currentSessionId = this.currentSessionId.value;
+        if (currentSessionId == null || currentSessionId.isEmpty) {
+          _stopCallDetailsPolling();
+          return;
+        }
+        
+        // Stop polling if call is not active
+        if (callStatus.value != 'active' && callStatus.value != 'connecting') {
+          _stopCallDetailsPolling();
+          return;
+        }
+        
+        // Poll for call details
+        _loadCallDetails(currentSessionId);
+      },
+    );
   }
   
-  /// Schedule the next poll with adaptive interval
-  void _scheduleNextPoll(String sessionId, int intervalSeconds) {
-    _draftPollingTimer?.cancel();
+  /// Stop polling for call details updates
+  void _stopCallDetailsPolling() {
+    if (_callDetailsPollingTimer != null) {
+      _callDetailsPollingTimer!.cancel();
+      _callDetailsPollingTimer = null;
+      print('📋 [CALL DETAILS POLLING] Stopped call details polling');
+    }
+  }
+  
+  /// Update ID Information from call details
+  void _updateIdInformationFromCallDetails(CallDetailsResponse details) {
+    final infoRows = <InfoRow>[];
     
-    _draftPollingTimer = Timer(Duration(seconds: intervalSeconds), () {
-      final currentSessionId = this.currentSessionId.value;
-      if (currentSessionId == null || currentSessionId.isEmpty) {
-        _stopDraftPolling();
-        return;
+    // Determine which user info to show (caller or receiver)
+    // For USER role, show receiver (employee/officer) info
+    // For EMPLOYEE role, show caller (user) info
+    final userInfo = details.receiver ?? details.caller;
+    
+    // Only add officer name
+    if (userInfo != null) {
+      if (userInfo.name != null && userInfo.name!.isNotEmpty) {
+        infoRows.add(InfoRow('Officer Name', userInfo.name!));
       }
-      
-      // Stop polling if call is not active
-      if (callStatus.value != 'active') {
-        _stopDraftPolling();
-        return;
+    }
+    
+    // Add call status
+    if (details.status != null) {
+      infoRows.add(InfoRow('Call Status', details.status!));
+    }
+    
+    // Add call date
+    if (details.createdAt != null) {
+      final dateStr = '${details.createdAt!.day}/${details.createdAt!.month}/${details.createdAt!.year}';
+      infoRows.add(InfoRow('Call Date', dateStr));
+    }
+    
+    idInformation.assignAll(infoRows);
+    print('✅ [CALL DETAILS] Updated ID Information with ${infoRows.length} rows');
+  }
+
+  /// Handle call ended (cleanup)
+  Future<void> _handleCallEnded({bool shouldNavigate = true}) async {
+    // Stop polling when call ends
+    _stopCallDetailsPolling();
+    
+    // Save report ID before clearing call details
+    final reportId = reportInfo.value?.id;
+    print('📋 [CALL ENDED] Report ID: ${reportId ?? "null"}');
+    
+    await disconnectFromRoom();
+    callStatus.value = 'ended';
+    
+    // Clear call details (but keep reportId for fetching)
+    final savedReportId = reportId;
+    callDetails.value = null;
+    reportInfo.value = null;
+    statementInfo.value = null;
+    
+    currentSessionId.value = '';
+    currentRoomName.value = '';
+    currentWsUrl.value = '';
+    
+    // If there's a report ID and we should navigate, fetch and show report
+    if (shouldNavigate && savedReportId != null && savedReportId.isNotEmpty) {
+      try {
+        print('📋 [CALL ENDED] Fetching report with ID: $savedReportId');
+        // Clear loading state when navigation happens
+        isEndingCall.value = false;
+        await _fetchAndShowReport(savedReportId);
+      } catch (e, stackTrace) {
+        print('❌ [CALL ENDED] Error fetching report: $e');
+        print('❌ [CALL ENDED] Stack trace: $stackTrace');
+        // Clear loading state when navigation happens
+        isEndingCall.value = false;
+        // If report fetch fails, just navigate to home
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Get.offAllNamed(Routes.HOME);
+        });
       }
-      
-      // Stop polling if report is submitted
-      if (reportDraft.value?.reportSubmitted == true) {
-        _stopDraftPolling();
-        pollingStatus.value = 'Report submitted successfully';
-        return;
-      }
-      
-      // Poll and schedule next one
-      _pollDraft(currentSessionId).then((_) {
-        // Determine next interval based on updates
-        final nextInterval = _consecutiveNoUpdatesCount >= 2 
-            ? _slowPollInterval 
-            : _normalPollInterval;
-        _scheduleNextPoll(currentSessionId, nextInterval);
+    } else if (shouldNavigate) {
+      // No report, just navigate to home
+      print('📋 [CALL ENDED] No report found, navigating to home');
+      // Clear loading state when navigation happens
+      isEndingCall.value = false;
+      Future.delayed(const Duration(milliseconds: 500), () {
+        Get.offAllNamed(Routes.HOME);
       });
-    });
+    }
   }
   
-  /// Stop polling for report draft updates
-  void _stopDraftPolling() {
-    if (_draftPollingTimer != null) {
-      _draftPollingTimer!.cancel();
-      _draftPollingTimer = null;
-      print('📋 [DRAFT POLLING] Stopped draft polling');
-    }
-    isPollingDraft.value = false;
-    _consecutiveNoUpdatesCount = 0; // Reset counter
-  }
-  
-  /// Poll for draft updates
-  Future<void> _pollDraft(String callSessionId) async {
-    // Validate sessionId before making request
-    if (callSessionId.isEmpty) {
-      print('⚠️ [DRAFT POLLING] Invalid callSessionId: empty string');
-      return;
-    }
-    
+  /// Fetch report by ID and show in confirmation page view
+  Future<void> _fetchAndShowReport(String reportId) async {
     try {
-      print('📋 [DRAFT POLLING] Polling draft for session: $callSessionId');
+      print('📋 [REPORT FETCH] Fetching report from admin API...');
+      // Use Dio directly for admin API since it has a different base URL
+      final dio = DioUtil().getDio(useAccessToken: true);
+      final adminBaseUrl = 'https://sps-admin.zorcloud.net/api/v1';
+      final response = await dio.get('$adminBaseUrl/reports/$reportId');
       
-      final response = await _reportService.getDraft(callSessionId);
-      
-      // Validate response structure
-      if (response.success != true) {
-        print('⚠️ [DRAFT POLLING] API returned success=false');
-        if (reportDraft.value == null) {
-          pollingStatus.value = 'Waiting for officer to start form...';
-        }
-        _consecutiveNoUpdatesCount++;
-        return;
-      }
-      
-      if (response.data == null) {
-        print('⚠️ [DRAFT POLLING] No draft data available yet');
-        if (reportDraft.value == null) {
-          pollingStatus.value = 'Waiting for officer to start form...';
-        }
-        _consecutiveNoUpdatesCount++;
-        return;
-      }
-      
-      final draftData = response.data!;
-      
-      // Validate that callSessionId matches (security check)
-      if (draftData.callSessionId != null && 
-          draftData.callSessionId != callSessionId) {
-        print('⚠️ [DRAFT POLLING] Session ID mismatch! Expected: $callSessionId, Got: ${draftData.callSessionId}');
-        // Continue anyway, but log the issue
-      }
-      
-      // Check if report is submitted
-      if (draftData.reportSubmitted == true) {
-        print('✅ [DRAFT POLLING] Report submitted!');
-        reportDraft.value = draftData;
-        _stopDraftPolling();
+      if (response.statusCode == 200 && response.data != null) {
+        final responseData = response.data as Map<String, dynamic>;
+        print('✅ [REPORT FETCH] Report fetched successfully');
         
-        if (draftData.caseNumber != null && draftData.caseNumber!.isNotEmpty) {
-          pollingStatus.value = 'Report submitted - Case: ${draftData.caseNumber}';
-          AppToasts.showSuccess('Report submitted successfully. Case number: ${draftData.caseNumber}');
-        } else if (draftData.reportId != null && draftData.reportId!.isNotEmpty) {
-          pollingStatus.value = 'Report submitted successfully';
-          AppToasts.showSuccess('Report submitted successfully');
-        } else {
-          pollingStatus.value = 'Report submitted successfully';
-          AppToasts.showSuccess('Report submitted successfully');
-        }
-        return;
-      }
-      
-      // Check if form data has updates
-      final currentFormData = draftData.formData;
-      bool hasNewUpdates = false;
-      
-      if (currentFormData != null && currentFormData.isNotEmpty) {
-        // Compare with previous form data to detect updates
-        if (_previousFormData == null) {
-          hasNewUpdates = true;
-          _consecutiveNoUpdatesCount = 0; // Reset counter on first data
-          print('📋 [DRAFT POLLING] First draft data received');
-        } else {
-          // Track which fields were updated
-          final updatedFields = <String>[];
-          
-          // Check if any field changed
-          for (var key in currentFormData.keys) {
-            final oldValue = _previousFormData![key];
-            final newValue = currentFormData[key];
-            
-            // Deep comparison for better accuracy
-            if (oldValue != newValue) {
-              hasNewUpdates = true;
-              updatedFields.add(key);
-              _consecutiveNoUpdatesCount = 0; // Reset counter on update
-              print('📋 [DRAFT POLLING] Field updated: $key ($oldValue -> $newValue)');
-            }
-          }
-          
-          // Also check for new fields that weren't in previous data
-          for (var key in currentFormData.keys) {
-            if (!_previousFormData!.containsKey(key)) {
-              hasNewUpdates = true;
-              updatedFields.add(key);
-              _consecutiveNoUpdatesCount = 0;
-              print('📋 [DRAFT POLLING] New field added: $key');
-            }
-          }
-          
-          // Update recently updated fields for UI highlighting
-          if (updatedFields.isNotEmpty) {
-            recentlyUpdatedFields.clear();
-            recentlyUpdatedFields.addAll(updatedFields);
-            // Clear highlights after 3 seconds
-            _fieldHighlightTimer?.cancel();
-            _fieldHighlightTimer = Timer(const Duration(seconds: 3), () {
-              recentlyUpdatedFields.clear();
-            });
-          }
-          
-          // If no updates detected but backend says there are updates, trust the backend
-          if (!hasNewUpdates && draftData.hasUpdates == true) {
-            hasNewUpdates = true;
-            _consecutiveNoUpdatesCount = 0;
-            print('📋 [DRAFT POLLING] Backend indicates updates (hasUpdates=true)');
-            // Mark all fields as updated if backend says so but we can't detect changes
-            recentlyUpdatedFields.clear();
-            recentlyUpdatedFields.addAll(currentFormData.keys);
-            _fieldHighlightTimer?.cancel();
-            _fieldHighlightTimer = Timer(const Duration(seconds: 3), () {
-              recentlyUpdatedFields.clear();
-            });
-          }
+        // Parse response using model
+        final reportWrapper = ReportResponseWrapper.fromJson(responseData);
+        
+        if (reportWrapper.data == null) {
+          print('⚠️ [REPORT FETCH] Report data is null');
+          Future.delayed(const Duration(milliseconds: 500), () {
+            Get.offAllNamed(Routes.HOME);
+          });
+          return;
         }
         
-        // Update previous form data
-        _previousFormData = Map<String, dynamic>.from(currentFormData);
+        final reportData = reportWrapper.data!;
+        print('📋 [REPORT FETCH] Report ID: ${reportData.id}');
+        print('📋 [REPORT FETCH] Case Number: ${reportData.caseNumber}');
+        print('📋 [REPORT FETCH] Report Type: ${reportData.reportType?.name}');
+        print('📋 [REPORT FETCH] Statements count: ${reportData.statements?.length ?? 0}');
+      
+        // Convert report data to formData format for ConfirmationPageView
+        final formData = _convertReportToFormData(reportData);
+        
+        // Navigate directly to confirmation page view
+        print('📋 [REPORT FETCH] Navigating to confirmation page view');
+        Future.delayed(const Duration(milliseconds: 500), () {
+          ConfirmationPageView.show(Get.context!, formData);
+        });
       } else {
-        // No form data yet
-        _consecutiveNoUpdatesCount++;
-      }
-      
-      // If no updates, increment counter for adaptive polling
-      if (!hasNewUpdates) {
-        _consecutiveNoUpdatesCount++;
-      }
-      
-      // Update draft data
-      reportDraft.value = draftData;
-      
-      // Update status message
-      if (hasNewUpdates) {
-        print('📋 [DRAFT POLLING] Draft updated with new data');
-        pollingStatus.value = 'Form updated - ${draftData.lastUpdated != null ? _formatTimestamp(draftData.lastUpdated!) : "Just now"}';
-      } else if (currentFormData != null && currentFormData.isNotEmpty) {
-        pollingStatus.value = 'Viewing your report - Last updated: ${draftData.lastUpdated != null ? _formatTimestamp(draftData.lastUpdated!) : "Unknown"}';
-      } else {
-        pollingStatus.value = 'Waiting for officer to start form...';
-      }
-      
-    } on dio.DioException catch (e) {
-      // Handle different HTTP status codes
-      final statusCode = e.response?.statusCode;
-      
-      if (statusCode == 404) {
-        // No draft exists yet - this is normal
-        print('ℹ️ [DRAFT POLLING] No draft exists yet (404)');
-        if (reportDraft.value == null) {
-          pollingStatus.value = 'Waiting for officer to start form...';
-        }
-        _consecutiveNoUpdatesCount++;
-        return;
-      } else if (statusCode == 401) {
-        // Unauthorized - token might be expired
-        print('⚠️ [DRAFT POLLING] Unauthorized (401) - token may be expired');
-        // Don't stop polling, let it retry (token refresh should handle this)
-        _consecutiveNoUpdatesCount++;
-        return;
-      } else if (statusCode == 403) {
-        // Forbidden - user doesn't have permission
-        print('❌ [DRAFT POLLING] Forbidden (403) - insufficient permissions');
-        _stopDraftPolling();
-        pollingStatus.value = 'Unable to view report';
-        return;
-      } else if (statusCode == 400) {
-        // Bad request - invalid sessionId
-        print('❌ [DRAFT POLLING] Bad request (400) - invalid callSessionId: $callSessionId');
-        _stopDraftPolling();
-        pollingStatus.value = 'Invalid call session';
-        return;
-      } else if (statusCode != null && statusCode >= 500) {
-        // Server error - retry on next interval
-        print('⚠️ [DRAFT POLLING] Server error ($statusCode): ${e.message}');
-        _consecutiveNoUpdatesCount++;
-        return;
-      } else if (e.type == dio.DioExceptionType.connectionError ||
-                 e.type == dio.DioExceptionType.connectionTimeout ||
-                 e.type == dio.DioExceptionType.receiveTimeout) {
-        // Network errors - retry on next interval
-        print('⚠️ [DRAFT POLLING] Network error: ${e.type} - ${e.message}');
-        _consecutiveNoUpdatesCount++;
-        return;
-      } else {
-        // Other errors
-        print('❌ [DRAFT POLLING] Error polling draft: $statusCode - ${e.message}');
-        _consecutiveNoUpdatesCount++;
-        return;
+        print('⚠️ [REPORT FETCH] Invalid response from report API');
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Get.offAllNamed(Routes.HOME);
+        });
       }
     } catch (e, stackTrace) {
-      print('❌ [DRAFT POLLING] Exception polling draft: $e');
-      print('❌ [DRAFT POLLING] Stack trace: $stackTrace');
-      _consecutiveNoUpdatesCount++;
-      // Don't show error toast for polling failures - polling will retry
+      print('❌ [REPORT FETCH] Error fetching report: $e');
+      print('❌ [REPORT FETCH] Stack trace: $stackTrace');
+      // If report fetch fails, navigate to home
+      Future.delayed(const Duration(milliseconds: 500), () {
+        Get.offAllNamed(Routes.HOME);
+      });
     }
   }
   
-  /// Format timestamp for display
-  String _formatTimestamp(String isoString) {
+  /// Convert report data from API to formData format for ConfirmationPageView
+  /// Only extracts necessary fields for the confirmation page
+  Map<String, String> _convertReportToFormData(ReportData reportData) {
+    final formData = <String, String>{};
+    
     try {
-      final dateTime = DateTime.parse(isoString);
-      final now = DateTime.now();
-      final difference = now.difference(dateTime);
+      print('📋 [REPORT CONVERT] Converting report data...');
       
-      if (difference.inSeconds < 60) {
-        return 'Just now';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-      } else {
-        return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+      // Extract ID - use caseNumber if available, otherwise use id
+      if (reportData.caseNumber != null && reportData.caseNumber!.isNotEmpty) {
+        formData['id'] = reportData.caseNumber!;
+        formData['caseNumber'] = reportData.caseNumber!;
+      } else if (reportData.id != null) {
+        formData['id'] = reportData.id!;
       }
-    } catch (e) {
-      return 'Unknown';
+      
+      // Extract Category - use reportType.code
+      if (reportData.reportType?.code != null && reportData.reportType!.code!.isNotEmpty) {
+        formData['category'] = reportData.reportType!.code!;
+      }
+      
+      // Extract Type - use reportType.name
+      if (reportData.reportType?.name != null && reportData.reportType!.name!.isNotEmpty) {
+        formData['incidentType'] = reportData.reportType!.name!;
+      }
+      
+      // Extract information from first statement
+      if (reportData.statements != null && reportData.statements!.isNotEmpty) {
+        final statement = reportData.statements!.first;
+        
+        // Extract full name
+        if (statement.fullName != null && statement.fullName!.trim().isNotEmpty) {
+          formData['fullName'] = statement.fullName!.trim();
+        }
+        
+        // Extract phone number
+        if (statement.phoneMobile != null && statement.phoneMobile!.trim().isNotEmpty) {
+          formData['phoneNumber'] = statement.phoneMobile!.trim();
+        }
+        
+        // Extract age
+        if (statement.age != null) {
+          formData['age'] = statement.age.toString();
+        }
+        
+        // Extract sex
+        if (statement.sex != null && statement.sex!.trim().isNotEmpty) {
+          formData['sex'] = statement.sex!.trim();
+        }
+        
+        // Extract nationality
+        if (statement.nationality != null && statement.nationality!.trim().isNotEmpty) {
+          formData['nationality'] = statement.nationality!.trim();
+        }
+        
+        // Extract date of birth
+        if (statement.dateOfBirth != null) {
+          try {
+            final dob = statement.dateOfBirth!;
+            formData['dateOfBirth'] = '${dob.day} ${_getMonthName(dob.month)}, ${dob.year}';
+          } catch (e) {
+            print('⚠️ [REPORT CONVERT] Error formatting date of birth: $e');
+          }
+        }
+        
+        // Extract statement text
+        if (statement.statement != null && statement.statement!.trim().isNotEmpty) {
+          formData['statement'] = statement.statement!.trim();
+        }
+        
+        // Extract statement date
+        if (statement.statementDate != null) {
+          try {
+            final stmtDate = statement.statementDate!;
+            formData['statementDate'] = '${stmtDate.day} ${_getMonthName(stmtDate.month)}, ${stmtDate.year}';
+          } catch (e) {
+            print('⚠️ [REPORT CONVERT] Error formatting statement date: $e');
+          }
+        }
+        
+        // Extract statement time
+        if (statement.statementTime != null && statement.statementTime!.trim().isNotEmpty) {
+          formData['statementTime'] = statement.statementTime!.trim();
+        }
+        
+        // Build address from available fields
+        final addressParts = <String>[];
+        
+        if (statement.specificAddress != null && statement.specificAddress!.trim().isNotEmpty) {
+          addressParts.add(statement.specificAddress!.trim());
+        }
+        if (statement.currentSubCity != null && statement.currentSubCity!.trim().isNotEmpty) {
+          addressParts.add(statement.currentSubCity!.trim());
+        }
+        if (statement.currentKebele != null && statement.currentKebele!.trim().isNotEmpty) {
+          addressParts.add(statement.currentKebele!.trim());
+        }
+        if (statement.currentHouseNumber != null && statement.currentHouseNumber!.trim().isNotEmpty) {
+          addressParts.add('House: ${statement.currentHouseNumber!.trim()}');
+        }
+        if (statement.otherAddress != null && statement.otherAddress!.trim().isNotEmpty) {
+          addressParts.add(statement.otherAddress!.trim());
+        }
+        
+        if (addressParts.isNotEmpty) {
+          formData['address'] = addressParts.join(', ');
+        }
+      }
+      
+      // Extract Schedule Time - use createdAt
+      if (reportData.createdAt != null) {
+        try {
+          final createdAt = reportData.createdAt!;
+          formData['submitTime'] = '${createdAt.day} ${_getMonthName(createdAt.month)}, ${createdAt.year}';
+          formData['scheduleTime'] = formData['submitTime']!;
+        } catch (e) {
+          print('⚠️ [REPORT CONVERT] Error formatting date: $e');
+        }
+      }
+      
+      print('✅ [REPORT CONVERT] Converted report data:');
+      print('  - ID: ${formData['id'] ?? 'N/A'}');
+      print('  - Category: ${formData['category'] ?? 'N/A'}');
+      print('  - Type: ${formData['incidentType'] ?? 'N/A'}');
+      print('  - Full Name: ${formData['fullName'] ?? 'N/A'}');
+      print('  - Phone Number: ${formData['phoneNumber'] ?? 'N/A'}');
+      print('  - Age: ${formData['age'] ?? 'N/A'}');
+      print('  - Sex: ${formData['sex'] ?? 'N/A'}');
+      print('  - Nationality: ${formData['nationality'] ?? 'N/A'}');
+      print('  - Date of Birth: ${formData['dateOfBirth'] ?? 'N/A'}');
+      print('  - Address: ${formData['address'] ?? 'N/A'}');
+      print('  - Statement: ${formData['statement'] != null ? "${formData['statement']!.substring(0, formData['statement']!.length > 50 ? 50 : formData['statement']!.length)}..." : 'N/A'}');
+      print('  - Statement Date: ${formData['statementDate'] ?? 'N/A'}');
+      print('  - Statement Time: ${formData['statementTime'] ?? 'N/A'}');
+      print('  - Schedule Time: ${formData['scheduleTime'] ?? 'N/A'}');
+      
+    } catch (e, stackTrace) {
+      print('⚠️ [REPORT CONVERT] Error converting report data: $e');
+      print('⚠️ [REPORT CONVERT] Stack trace: $stackTrace');
     }
+    
+    return formData;
   }
+  
+  /// Helper to get month name
+  String _getMonthName(int month) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return months[month - 1];
+  }
+  
+  // Removed draft polling - now using call details endpoint which includes report and statement
+  // Old draft polling methods removed - data comes from call details every 10 seconds
+  
+  // Removed: _startDraftPolling, _stopDraftPolling, _scheduleNextPoll, _pollDraft methods
+  // These are no longer needed as we get report and statement data from call details endpoint
 
   void confirmTerms() async {
     // Check authentication before confirming terms

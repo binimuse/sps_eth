@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sps_eth_app/app/modules/form_class/views/widget/case_summary_view.dart';
+import 'package:sps_eth_app/app/modules/call_class/views/widgets/confirmation_page_view.dart';
+
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
 import '../controllers/form_class_controller.dart';
@@ -646,11 +647,11 @@ class FormClassView extends GetView<FormClassController> {
           onPressed: showSubmit 
               ? () {
                   // Submit form
-                  Get.to(CaseSummaryView(formData: {},));
+                  Get.to(ConfirmationPageView(formData: {},));
                 }
               : () => controller.nextStep(),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0F3955),
+            backgroundColor: const Color.fromARGB(255, 31, 34, 37),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
             shape: RoundedRectangleBorder(

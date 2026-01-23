@@ -12,15 +12,15 @@ class LanguageView extends GetView<LanguageController> {
 
   // All languages listed together
   static final List<Map<String, dynamic>> allLanguages = [
+    // English first
+    {'name': 'English', 'icon': Icons.language},
     // Local languages
-      {'name': 'አማርኛ', 'icon': Icons.translate}, // Amharic
+    {'name': 'አማርኛ', 'icon': Icons.translate}, // Amharic
     {'name': 'Afaan Oromoo', 'icon': Icons.translate},
-  
     {'name': 'ትግርኛ', 'icon': Icons.translate}, // Tigrigna
     {'name': 'Afi Somali', 'icon': Icons.translate},
     // Other languages
     {'name': 'Arabic', 'icon': Icons.translate},
-    {'name': 'English', 'icon': Icons.language},
   ];
 
   @override
@@ -52,10 +52,8 @@ class LanguageView extends GetView<LanguageController> {
                 child: SizedBox(
                   height: viewportHeight,
                   child: SideInfoPanel(
-                    title: 'SMART POLICE\nSTATION',
-                    description: 'Loreim re in charge of planning and managing marketing'
-                        'campaigns that promote a company\'s brand. marketing'
-                        'campaigns that promote a company\'s brand.',
+                    title: 'SMART POLICE\nSTATION'.tr,
+                    description: 'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
                     logoAsset: Assets.images.efpLogo.path,
                     illustrationAsset: Assets.images.law.path,
                   ),
@@ -82,16 +80,15 @@ class LanguageView extends GetView<LanguageController> {
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text('Select Language',
+                              children: [
+                                Text('Select Language'.tr,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w800,
                                       color: Color(0xFF0F3955),
                                     )),
                                 SizedBox(height: 4),
                                 Text(
-                                  'Loreim re in charge of planning and managing marketing\n'
-                                  'campaigns that promote a company\'s brand.',
+                                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
                                   style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
                                 ),
                               ],
@@ -109,7 +106,7 @@ class LanguageView extends GetView<LanguageController> {
                       ),
                       onPressed: () => Get.back(),
                       icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                      label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                      label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                     ),
                     const SizedBox(height: 16),
                     // Language grid - Show all languages

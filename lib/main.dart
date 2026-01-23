@@ -4,7 +4,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:get/get.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:sps_eth_app/app/app_language/translations.dart';
-import 'package:sps_eth_app/app/utils/lang_util.dart';
+import 'package:sps_eth_app/app/utils/constants.dart';
 import 'package:sps_eth_app/app/utils/prefrence_utility.dart';
 import 'package:upgrader/upgrader.dart';
 import 'app/routes/app_pages.dart';
@@ -17,16 +17,25 @@ void main() async {
   print('This is a test print from main.dart');
 
   WidgetsFlutterBinding.ensureInitialized();
-  // Lock orientation to landscape for tablet mode
+  // Lock orientation to landscape - prevent rotation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
   ]);
   await PreferenceUtils.init();
 
-  selectedLocale = LanUtil.getSelecctedLanguage();
-    
-
+  // Set default language to English if no language preference exists
+  final String savedLanguage = PreferenceUtils.getString(Constants.selectedLanguage, '');
+  if (savedLanguage.isEmpty) {
+    await PreferenceUtils.setString(Constants.selectedLanguage, Constants.lanEn);
+    selectedLocale = 'en_US'; // Map 'en' to 'en_US' for translations
+  } else {
+    // Map language codes to translation keys
+    if (savedLanguage == Constants.lanEn) {
+      selectedLocale = 'en_US';
+    } else {
+      selectedLocale = savedLanguage; // 'am', 'or', 'ti', 'so' match translation keys
+    }
+  }
 
   await Future<void>.delayed(const Duration(milliseconds: 5000));
 

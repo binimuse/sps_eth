@@ -978,6 +978,15 @@ class $AssetsImagesGen {
   AssetGenImage get background =>
       const AssetGenImage('assets/images/background.png');
 
+  /// File path: assets/images/bg3.jpg
+  AssetGenImage get bg3 => const AssetGenImage('assets/images/bg3.jpg');
+
+  /// File path: assets/images/bg4.jpg
+  AssetGenImage get bg4 => const AssetGenImage('assets/images/bg4.jpg');
+
+  /// File path: assets/images/bg5.jpg
+  AssetGenImage get bg5 => const AssetGenImage('assets/images/bg5.jpg');
+
   /// File path: assets/images/call_a.png
   AssetGenImage get callA => const AssetGenImage('assets/images/call_a.png');
 
@@ -1093,6 +1102,9 @@ class $AssetsImagesGen {
     back,
     back1,
     background,
+    bg3,
+    bg4,
+    bg5,
     callA,
     calling,
     card,

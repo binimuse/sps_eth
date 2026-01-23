@@ -203,7 +203,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                           description: 'Ensuring accountability through proper incident documentation.',
                                           image: Assets.images.callA.path,
                                           onTap: () {
-                                         Get.toNamed(Routes.CALL_CLASS);
+                                         Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
                                         },
                                       ),
                                     ),

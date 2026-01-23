@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/promo_card.dart';
-import 'package:sps_eth_app/app/common/widgets/custom_loading_widget.dart';
-import 'package:sps_eth_app/app/utils/enums.dart';
 import '../controllers/residence_id_controller.dart';
 
 class ResidenceIdView extends GetView<ResidenceIdController> {
   const ResidenceIdView({super.key});
+  
   @override
   Widget build(BuildContext context) {
     return Container( 
@@ -24,13 +24,12 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // LEFT PROMO CARD
                 SizedBox(
                   width: 300,
-                  child: PromoCard(
-                  ),
+                  child: PromoCard(),
                 ),
 
                 const SizedBox(width: 24),
@@ -38,196 +37,345 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                 // CENTER CONTENT
                 Expanded(
                   flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Back Button
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          side: const BorderSide(color: Color(0xFFCBDCE7)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: () => Get.back(),
-                        icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                        label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
-                      ),
-                      const SizedBox(height: 16),
-                      // Main Card
-                      Expanded(
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Obx(() {
-                            // Show loading overlay
-                            if (controller.networkStatus.value == NetworkStatus.LOADING) {
-                              return const Center(child: CustomLoadingWidget());
-                            }
-
-                            return Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Top Section: ID Scanning Icon and Text
-                                SizedBox(
-                                  height: 80,
-                                  width: 80,
-                                  child: Image.asset(
-                                    Assets.images.scanid.path,
-                                    fit: BoxFit.contain,
-                                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top info box + back button
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE2F0F8),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'Scanning For ID ....',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF4A4A4A),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                                
-                                // ID Input Field
-                                TextField(
-                                  controller: controller.idController,
-                                  decoration: InputDecoration(
-                                    hintText: 'ID',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 14,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.grey[100],
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 14,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                
-                                // Phone Number Input Field
-                                TextField(
-                                  controller: controller.phoneController,
-                                  keyboardType: TextInputType.phone,
-                                  decoration: InputDecoration(
-                                    hintText: 'Phone Number',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 14,
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.grey[100],
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 14,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                
-                                // Find Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF1976D2),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 32,
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    onPressed: () => controller.signup(),
-                                    child: const Text(
-                                      'Find',
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Select ID Type'.tr,
                                       style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0F3955),
                                       ),
                                     ),
-                                  ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
+                                      style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 20),
-                                
-                                // Separator: "or" text
-                                const Text(
-                                  'or',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF9E9E9E),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                
-                                // Bottom Section: Guest Option Card
-                                GestureDetector(
-                                  onTap: () {
-                                    // Handle guest continuation
-                                  },
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 24,
-                                      vertical: 35,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      image: DecorationImage(
-                                        image: AssetImage(Assets.images.background.path),
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Icon(
-                                          Icons.person_outline,
-                                          size: 32,
-                                          color: const Color(0xFF1976D2),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        const Text(
-                                          'Continue as a Guest',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF4A4A4A),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                            OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            side: const BorderSide(color: Color(0xFFCBDCE7)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () => Get.back(),
+                          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                          label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
+                        ),
+
+                               OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            side: const BorderSide(color: Color(0xFFCBDCE7)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: () {
+                            Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
+                          },
+                          icon: const Icon(Icons.person_outline, color: Color(0xFF0F3955)),
+                          label: Text('Continue as guest'.tr, style: TextStyle(color: Color(0xFF0F3955))),
+                        ),
+                        ],),
+                      
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Single Card with Three ID Type Buttons or Input Field
+                        Obx(() {
+                          final selectedType = controller.selectedIdType.value;
+                          
+                          return Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
-                            );
-                          }),
-                        ),
-                      ),
-                    ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Header with back button if selected
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                          selectedType.isEmpty
+                                          ? 'Select Your ID Type'.tr
+                                          : selectedType == 'fayda'
+                                              ? 'Enter Phone Number'.tr
+                                              : selectedType == 'residence'
+                                                  ? 'Enter Residence ID'.tr
+                                                  : 'Enter TIN Number'.tr,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0F3955),
+                                      ),
+                                    ),
+                                    if (selectedType.isNotEmpty)
+                                      IconButton(
+                                        icon: const Icon(Icons.close, color: Color(0xFF0F3955)),
+                                        onPressed: () => controller.clearSelection(),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                
+                                // Show buttons if nothing selected
+                                if (selectedType.isEmpty) ...[
+                                  // Fayda ID Button
+                                  _IdTypeButton(
+                                    title: 'Fayda ID'.tr,
+                                    subtitle: 'Use your Fayda ID to continue with the process'.tr,
+                                    icon: Icons.credit_card,
+                                    onTap: () {
+                                      controller.selectIdType('fayda');
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  
+                                  // Residence ID Button
+                                  _IdTypeButton(
+                                    title: 'Residence ID'.tr,
+                                    subtitle: 'Use your Residence ID or National ID to continue'.tr,
+                                    icon: Icons.badge,
+                                    onTap: () {
+                                      controller.selectIdType('residence');
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  
+                                  // TIN Number Button
+                                  _IdTypeButton(
+                                    title: 'TIN Number'.tr,
+                                    subtitle: 'Use your Tax Identification Number to continue'.tr,
+                                    icon: Icons.numbers,
+                                    onTap: () {
+                                      controller.selectIdType('tin');
+                                    },
+                                  ),
+                                ],
+                                
+                                // Show input field based on selection
+                                if (selectedType == 'fayda') ...[
+                                  TextField(
+                                    controller: controller.phoneController,
+                                    keyboardType: TextInputType.phone,
+                                    decoration: InputDecoration(
+                                      hintText: 'Phone Number'.tr,
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.grey[100],
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF1976D2),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      onPressed: () => controller.submit(),
+                                      child: Text(
+                                        'Continue'.tr,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                
+                                if (selectedType == 'residence') ...[
+                                  TextField(
+                                    controller: controller.idController,
+                                    decoration: InputDecoration(
+                                      hintText: 'Residence ID / National ID'.tr,
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.grey[100],
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF1976D2),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      onPressed: () => controller.submit(),
+                                      child: Text(
+                                        'Continue'.tr,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                
+                                if (selectedType == 'tin') ...[
+                                  TextField(
+                                    controller: controller.tinController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      hintText: 'TIN Number'.tr,
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.grey[100],
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF1976D2),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      onPressed: () => controller.submit(),
+                                      child: Text(
+                                        'Continue'.tr,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 20),
+                        
+                        // Guest Option Card
+                        // GestureDetector(
+                        //   onTap: () {
+                        //     Get.toNamed(Routes.CALL_CLASS);
+                        //   },
+                        //   child: Container(
+                        //     width: double.infinity,
+                        //     padding: const EdgeInsets.symmetric(
+                        //       horizontal: 24,
+                        //       vertical: 35,
+                        //     ),
+                        //     decoration: BoxDecoration(
+                        //       image: DecorationImage(
+                        //         image: AssetImage(Assets.images.background.path),
+                        //         fit: BoxFit.cover,
+                        //       ),
+                        //       borderRadius: BorderRadius.circular(16),
+                        //     ),
+                        //     child: Column(
+                        //       children: [
+                        //         Icon(
+                        //           Icons.person_outline,
+                        //           size: 32,
+                        //           color: const Color(0xFF1976D2),
+                        //         ),
+                        //         const SizedBox(height: 12),
+                        //         const Text(
+                        //           'Continue as a Guest',
+                        //           style: TextStyle(
+                        //             fontSize: 15,
+                        //             fontWeight: FontWeight.w600,
+                        //             color: Color(0xFF4A4A4A),
+                        //           ),
+                        //         ),
+                        //       ],
+                        //     ),
+                        //   ),
+                        // ),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -241,6 +389,85 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IdTypeButton extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _IdTypeButton({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F9FC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFCBDCE7),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6F3FB),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 32,
+                color: const Color(0xFF0A5B95),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Color(0xFF0A5B95),
+                      fontFamily: 'DMSans',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF4F6B7E),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 20,
+              color: Color(0xFF0A5B95),
+            ),
+          ],
         ),
       ),
     );

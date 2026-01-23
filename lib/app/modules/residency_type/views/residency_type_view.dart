@@ -38,8 +38,8 @@ class FiilingClassView extends GetView<FiilingClassController> {
                 child: SizedBox(
                   height: viewportHeight,
                   child: SideInfoPanel(
-                  title: 'SMART POLICE\nSTATION',
-                  description: 'Loreim re in charge of planning and managing marketing campaigns that promote a company\'s brand. marketing campaigns that promote a company\'s brand.',
+                  title: 'SMART POLICE\nSTATION'.tr,
+                  description: 'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
                   logoAsset: Assets.images.efpLogo.path,
                   illustrationAsset: Assets.images.law.path,
                   ),
@@ -65,16 +65,15 @@ class FiilingClassView extends GetView<FiilingClassController> {
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text('Select Residency Type',
+                              children: [
+                                Text('Select Residency Type'.tr,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w800,
                                       color: Color(0xFF0F3955),
                                     )),
                                 SizedBox(height: 4),
                                 Text(
-                                  'Loreim re in charge of planning and managing marketing\n'
-                                  'campaigns that promote a company\'s brand.',
+                                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
                                   style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
                                 ),
                               ],
@@ -94,7 +93,7 @@ class FiilingClassView extends GetView<FiilingClassController> {
                           ),
                           onPressed: () => Get.back(),
                           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                          label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                          label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                         ),
                          const SizedBox(height: 16),
                     // Two selection cards
@@ -115,8 +114,8 @@ class FiilingClassView extends GetView<FiilingClassController> {
                                   height: 320,
                                   width: double.infinity,
                                   child: _ServiceCard(
-                                    title: 'Residence ID',
-                                    subtitle: 'Please Start your process using your\nResidence id / National id',
+                                    title: 'Residence'.tr,
+                                    subtitle: 'Please Start your process using your\nResidence id / National id'.tr,
                                     image: Assets.images.localResident.path,
                                   ),
                                 ),
@@ -135,8 +134,8 @@ class FiilingClassView extends GetView<FiilingClassController> {
                                   height: 320,
                                   width: double.infinity,
                                   child: _ServiceCard(
-                                    title: 'Visitor ID',
-                                    subtitle: 'If you are foreigner you can start your process\nusing your passport id',
+                                    title: 'Visitor'.tr,
+                                    subtitle: 'If you are foreigner you can start your process\nusing your passport id'.tr,
                                     image: Assets.images.visitor.path,
                                   ),
                                 ),

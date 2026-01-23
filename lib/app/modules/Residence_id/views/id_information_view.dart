@@ -87,27 +87,27 @@ class IdInformationView extends StatelessWidget {
                 children: [
                   // Table Rows
                   _buildTableRow(
-                    'ID Information',
+                    'ID Information'.tr,
                     idInfo['id'] ?? '1231235163',
                   ),
                   _buildTableRow(
-                    'Name Information',
+                    'Name Information'.tr,
                     idInfo['name'] ?? 'Abeba Shimeles Adera',
                   ),
                   _buildTableRow(
-                    'Birth Date',
+                    'Birth Date'.tr,
                     idInfo['birthDate'] ?? 'Aug 12, 2024',
                   ),
                   _buildTableRow(
-                    'Email',
+                    'Email'.tr,
                     idInfo['email'] ?? 'abeba@gmail.com',
                   ),
                   _buildTableRow(
-                    'Phone Number',
+                    'Phone Number'.tr,
                     idInfo['phoneNumber'] ?? '0913427553',
                   ),
                   _buildTableRow(
-                    'Residence Address',
+                    'Residence Address'.tr,
                     idInfo['residenceAddress'] ?? '-',
                   ),
                   
@@ -137,8 +137,8 @@ class IdInformationView extends StatelessWidget {
                         onPressed: () {
                           Get.back();
                         },
-                        child: const Text(
-                          'Cancel',
+                        child: Text(
+                          'Cancel'.tr,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -160,13 +160,13 @@ class IdInformationView extends StatelessWidget {
                           elevation: 0,
                         ),
                         onPressed: () {
-                       Get.toNamed(Routes.SERVICE_LIST);
+                       Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
                         },
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
+                          children:  [
                             Text(
-                              'Confirm',
+                              'Confirm'.tr,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,

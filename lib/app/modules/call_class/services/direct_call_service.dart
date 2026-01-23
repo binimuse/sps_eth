@@ -13,7 +13,10 @@ abstract class DirectCallService {
 
   /// Request a call (Client/User role)
   /// 
-  /// Request body: {} (empty)
+  /// Request body: {
+  ///   "isVisitor": boolean (optional),
+  ///   "preferredLanguage": string (optional)
+  /// }
   /// 
   /// Response:
   /// {
@@ -27,7 +30,7 @@ abstract class DirectCallService {
   ///   "meta": { ... }
   /// }
   @POST(Constants.directCallRequest)
-  Future<DirectCallResponseWrapper> requestCall();
+  Future<DirectCallResponseWrapper> requestCall(@Body() RequestCallRequest? request);
 
   /// Accept a call (Employee role)
   /// 
@@ -84,5 +87,39 @@ abstract class DirectCallService {
   /// ]
   @GET(Constants.directCallPending)
   Future<List<PendingCall>> getPendingCalls();
+
+  /// Get call details by session ID
+  /// 
+  /// Response:
+  /// {
+  ///   "success": true,
+  ///   "data": {
+  ///     "id": "session-uuid",
+  ///     "caller": {
+  ///       "id": "caller-uuid",
+  ///       "name": "John Doe",
+  ///       "phone": "+1234567890",
+  ///       "email": "john@example.com"
+  ///     },
+  ///     "receiver": {
+  ///       "id": "receiver-uuid",
+  ///       "name": "Jane Doe",
+  ///       "phone": "+1234567891",
+  ///       "email": "jane@example.com"
+  ///     },
+  ///     "roomName": "call-1234567890-abc123",
+  ///     "status": "ACTIVE",
+  ///     "startedAt": "2024-01-01T12:00:00Z",
+  ///     "endedAt": null,
+  ///     "createdAt": "2024-01-01T12:00:00Z",
+  ///     "updatedAt": "2024-01-01T12:00:00Z"
+  ///   },
+  ///   "meta": { ... }
+  /// }
+  @GET(Constants.directCallDetails)
+  Future<CallDetailsResponseWrapper> getCallDetails(
+    @Path('sessionId') String sessionId,
+    @Query('_t') int? timestamp, // Cache-busting parameter
+  );
 }
 

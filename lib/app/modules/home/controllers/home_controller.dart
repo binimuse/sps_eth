@@ -14,6 +14,14 @@ class HomeController extends GetxController {
 
   final RxList<String> alerts = <String>[].obs;
 
+  // Hero section images for carousel slider
+  final List<String> heroImages = [
+    'assets/images/bg4.jpg',
+    'assets/images/bg3.jpg',
+    'assets/images/bg5.jpg',
+    'assets/images/news.png',
+  ];
+
   String get heroVideoUrl =>
       'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
 
@@ -53,7 +61,7 @@ class HomeController extends GetxController {
   Future<void> onSwipeToCallComplete() async {
     try {
       // Navigate first, then show snackbar if needed (avoid overlay issues)
-      await Get.toNamed(Routes.CALL_CLASS, arguments: {'autoStart': true});
+      await Get.toNamed(Routes.CALL_CLASS, arguments: {'autoStart': true, 'isVisitor': false});
       // Note: Snackbar removed to avoid overlay issues during navigation
       // The call class will handle its own status messages
     } catch (e, stackTrace) {
@@ -89,7 +97,7 @@ class HomeController extends GetxController {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Exit App?',
+                'Exit App?'.tr,
                 style: TextStyle(
                   color: AppColors.danger,
                   fontWeight: FontWeight.bold,
@@ -99,14 +107,14 @@ class HomeController extends GetxController {
           ],
         ),
         content: Text(
-          'Are you sure you want to close the app?',
+          'Are you sure you want to close the app?'.tr,
           style: TextStyle(color: AppColors.grayDark),
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Get.back(result: false),
             child: Text(
-              'Cancel',
+              'Cancel'.tr,
               style: TextStyle(color: AppColors.primary),
             ),
           ),
@@ -116,7 +124,7 @@ class HomeController extends GetxController {
               backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Exit'),
+            child: Text('Exit'.tr),
           ),
         ],
       ),
