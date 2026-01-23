@@ -21,6 +21,10 @@
 <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+
+<!-- USB/OTG permissions for passport scanner hardware -->
+<uses-permission android:name="android.permission.USB_PERMISSION" />
+<uses-feature android:name="android.hardware.usb.host" android:required="false" />
     
     <application
         android:label="sps_eth_app"
