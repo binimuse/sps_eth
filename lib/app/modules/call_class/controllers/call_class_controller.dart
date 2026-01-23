@@ -1937,7 +1937,9 @@ class CallClassController extends GetxController {
       final response = await dio.get('$adminBaseUrl/reports/$reportId');
       
       if (response.statusCode == 200 && response.data != null) {
-        final responseData = response.data as Map<String, dynamic>;
+        final responseData = response.data is Map
+            ? Map<String, dynamic>.from(response.data as Map)
+            : <String, dynamic>{};
         print('✅ [REPORT FETCH] Report fetched successfully');
         
         // Parse response using model

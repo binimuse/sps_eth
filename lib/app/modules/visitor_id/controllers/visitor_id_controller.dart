@@ -125,7 +125,6 @@ Future<void> scanPassport() async {
       errorMessage = e.message ?? e.code;
       print('Error Code: ${e.code}');
       print('Error Message: ${e.message}');
-      print('Error Details: ${e.details}');
       
       // Show comprehensive diagnostic for INIT_FAIL_DETAILED
       if (e.code == 'INIT_FAIL_DETAILED') {
@@ -136,10 +135,22 @@ Future<void> scanPassport() async {
         
         // Extract details if available
         if (e.details != null && e.details is Map) {
-          final details = e.details as Map<String, dynamic>;
+          final details = Map<String, dynamic>.from(e.details as Map);
           print('=== FULL DIAGNOSTIC DATA ===');
           print('Error Code: ${details['errorCode']}');
-          print('Device Online: ${details['deviceOnline']}');
+          
+          // Format deviceOnline status properly (0=offline, 1=online, 2+=error/unknown)
+          final deviceOnlineStatus = details['deviceOnline'];
+          String deviceOnlineText;
+          if (deviceOnlineStatus == 1) {
+            deviceOnlineText = '✅ YES (1)';
+          } else if (deviceOnlineStatus == 0) {
+            deviceOnlineText = '❌ NO (0)';
+          } else {
+            deviceOnlineText = '⚠️ UNKNOWN ($deviceOnlineStatus)';
+          }
+          print('Device Online: $deviceOnlineText');
+          
           print('Current Device: ${details['currentDevice']}');
           print('Device Type: ${details['deviceType']}');
           print('Device SN: ${details['deviceSN']}');
