@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/promo_card.dart';
+import 'package:sps_eth_app/app/utils/enums.dart';
 import '../controllers/residence_id_controller.dart';
 
 class ResidenceIdView extends GetView<ResidenceIdController> {
@@ -83,7 +84,16 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          onPressed: () => Get.back(),
+                          onPressed: () {
+                            try {
+                              Get.back(closeOverlays: false);
+                            } catch (e) {
+                              // Fallback if Get.back fails
+                              if (Get.context != null) {
+                                Navigator.of(Get.context!).pop();
+                              }
+                            }
+                          },
                           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
                           label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                         ),
@@ -136,7 +146,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                           selectedType.isEmpty
                                           ? 'Select Your ID Type'.tr
                                           : selectedType == 'fayda'
-                                              ? 'Enter Phone Number'.tr
+                                              ? 'Enter FAN or FIN Number'.tr
                                               : selectedType == 'residence'
                                                   ? 'Enter Residence ID'.tr
                                                   : 'Enter TIN Number'.tr,
@@ -192,50 +202,214 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                 
                                 // Show input field based on selection
                                 if (selectedType == 'fayda') ...[
-                                  TextField(
-                                    controller: controller.phoneController,
-                                    keyboardType: TextInputType.phone,
-                                    decoration: InputDecoration(
-                                      hintText: 'Phone Number'.tr,
-                                      hintStyle: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.grey[100],
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 14,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF1976D2),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        elevation: 0,
-                                      ),
-                                      onPressed: () => controller.submit(),
-                                      child: Text(
-                                        'Continue'.tr,
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  Obx(() {
+                                    final isOtpSent = controller.isOtpSent.value;
+                                    final maskedMobile = controller.maskedMobile.value;
+                                    
+                                    if (isOtpSent) {
+                                      // Show OTP input
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (maskedMobile.isNotEmpty) ...[
+                                            Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE3F2FD),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.info_outline,
+                                                    color: Color(0xFF1976D2),
+                                                    size: 20,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      'OTP sent to $maskedMobile'.tr,
+                                                      style: const TextStyle(
+                                                        color: Color(0xFF1976D2),
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(height: 16),
+                                          ],
+                                          TextField(
+                                            controller: controller.otpController,
+                                            keyboardType: TextInputType.number,
+                                            maxLength: 6,
+                                            decoration: InputDecoration(
+                                              hintText: 'Enter OTP Code'.tr,
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                              ),
+                                              filled: true,
+                                              fillColor: Colors.grey[100],
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: BorderSide.none,
+                                              ),
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 14,
+                                              ),
+                                              counterText: '',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              TextButton(
+                                                onPressed: () {
+                                                  controller.isOtpSent.value = false;
+                                                  controller.otpController.clear();
+                                                },
+                                                child: Text(
+                                                  'Change FAN/FIN Number'.tr,
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF1976D2),
+                                                  ),
+                                                ),
+                                              ),
+                                              TextButton(
+                                                onPressed: () => controller.requestFaydaOtp(),
+                                                child: Text(
+                                                  'Resend OTP'.tr,
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF1976D2),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 20),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF1976D2),
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                elevation: 0,
+                                              ),
+                                              onPressed: controller.otpNetworkStatus.value == NetworkStatus.LOADING
+                                                  ? null
+                                                  : () => controller.submit(),
+                                              child: controller.otpNetworkStatus.value == NetworkStatus.LOADING
+                                                  ? const SizedBox(
+                                                      height: 20,
+                                                      width: 20,
+                                                      child: CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                      ),
+                                                    )
+                                                  : Text(
+                                                      'Verify OTP'.tr,
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    } else {
+                                      // Show FAN/FIN input
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          TextField(
+                                            controller: controller.phoneController,
+                                            keyboardType: TextInputType.number,
+                                            maxLength: 20,
+                                            decoration: InputDecoration(
+                                              hintText: 'Enter FAN or FIN Number'.tr,
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                              ),
+                                              filled: true,
+                                              fillColor: Colors.grey[100],
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: BorderSide.none,
+                                              ),
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 14,
+                                              ),
+                                              counterText: '',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Enter your 12-digit FAN (Fayda Account Number) or FIN (Fayda Identification Number)'.tr,
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          if (controller.otpError.value.isNotEmpty) ...[
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              controller.otpError.value,
+                                              style: const TextStyle(
+                                                color: Colors.red,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                          const SizedBox(height: 20),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF1976D2),
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                elevation: 0,
+                                              ),
+                                              onPressed: controller.otpNetworkStatus.value == NetworkStatus.LOADING
+                                                  ? null
+                                                  : () => controller.submit(),
+                                              child: controller.otpNetworkStatus.value == NetworkStatus.LOADING
+                                                  ? const SizedBox(
+                                                      height: 20,
+                                                      width: 20,
+                                                      child: CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                      ),
+                                                    )
+                                                  : Text(
+                                                      'Send OTP'.tr,
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }
+                                  }),
                                 ],
                                 
                                 if (selectedType == 'residence') ...[

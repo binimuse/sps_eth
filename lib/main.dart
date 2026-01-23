@@ -6,6 +6,7 @@ import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:sps_eth_app/app/app_language/translations.dart';
 import 'package:sps_eth_app/app/utils/constants.dart';
 import 'package:sps_eth_app/app/utils/prefrence_utility.dart';
+import 'package:sps_eth_app/app/utils/kiosk_machine_id_util.dart';
 import 'package:upgrader/upgrader.dart';
 import 'app/routes/app_pages.dart';
 
@@ -22,6 +23,9 @@ void main() async {
     DeviceOrientation.landscapeLeft,
   ]);
   await PreferenceUtils.init();
+
+  // Initialize and store Android ID for kiosk machine identification
+  await KioskMachineIdUtil.initializeAndStoreAndroidId();
 
   // Set default language to English if no language preference exists
   final String savedLanguage = PreferenceUtils.getString(Constants.selectedLanguage, '');

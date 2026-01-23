@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- USB device filter for passport scanner hardware -->
+    <!-- This allows the app to automatically request permission when device is connected -->
+    <!-- Add specific vendor/product IDs if known, or leave generic to catch all USB devices -->
+    <usb-device class="255" subclass="255" protocol="255" />
+</resources>

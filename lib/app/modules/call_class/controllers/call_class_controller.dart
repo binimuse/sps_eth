@@ -3,7 +3,6 @@ import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:get/get.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:sps_eth_app/app/modules/form_class/views/widget/scanning_document_view.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocket_service.dart';
 import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
@@ -18,6 +17,7 @@ import 'package:sps_eth_app/app/utils/jwt_util.dart';
 import 'package:sps_eth_app/app/utils/device_id_util.dart';
 import 'package:sps_eth_app/app/utils/connectivity_util.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
+import 'package:sps_eth_app/app/common/widgets/line_busy_dialog.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/app/modules/language/controllers/language_controller.dart';
 import 'package:sps_eth_app/app/modules/language/views/language_view.dart';
@@ -32,20 +32,6 @@ class ChatMessage {
     required this.isFromOP,
     required this.time,
   });
-}
-
-typedef ActionCallback = void Function(BuildContext context);
-
-class ActionTileConfig {
-  const ActionTileConfig({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final ActionCallback onPressed;
 }
 
 class InfoRow {
@@ -75,7 +61,11 @@ class CallClassController extends GetxController {
   TextEditingController? focusedController;
   FocusNode? focusedField = FocusNode();
 
-  final RxList<ActionTileConfig> actionTiles = <ActionTileConfig>[].obs;
+  // Progress tracking for call process
+  final RxInt currentProgressStep = 0.obs; // 0: not started, 1: connecting, 2: report initiated, 3: attachment upload
+  final RxBool isConnectingToOfficer = false.obs;
+  final RxBool isReportInitiated = false.obs;
+  final RxBool isAttachmentUploading = false.obs;
   final RxList<InfoRow> idInformation = <InfoRow>[].obs;
   final RxList<DocumentItem> supportingDocuments = <DocumentItem>[].obs;
   final RxString termsAndConditions =
@@ -143,6 +133,10 @@ class CallClassController extends GetxController {
   // Call request parameters
   bool _isVisitor = false; // Default to false (residence/home)
   String? _preferredLanguage; // Will be set if language was selected
+  
+  // Fayda ID verification data
+  final RxString faydaTransactionID = ''.obs;
+  final Rx<Map<String, dynamic>> faydaData = Rx<Map<String, dynamic>>(<String, dynamic>{});
 
   @override
   void onInit() {
@@ -150,6 +144,22 @@ class CallClassController extends GetxController {
     try {
       // Initialize connectivity monitoring
       connectivityUtil.initialize();
+      
+      // Listen to connectivity changes to auto-retry when internet comes back
+      ever(connectivityUtil.isOnline, (bool isOnline) {
+        if (isOnline) {
+          print('🌐 [CONNECTIVITY] Internet restored, checking if retry is needed...');
+          // If WebSocket is not connected, try to reconnect
+          if (_webSocketService != null && !_webSocketService!.isConnected) {
+            print('🔄 [CONNECTIVITY] WebSocket disconnected, attempting to reconnect...');
+            _connectWebSocket().catchError((e) {
+              print('❌ [CONNECTIVITY] Failed to reconnect WebSocket: $e');
+            });
+          }
+        } else {
+          print('🌐 [CONNECTIVITY] Internet disconnected');
+        }
+      });
       
       // Read arguments to determine call source and get preferred language
       final args = Get.arguments;
@@ -163,6 +173,26 @@ class CallClassController extends GetxController {
         // Get isVisitor flag (default to false if not provided)
         _isVisitor = args['isVisitor'] == true;
         print('📞 [INIT] isVisitor: $_isVisitor');
+        
+        // Get transactionID from Fayda verification (if available)
+        if (args['transactionID'] != null) {
+          faydaTransactionID.value = args['transactionID'].toString();
+          print('📞 [INIT] Fayda Transaction ID: ${faydaTransactionID.value}');
+          
+          // Auto-start call when coming from Fayda verification
+          autoStartCall.value = true;
+          print('📞 [INIT] Auto-starting call for Fayda verification');
+        }
+        
+        // Get Fayda data (if available)
+        if (args['faydaData'] != null && args['faydaData'] is Map) {
+          final faydaDataMap = Map<String, dynamic>.from(args['faydaData'] as Map);
+          faydaData.value = faydaDataMap;
+          print('📞 [INIT] Fayda Data received:');
+          print('  - Name: ${faydaDataMap['name']}');
+          print('  - Individual ID: ${faydaDataMap['individualId']}');
+          print('  - Status: ${faydaDataMap['status']}');
+        }
         
         // Get preferred language from LanguageController if available
         _preferredLanguage = _getPreferredLanguage();
@@ -473,9 +503,24 @@ class CallClassController extends GetxController {
       
       _webSocketService!.onError = (error) {
         print('❌ [WEBSOCKET ERROR] Error: $error');
+        
+        // Check if it's a network/internet error
+        final errorString = error.toString().toLowerCase();
+        final isNetworkError = errorString.contains('socketexception') ||
+            errorString.contains('failed host lookup') ||
+            errorString.contains('no address associated') ||
+            errorString.contains('network is unreachable') ||
+            errorString.contains('connection failed');
+        
+        if (isNetworkError && !connectivityUtil.isOnline.value) {
+          print('🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...');
+          // Wait for internet and retry connection
+          _waitForInternetAndRetryWebSocket();
+          return;
+        }
+        
         // Don't show error toast for auth errors, perform anonymous login instead
-        if (error.toString().toLowerCase().contains('auth') || 
-            error.toString().toLowerCase().contains('unauthorized')) {
+        if (errorString.contains('auth') || errorString.contains('unauthorized')) {
           print('🔐 [WEBSOCKET ERROR] Auth error detected, performing anonymous login');
           // Perform anonymous login
           _performAnonymousLogin().catchError((authError) {
@@ -494,10 +539,26 @@ class CallClassController extends GetxController {
       print('❌ [WEBSOCKET ERROR] Exception connecting WebSocket: $e');
       print('❌ [WEBSOCKET ERROR] Stack trace: $stackTrace');
       final errorMessage = e.toString();
+      
+      // Check if it's a network/internet error
+      final errorString = errorMessage.toLowerCase();
+      final isNetworkError = errorString.contains('socketexception') ||
+          errorString.contains('failed host lookup') ||
+          errorString.contains('no address associated') ||
+          errorString.contains('network is unreachable') ||
+          errorString.contains('connection failed');
+      
+      if (isNetworkError && !connectivityUtil.isOnline.value) {
+        print('🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...');
+        // Wait for internet and retry connection
+        await _waitForInternetAndRetryWebSocket();
+        return;
+      }
+      
       AppToasts.showError('WebSocket connection failed: $errorMessage');
-      if (errorMessage.toLowerCase().contains('auth') || 
-          errorMessage.toLowerCase().contains('token') ||
-          errorMessage.toLowerCase().contains('unauthorized')) {
+      if (errorString.contains('auth') || 
+          errorString.contains('token') ||
+          errorString.contains('unauthorized')) {
         // Try anonymous login
         try {
           await _performAnonymousLogin();
@@ -506,6 +567,60 @@ class CallClassController extends GetxController {
         }
       }
       rethrow;
+    }
+  }
+  
+  /// Wait for internet connection and retry WebSocket connection
+  Future<void> _waitForInternetAndRetryWebSocket() async {
+    try {
+      print('⏳ [WEBSOCKET RETRY] Waiting for internet connection...');
+      final internetRestored = await connectivityUtil.waitForInternet(
+        timeout: const Duration(seconds: 60),
+      );
+      
+      if (internetRestored) {
+        print('✅ [WEBSOCKET RETRY] Internet restored, retrying WebSocket connection...');
+        // Small delay to ensure connection is stable
+        await Future.delayed(const Duration(seconds: 2));
+        // Retry WebSocket connection
+        await _connectWebSocket();
+      } else {
+        print('⏰ [WEBSOCKET RETRY] Timeout waiting for internet, giving up');
+        AppToasts.showError('No internet connection. Please check your network and try again.');
+      }
+    } catch (e, stackTrace) {
+      print('❌ [WEBSOCKET RETRY] Error waiting for internet: $e');
+      print('❌ [WEBSOCKET RETRY] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to reconnect. Please check your internet connection.');
+    }
+  }
+  
+  /// Wait for internet connection and retry call request
+  Future<void> _waitForInternetAndRetryCall() async {
+    try {
+      print('⏳ [REQUEST CALL RETRY] Waiting for internet connection...');
+      final internetRestored = await connectivityUtil.waitForInternet(
+        timeout: const Duration(seconds: 60),
+      );
+      
+      if (internetRestored) {
+        print('✅ [REQUEST CALL RETRY] Internet restored, retrying call request...');
+        // Small delay to ensure connection is stable
+        await Future.delayed(const Duration(seconds: 2));
+        // Retry call request
+        await requestCall();
+      } else {
+        print('⏰ [REQUEST CALL RETRY] Timeout waiting for internet, giving up');
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        callStatus.value = 'idle';
+        AppToasts.showError('No internet connection. Please check your network and try again.');
+      }
+    } catch (e, stackTrace) {
+      print('❌ [REQUEST CALL RETRY] Error waiting for internet: $e');
+      print('❌ [REQUEST CALL RETRY] Stack trace: $stackTrace');
+      callNetworkStatus.value = NetworkStatus.ERROR;
+      callStatus.value = 'idle';
+      AppToasts.showError('Failed to reconnect. Please check your internet connection.');
     }
   }
   
@@ -601,28 +716,12 @@ class CallClassController extends GetxController {
         ),
       ]);
 
-      actionTiles.assignAll([
-        ActionTileConfig(
-          icon: Icons.document_scanner,
-          label: 'Scan Document',
-          onPressed: (context) => ScanningDocumentView.show(context),
-        ),
-        ActionTileConfig(
-          icon: Icons.person,
-          label: 'Take Photo',
-          onPressed: (_) => onTakePhoto(),
-        ),
-        ActionTileConfig(
-          icon: Icons.usb,
-          label: 'Flash  Documents',
-          onPressed: (_) => onFlashDocuments(),
-        ),
-        ActionTileConfig(
-          icon: Icons.receipt_long,
-          label: 'Payment Receipt',
-          onPressed: (_) => onPaymentReceipt(),
-        ),
-      ]);
+      // Progress will be updated via WebSocket integration later
+      // For now, initialize to step 0 (not started)
+      currentProgressStep.value = 0;
+      isConnectingToOfficer.value = false;
+      isReportInitiated.value = false;
+      isAttachmentUploading.value = false;
 
       // ID Information and documents will be loaded from call details when call is active
       // Keep empty initially, will be populated when call details are fetched
@@ -708,10 +807,47 @@ class CallClassController extends GetxController {
       print('✅ [REQUEST CALL] Permissions granted');
       print('📞 [REQUEST CALL] Calling Direct Call API...');
       
-      // Create request payload with isVisitor and preferredLanguage
+      // Extract Fayda data if available
+      final faydaDataMap = faydaData.value;
+      String? idNumber;
+      String? photoUrl;
+      String? fullname;
+      String? fullnameAm;
+      String? nationality;
+      String? phoneNumber;
+      String? address;
+      
+      if (faydaDataMap.isNotEmpty && faydaTransactionID.value.isNotEmpty) {
+        idNumber = faydaDataMap['individualId']?.toString();
+        photoUrl = faydaDataMap['photo']?.toString();
+        fullname = faydaDataMap['name']?.toString();
+        fullnameAm = faydaDataMap['nameAm']?.toString();
+        nationality = faydaDataMap['nationality']?.toString();
+        phoneNumber = faydaDataMap['phoneNumber']?.toString();
+        address = faydaDataMap['address']?.toString();
+        
+        print('📤 [REQUEST CALL] Fayda data extracted:');
+        print('  - ID Number: $idNumber');
+        print('  - Full Name: $fullname');
+        print('  - Full Name (Am): $fullnameAm');
+        print('  - Nationality: $nationality');
+        print('  - Phone: $phoneNumber');
+        print('  - Address: $address');
+        print('  - Photo URL: ${photoUrl != null ? "${photoUrl.substring(0, 20)}..." : "null"}');
+      }
+      
+      // Create request payload with isVisitor, preferredLanguage, and Fayda data
       final requestPayload = RequestCallRequest(
         isVisitor: _isVisitor,
         preferredLanguage: _preferredLanguage,
+        idNumber: idNumber,
+        idType: faydaTransactionID.value.isNotEmpty ? 'fayda' : null,
+        photoUrl: photoUrl,
+        fullname: fullname,
+        fullnameAm: fullnameAm,
+        nationality: nationality,
+        phoneNumber: phoneNumber,
+        address: address,
       );
       
       // Print request payload details
@@ -734,6 +870,26 @@ class CallClassController extends GetxController {
       print('📤 [REQUEST CALL] {');
       print('📤 [REQUEST CALL]   "isVisitor": ${requestPayload.isVisitor}');
       print('📤 [REQUEST CALL]   "preferredLanguage": ${requestPayload.preferredLanguage != null ? "\"${requestPayload.preferredLanguage}\"" : "null"}');
+      if (requestPayload.idNumber != null) {
+        print('📤 [REQUEST CALL]   "idNumber": "${requestPayload.idNumber}"');
+        print('📤 [REQUEST CALL]   "idType": "${requestPayload.idType}"');
+        print('📤 [REQUEST CALL]   "fullname": "${requestPayload.fullname}"');
+        if (requestPayload.fullnameAm != null) {
+          print('📤 [REQUEST CALL]   "fullnameAm": "${requestPayload.fullnameAm}"');
+        }
+        if (requestPayload.nationality != null) {
+          print('📤 [REQUEST CALL]   "nationality": "${requestPayload.nationality}"');
+        }
+        if (requestPayload.phoneNumber != null) {
+          print('📤 [REQUEST CALL]   "phoneNumber": "${requestPayload.phoneNumber}"');
+        }
+        if (requestPayload.address != null) {
+          print('📤 [REQUEST CALL]   "address": "${requestPayload.address}"');
+        }
+        if (requestPayload.photoUrl != null) {
+          print('📤 [REQUEST CALL]   "photoUrl": "${requestPayload.photoUrl!.substring(0, requestPayload.photoUrl!.length > 50 ? 50 : requestPayload.photoUrl!.length)}..."');
+        }
+      }
       print('📤 [REQUEST CALL] }');
       print('📤 [REQUEST CALL] ======================================');
       
@@ -825,7 +981,18 @@ class CallClassController extends GetxController {
       } else if (e.type == dio.DioExceptionType.connectionError ||
                  e.error?.toString().toLowerCase().contains('connection closed') == true ||
                  e.error?.toString().toLowerCase().contains('connection refused') == true ||
-                 e.message?.toLowerCase().contains('connection closed') == true) {
+                 e.error?.toString().toLowerCase().contains('failed host lookup') == true ||
+                 e.error?.toString().toLowerCase().contains('no address associated') == true ||
+                 e.error?.toString().toLowerCase().contains('network is unreachable') == true ||
+                 e.message?.toLowerCase().contains('connection closed') == true ||
+                 e.message?.toLowerCase().contains('failed host lookup') == true) {
+        // Check if it's an internet connectivity issue
+        if (!connectivityUtil.isOnline.value) {
+          print('🌐 [REQUEST CALL] Internet disconnected, waiting for connection to restore...');
+          // Wait for internet and retry
+          await _waitForInternetAndRetryCall();
+          return; // Exit early, retry will happen in _waitForInternetAndRetryCall
+        }
         errorMessage = 'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
         print('⚠️ [REQUEST CALL] This appears to be a backend/network issue. The server closed the connection unexpectedly.');
       } else if (e.response?.statusCode == 403) {
@@ -854,7 +1021,42 @@ class CallClassController extends GetxController {
           }
         }
       } else if (e.response?.statusCode == 503) {
-        errorMessage = 'No agents available. Please try again later.';
+        // Check if it's a "no agents available" error
+        bool isNoAgentsError = false;
+        try {
+          final responseData = e.response!.data;
+          if (responseData is Map<String, dynamic>) {
+            final error = responseData['error'];
+            if (error is Map && error.containsKey('message')) {
+              final errorMsg = error['message']?.toString().toLowerCase() ?? '';
+              if (errorMsg.contains('no connected call center agents') || 
+                  errorMsg.contains('no agents available')) {
+                isNoAgentsError = true;
+              }
+            }
+          }
+        } catch (_) {}
+        
+        if (isNoAgentsError) {
+          // Show line busy dialog instead of snackbar
+          final context = Get.context;
+          if (context != null) {
+            LineBusyDialogHelper.show(
+              context: context,
+              onTryAgain: () {
+                // Retry the call request
+                requestCall();
+              },
+            );
+          } else {
+            // Fallback to snackbar if context is not available
+            errorMessage = 'No agents available. Please try again later.';
+            AppToasts.showError(errorMessage);
+          }
+          return; // Don't show snackbar for this error
+        } else {
+          errorMessage = 'Service unavailable. Please try again later.';
+        }
       } else if (e.response != null) {
         try {
           final responseData = e.response!.data;
@@ -872,8 +1074,10 @@ class CallClassController extends GetxController {
       print('❌ [REQUEST CALL] Error message: $errorMessage');
       print('❌ [REQUEST CALL] Error type: ${e.type}');
       
-      // Show user-friendly error message
-      AppToasts.showError(errorMessage);
+      // Show user-friendly error message (only if not already shown via dialog)
+      if (errorMessage.isNotEmpty) {
+        AppToasts.showError(errorMessage);
+      }
     } catch (e, stackTrace) {
       print('❌ [REQUEST CALL] Exception: $e');
       print('❌ [REQUEST CALL] Stack trace: $stackTrace');
@@ -1757,6 +1961,7 @@ class CallClassController extends GetxController {
         
         // Always update values - create new references to ensure GetX detects changes
         // This is important in release mode where object references might be optimized
+        final oldReportSubmitted = reportInfo.value?.submitted ?? false;
         reportInfo.value = newReport;
         statementInfo.value = newStatement;
         
@@ -1772,6 +1977,16 @@ class CallClassController extends GetxController {
         if (reportChanged || newReport != null) {
           reportInfo.refresh();
           reportInfo.value = newReport; // Re-assign to trigger change
+          
+          // Auto-confirm when report is submitted (only if coming from Fayda verification)
+          final newReportSubmitted = newReport?.submitted ?? false;
+          if (!oldReportSubmitted && newReportSubmitted && faydaTransactionID.value.isNotEmpty) {
+            print('✅ [AUTO CONFIRM] Report submitted, auto-confirming for Fayda user...');
+            // Auto-confirm after a short delay to allow UI to update
+            Future.delayed(const Duration(milliseconds: 1000), () {
+              confirmReportSubmission();
+            });
+          }
         }
         
         if (newReport != null) {
@@ -1793,6 +2008,23 @@ class CallClassController extends GetxController {
     } catch (e, stackTrace) {
       print('❌ [CALL DETAILS] Error loading call details: $e');
       print('❌ [CALL DETAILS] Stack trace: $stackTrace');
+      
+      // Check if it's a network/internet error
+      final errorString = e.toString().toLowerCase();
+      final isNetworkError = errorString.contains('socketexception') ||
+          errorString.contains('failed host lookup') ||
+          errorString.contains('no address associated') ||
+          errorString.contains('network is unreachable') ||
+          errorString.contains('connection failed') ||
+          (e is dio.DioException && 
+           (e.type == dio.DioExceptionType.connectionError ||
+            e.type == dio.DioExceptionType.connectionTimeout));
+      
+      if (isNetworkError && !connectivityUtil.isOnline.value) {
+        print('🌐 [CALL DETAILS] Network error detected, will retry when internet comes back');
+        // Don't retry immediately - the polling will retry automatically when internet comes back
+        // The connectivity listener will trigger a retry
+      }
       // Don't show error toast - this is a background operation
     } finally {
       _isLoadingCallDetails = false;
@@ -1924,6 +2156,67 @@ class CallClassController extends GetxController {
       Future.delayed(const Duration(milliseconds: 500), () {
         Get.offAllNamed(Routes.HOME);
       });
+    }
+  }
+  
+  /// Confirm report submission - navigate to confirmation page and end call
+  Future<void> confirmReportSubmission() async {
+    try {
+      final reportId = reportInfo.value?.id;
+      if (reportId == null || reportId.isEmpty) {
+        AppToasts.showError('Report ID not found');
+        return;
+      }
+      
+      print('✅ [REPORT CONFIRM] Confirming report submission: $reportId');
+      
+      // Fetch and show report in confirmation page
+      await _fetchAndShowReport(reportId);
+      
+      // End the call after showing confirmation page (without navigation since we're already showing confirmation page)
+      await disconnectFromRoom();
+      callStatus.value = 'ended';
+      
+      // Clear call details
+      callDetails.value = null;
+      reportInfo.value = null;
+      statementInfo.value = null;
+      
+      currentSessionId.value = '';
+      currentRoomName.value = '';
+      currentWsUrl.value = '';
+      
+      // Stop polling
+      _stopCallDetailsPolling();
+      
+      print('✅ [REPORT CONFIRM] Call ended and confirmation page shown');
+    } catch (e, stackTrace) {
+      print('❌ [REPORT CONFIRM] Error confirming report: $e');
+      print('❌ [REPORT CONFIRM] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to confirm report: ${e.toString()}');
+    }
+  }
+  
+  /// Reject report submission - stay on page (API integration to be added later)
+  Future<void> rejectReportSubmission() async {
+    try {
+      final reportId = reportInfo.value?.id;
+      if (reportId == null || reportId.isEmpty) {
+        AppToasts.showError('Report ID not found');
+        return;
+      }
+      
+      print('❌ [REPORT REJECT] Rejecting report submission: $reportId');
+      
+      // TODO: Integrate API call to reject report
+      // For now, just show a message and stay on the page
+      AppToasts.showWarning('Report rejection will be processed. API integration pending.');
+      
+      // Stay on the page - no navigation
+    } catch (e, stackTrace) {
+      print('❌ [REPORT REJECT] Error rejecting report: $e');
+      print('❌ [REPORT REJECT] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to reject report: ${e.toString()}');
     }
   }
   

@@ -1,5 +1,13 @@
 package com.sps.eth.sps_eth_app
 
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +22,121 @@ class MainActivity : FlutterActivity() {
 
     private val CHANNEL = "passport_scanner"
     private val TAG = "PassportScanner"
+    private val ACTION_USB_PERMISSION = "com.sps.eth.sps_eth_app.USB_PERMISSION"
+    
+    private val usbPermissionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (ACTION_USB_PERMISSION == intent.action) {
+                synchronized(this) {
+                    val device: UsbDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+                    }
+                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        device?.apply {
+                            Log.d(TAG, "USB permission granted for device: $deviceName")
+                        }
+                    } else {
+                        Log.e(TAG, "USB permission denied for device: ${device?.deviceName}")
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Register USB permission receiver
+        // Android 13+ (API 33) requires RECEIVER_EXPORTED or RECEIVER_NOT_EXPORTED
+        val filter = IntentFilter(ACTION_USB_PERMISSION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ requires explicit flag
+            registerReceiver(usbPermissionReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            // Android 12 and below - no flag needed
+            registerReceiver(usbPermissionReceiver, filter)
+        }
+        
+        // Also register for USB device attached events
+        val usbAttachedFilter = IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbPermissionReceiver, usbAttachedFilter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(usbPermissionReceiver, usbAttachedFilter)
+        }
+        
+        // Request USB permissions for connected devices
+        requestUSBPermissions()
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(usbPermissionReceiver)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error unregistering USB receiver: ${e.message}")
+        }
+    }
+    
+    private fun requestUSBPermissions() {
+        try {
+            val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+            if (usbManager == null) {
+                Log.e(TAG, "USB service not available")
+                return
+            }
+            
+            val deviceList = usbManager.deviceList
+            Log.d(TAG, "Found ${deviceList.size} USB device(s) on Android ${Build.VERSION.SDK_INT}")
+            
+            if (deviceList.isEmpty()) {
+                Log.w(TAG, "No USB devices found. Check:")
+                Log.w(TAG, "  1. USB/OTG cable connected")
+                Log.w(TAG, "  2. Scanner powered on")
+                Log.w(TAG, "  3. USB host mode enabled")
+                return
+            }
+            
+            for (device in deviceList.values) {
+                val hasPermission = usbManager.hasPermission(device)
+                Log.d(TAG, "Device: ${device.deviceName}")
+                Log.d(TAG, "  VID: ${device.vendorId}, PID: ${device.productId}")
+                Log.d(TAG, "  Has Permission: $hasPermission")
+                
+                if (!hasPermission) {
+                    Log.d(TAG, "Requesting USB permission for: ${device.deviceName}")
+                    
+                    // Android 12+ requires FLAG_IMMUTABLE for PendingIntent
+                    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        PendingIntent.FLAG_IMMUTABLE
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        PendingIntent.FLAG_IMMUTABLE
+                    } else {
+                        @Suppress("DEPRECATION", "UnspecifiedImmutableFlag")
+                        0
+                    }
+                    
+                    val permissionIntent = PendingIntent.getBroadcast(
+                        this, 0,
+                        Intent(ACTION_USB_PERMISSION).apply {
+                            putExtra(UsbManager.EXTRA_DEVICE, device)
+                        },
+                        flags
+                    )
+                    
+                    usbManager.requestPermission(device, permissionIntent)
+                    Log.d(TAG, "USB permission request sent for: ${device.deviceName}")
+                } else {
+                    Log.d(TAG, "✅ USB permission already granted for: ${device.deviceName}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error requesting USB permissions: ${e.message}", e)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -36,6 +159,42 @@ class MainActivity : FlutterActivity() {
                         status["sdkLoaded"] = true
                         status["assetsCopied"] = kernelPath != null
                         status["assetsPath"] = kernelPath ?: "Failed"
+                        
+                        // Get USB device information
+                        try {
+                            val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+                            if (usbManager != null) {
+                                val deviceList = usbManager.deviceList
+                                if (deviceList.isNotEmpty()) {
+                                    val usbDevices = mutableListOf<Map<String, Any>>()
+                                    for (device in deviceList.values) {
+                                        val hasPermission = usbManager.hasPermission(device)
+                                        val deviceInfo = hashMapOf<String, Any>(
+                                            "name" to (device.deviceName ?: "Unknown"),
+                                            "vendorId" to device.vendorId,
+                                            "vendorIdHex" to "0x${device.vendorId.toString(16).uppercase()}",
+                                            "productId" to device.productId,
+                                            "productIdHex" to "0x${device.productId.toString(16).uppercase()}",
+                                            "deviceClass" to device.deviceClass,
+                                            "hasPermission" to hasPermission
+                                        )
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                            deviceInfo["manufacturer"] = device.manufacturerName ?: "Unknown"
+                                            deviceInfo["product"] = device.productName ?: "Unknown"
+                                            deviceInfo["serial"] = device.serialNumber ?: "Unknown"
+                                        }
+                                        usbDevices.add(deviceInfo)
+                                    }
+                                    status["usbDevices"] = usbDevices
+                                    status["usbDeviceCount"] = deviceList.size
+                                } else {
+                                    status["usbDevices"] = emptyList<Map<String, Any>>()
+                                    status["usbDeviceCount"] = 0
+                                }
+                            }
+                        } catch (e: Exception) {
+                            status["usbDeviceError"] = e.message ?: "Unknown error"
+                        }
                         
                         if (kernelPath != null) {
                             val configFile = File(kernelPath + "IDCardConfig.ini")
@@ -226,7 +385,46 @@ class MainActivity : FlutterActivity() {
                             }
                             diagnostics.append("Meaning: $errorExplanation\n\n")
                             
-                            // Try to get device information even if init failed
+                            // Get USB device information
+                            val usbDeviceInfo = StringBuilder()
+                            try {
+                                val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+                                if (usbManager != null) {
+                                    val deviceList = usbManager.deviceList
+                                    if (deviceList.isNotEmpty()) {
+                                        usbDeviceInfo.append("📱 USB DEVICE INFORMATION:\n")
+                                        for ((index, device) in deviceList.values.withIndex()) {
+                                            val hasPermission = usbManager.hasPermission(device)
+                                            usbDeviceInfo.append("Device ${index + 1}:\n")
+                                            usbDeviceInfo.append("  Name: ${device.deviceName}\n")
+                                            usbDeviceInfo.append("  VID: 0x${device.vendorId.toString(16).uppercase()} (${device.vendorId})\n")
+                                            usbDeviceInfo.append("  PID: 0x${device.productId.toString(16).uppercase()} (${device.productId})\n")
+                                            usbDeviceInfo.append("  Class: ${device.deviceClass}\n")
+                                            usbDeviceInfo.append("  Subclass: ${device.deviceSubclass}\n")
+                                            usbDeviceInfo.append("  Protocol: ${device.deviceProtocol}\n")
+                                            usbDeviceInfo.append("  Permission: ${if (hasPermission) "✅ Granted" else "❌ Not granted"}\n")
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                                usbDeviceInfo.append("  Manufacturer: ${device.manufacturerName ?: "Unknown"}\n")
+                                                usbDeviceInfo.append("  Product: ${device.productName ?: "Unknown"}\n")
+                                                usbDeviceInfo.append("  Serial: ${device.serialNumber ?: "Unknown"}\n")
+                                            }
+                                            usbDeviceInfo.append("\n")
+                                        }
+                                    } else {
+                                        usbDeviceInfo.append("📱 USB DEVICE INFORMATION:\n")
+                                        usbDeviceInfo.append("❌ No USB devices detected\n")
+                                        usbDeviceInfo.append("Check USB/OTG connection\n\n")
+                                    }
+                                } else {
+                                    usbDeviceInfo.append("📱 USB DEVICE INFORMATION:\n")
+                                    usbDeviceInfo.append("❌ USB service not available\n\n")
+                                }
+                            } catch (e: Exception) {
+                                usbDeviceInfo.append("📱 USB DEVICE INFORMATION:\n")
+                                usbDeviceInfo.append("❌ Error: ${e.message}\n\n")
+                            }
+                            
+                            // Try to get SDK device information even if init failed
                             var deviceOnline = -1
                             var currentDevice = "Unknown"
                             var deviceType = -1
@@ -241,8 +439,11 @@ class MainActivity : FlutterActivity() {
                                 currentDevice = "Error: ${e.message}"
                             }
                             
-                            // Device status
-                            diagnostics.append("🔌 DEVICE STATUS:\n")
+                            // Add USB device info to diagnostics
+                            diagnostics.append(usbDeviceInfo.toString())
+                            
+                            // SDK Device status
+                            diagnostics.append("🔌 SDK DEVICE STATUS:\n")
                             diagnostics.append("Device Online: ${if (deviceOnline == 1) "✅ YES" else "❌ NO ($deviceOnline)"}\n")
                             diagnostics.append("Current Device: $currentDevice\n")
                             diagnostics.append("Device Type: $deviceType\n")
