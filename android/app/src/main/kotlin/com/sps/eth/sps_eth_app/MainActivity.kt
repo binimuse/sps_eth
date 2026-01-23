@@ -53,9 +53,15 @@ class MainActivity : FlutterActivity() {
                                 try {
                                     val deviceOnline = api.CheckDeviceOnlineEx()
                                     val currentDevice = api.GetCurrentDevice()
+                                    val deviceType = api.GetDeviceType()
+                                    val deviceSN = api.GetDeviceSN()
+                                    
                                     status["deviceOnline"] = deviceOnline == 1
                                     status["currentDevice"] = currentDevice ?: "None"
+                                    status["deviceType"] = deviceType
+                                    status["deviceSN"] = deviceSN ?: "None"
                                     status["hardwareDetected"] = deviceOnline == 1
+                                    
                                     api.FreeIDCard()
                                 } catch (e: Exception) {
                                     status["deviceOnline"] = false
@@ -65,14 +71,39 @@ class MainActivity : FlutterActivity() {
                                     api.FreeIDCard()
                                 }
                             } else {
-                                // Initialization failed - expected on tablet
-                                status["deviceOnline"] = false
-                                status["currentDevice"] = "Hardware not detected (Expected on tablet)"
-                                status["hardwareDetected"] = false
+                                // Initialization failed - try to check device anyway
                                 status["initErrorCode"] = initRet
                                 status["initErrorMessage"] = when (initRet) {
-                                    2 -> "Device initialization failed - Hardware required"
+                                    2 -> "Device initialization failed - Check USB connection and permissions"
                                     else -> "Initialization failed with code: $initRet"
+                                }
+                                
+                                // Try to check device even if init failed
+                                try {
+                                    val deviceOnline = api.CheckDeviceOnlineEx()
+                                    val currentDevice = api.GetCurrentDevice()
+                                    val deviceType = api.GetDeviceType()
+                                    val deviceSN = api.GetDeviceSN()
+                                    
+                                    status["deviceOnline"] = deviceOnline == 1
+                                    status["currentDevice"] = currentDevice ?: "None"
+                                    status["deviceType"] = deviceType
+                                    status["deviceSN"] = deviceSN ?: "None"
+                                    status["hardwareDetected"] = deviceOnline == 1
+                                    
+                                    if (deviceOnline == 1 || !currentDevice.isNullOrEmpty()) {
+                                        status["initErrorMessage"] = "Device detected but initialization failed - Check permissions/license"
+                                    } else {
+                                        status["hardwareDetected"] = false
+                                        if (initRet == 2) {
+                                            status["initErrorMessage"] = "Hardware not detected - Check USB connection"
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    status["deviceOnline"] = false
+                                    status["currentDevice"] = "Cannot check (init failed)"
+                                    status["hardwareDetected"] = false
+                                    status["deviceCheckError"] = e.message ?: "Unknown"
                                 }
                             }
                         }
@@ -106,84 +137,179 @@ class MainActivity : FlutterActivity() {
 
                         Log.d(TAG, "Assets copied to: $kernelPath")
 
-                        // Check device availability BEFORE initialization (if SDK supports it)
-                        // Note: Some SDK versions require initialization first
-                        Log.d(TAG, "Checking device availability...")
-                        try {
-                            val deviceOnline = api.CheckDeviceOnlineEx()
-                            val currentDevice = api.GetCurrentDevice()
-                            Log.d(TAG, "Device online check: $deviceOnline")
-                            Log.d(TAG, "Current device: $currentDevice")
-                            
-                            if (deviceOnline == 0) {
-                                Log.w(TAG, "⚠️ No scanner hardware detected - This is expected on tablet/emulator")
-                                Log.w(TAG, "⚠️ Real scanning requires SPS Smart Police Station hardware")
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Device check methods not available or require initialization first: ${e.message}")
-                        }
-
-                        // Initialize SDK
+                        // Initialize SDK FIRST (required before device check)
                         Log.d(TAG, "Initializing SDK...")
                         val initRet = api.InitIDCard("", 1, kernelPath)
                         Log.d(TAG, "InitIDCard returned: $initRet")
+                        
+                        // If initialization fails, try to get more info
+                        if (initRet != 0) {
+                            Log.e(TAG, "SDK initialization failed with code: $initRet")
+                            
+                            // Try to check device status even if init failed (some SDKs allow this)
+                            try {
+                                val deviceOnline = api.CheckDeviceOnlineEx()
+                                val currentDevice = api.GetCurrentDevice()
+                                val deviceType = api.GetDeviceType()
+                                val deviceSN = api.GetDeviceSN()
+                                
+                                Log.d(TAG, "Device check after failed init:")
+                                Log.d(TAG, "  - Device online: $deviceOnline")
+                                Log.d(TAG, "  - Current device: $currentDevice")
+                                Log.d(TAG, "  - Device type: $deviceType")
+                                Log.d(TAG, "  - Device SN: $deviceSN")
+                                
+                                if (deviceOnline == 1 || !currentDevice.isNullOrEmpty()) {
+                                    Log.w(TAG, "⚠️ Device detected but initialization still failed!")
+                                    Log.w(TAG, "⚠️ This might indicate:")
+                                    Log.w(TAG, "   1. USB/OTG permissions not granted")
+                                    Log.w(TAG, "   2. Device driver not loaded")
+                                    Log.w(TAG, "   3. Device not properly connected")
+                                    Log.w(TAG, "   4. License/authorization issue")
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Device check failed: ${e.message}")
+                            }
+                        } else {
+                            // SDK initialized successfully - check device
+                            Log.d(TAG, "SDK initialized successfully, checking device...")
+                            try {
+                                val deviceOnline = api.CheckDeviceOnlineEx()
+                                val currentDevice = api.GetCurrentDevice()
+                                val deviceType = api.GetDeviceType()
+                                val deviceSN = api.GetDeviceSN()
+                                
+                                Log.d(TAG, "Device Status:")
+                                Log.d(TAG, "  - Device online: $deviceOnline")
+                                Log.d(TAG, "  - Current device: $currentDevice")
+                                Log.d(TAG, "  - Device type: $deviceType")
+                                Log.d(TAG, "  - Device SN: $deviceSN")
+                                
+                                if (deviceOnline == 0) {
+                                    Log.w(TAG, "⚠️ Device online check returned 0 (not detected)")
+                                    Log.w(TAG, "⚠️ Check:")
+                                    Log.w(TAG, "   1. USB/OTG cable connected")
+                                    Log.w(TAG, "   2. Scanner powered on")
+                                    Log.w(TAG, "   3. USB permissions granted")
+                                    Log.w(TAG, "   4. Device drivers installed")
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error checking device: ${e.message}", e)
+                            }
+                        }
 
                         if (initRet != 0) {
-                            val errorMsg = when (initRet) {
-                                1 -> "Authorization ID is incorrect"
-                                2 -> {
-                                    // Error code 2 = Device initialization failed
-                                    // This is EXPECTED on tablet/emulator without hardware
-                                    val diagnostic = """
-                                        ⚠️ Device initialization failed (Error Code: 2)
-                                        
-                                        This is NORMAL if testing on:
-                                        - Android tablet (no scanner hardware)
-                                        - Android emulator
-                                        - Device without SPS scanner connected
-                                        
-                                        ✅ This WILL work on:
-                                        - SPS Smart Police Station kiosk
-                                        - Device with scanner hardware connected
-                                        
-                                        📋 SDK Status:
-                                        - Native libraries loaded: ✅
-                                        - Assets copied: ✅
-                                        - SDK initialized: ❌ (requires hardware)
-                                        
-                                        💡 To verify on real hardware:
-                                        1. Connect SPS scanner via USB/OTG
-                                        2. Ensure scanner is powered on
-                                        3. Check device manager for scanner device
-                                    """.trimIndent()
-                                    Log.w(TAG, diagnostic)
-                                    "Device initialization failed - Hardware scanner required (Expected on tablet)"
-                                }
-                                3 -> "Recognition engine initialization failed - Check assets folder"
-                                4 -> "Authorization files not found - Check license files"
-                                5 -> "Failed to load templates - Check model files in assets"
-                                6 -> "Chip reader initialization failed"
-                                7 -> "Chinese ID card reader initialization failed"
-                                else -> "Initialization failed with code: $initRet"
-                            }
-                            Log.e(TAG, "InitIDCard failed: $errorMsg")
+                            // Build comprehensive diagnostic information
+                            val diagnostics = StringBuilder()
+                            diagnostics.append("=== SDK DIAGNOSTIC REPORT ===\n\n")
                             
-                            // For error code 2, provide more helpful message
-                            if (initRet == 2) {
-                                val diagnosticData = hashMapOf<String, String>(
-                                    "errorCode" to "2",
-                                    "errorMessage" to errorMsg,
-                                    "isTabletTest" to "true",
-                                    "requiresHardware" to "true",
-                                    "sdkLoaded" to "true",
-                                    "assetsCopied" to "true",
-                                    "message" to "This error is EXPECTED on tablet. It WILL work on SPS kiosk hardware."
-                                )
-                                Handler(Looper.getMainLooper()).post {
-                                    result.error("INIT_FAIL_HARDWARE_REQUIRED", errorMsg, diagnosticData)
+                            // Basic status
+                            diagnostics.append("📋 INITIALIZATION STATUS:\n")
+                            diagnostics.append("InitIDCard Result: $initRet\n")
+                            diagnostics.append("Assets Path: $kernelPath\n")
+                            
+                            val configFile = File(kernelPath + "IDCardConfig.ini")
+                            diagnostics.append("Config File: ${if (configFile.exists()) "✅ Found" else "❌ Missing"}\n")
+                            diagnostics.append("Config Path: ${configFile.absolutePath}\n\n")
+                            
+                            // Error code explanation
+                            diagnostics.append("❌ ERROR CODE: $initRet\n")
+                            val errorExplanation = when (initRet) {
+                                1 -> "Authorization ID incorrect"
+                                2 -> "Device initialization failed"
+                                3 -> "Recognition engine init failed"
+                                4 -> "Authorization files not found"
+                                5 -> "Failed to load templates"
+                                6 -> "Chip reader init failed"
+                                7 -> "Chinese ID card reader init failed"
+                                else -> "Unknown error"
+                            }
+                            diagnostics.append("Meaning: $errorExplanation\n\n")
+                            
+                            // Try to get device information even if init failed
+                            var deviceOnline = -1
+                            var currentDevice = "Unknown"
+                            var deviceType = -1
+                            var deviceSN = "Unknown"
+                            
+                            try {
+                                deviceOnline = api.CheckDeviceOnlineEx()
+                                currentDevice = api.GetCurrentDevice() ?: "None"
+                                deviceType = api.GetDeviceType()
+                                deviceSN = api.GetDeviceSN() ?: "None"
+                            } catch (e: Exception) {
+                                currentDevice = "Error: ${e.message}"
+                            }
+                            
+                            // Device status
+                            diagnostics.append("🔌 DEVICE STATUS:\n")
+                            diagnostics.append("Device Online: ${if (deviceOnline == 1) "✅ YES" else "❌ NO ($deviceOnline)"}\n")
+                            diagnostics.append("Current Device: $currentDevice\n")
+                            diagnostics.append("Device Type: $deviceType\n")
+                            diagnostics.append("Device SN: $deviceSN\n\n")
+                            
+                            // Recommendations based on error code
+                            diagnostics.append("💡 RECOMMENDATIONS:\n")
+                            when (initRet) {
+                                2 -> {
+                                    if (deviceOnline == 1 || currentDevice != "None" && currentDevice != "Unknown") {
+                                        diagnostics.append("⚠️ Device DETECTED but init failed!\n")
+                                        diagnostics.append("Possible causes:\n")
+                                        diagnostics.append("1. USB permissions not granted\n")
+                                        diagnostics.append("2. Device driver not loaded\n")
+                                        diagnostics.append("3. License/authorization issue\n")
+                                        diagnostics.append("4. Device not properly initialized\n")
+                                    } else {
+                                        diagnostics.append("⚠️ Device NOT detected\n")
+                                        diagnostics.append("Check:\n")
+                                        diagnostics.append("1. USB/OTG cable connected?\n")
+                                        diagnostics.append("2. Scanner powered on?\n")
+                                        diagnostics.append("3. USB host mode enabled?\n")
+                                        diagnostics.append("4. USB permissions granted?\n")
+                                    }
                                 }
-                            } else {
-                                postError(result, "INIT_FAIL", errorMsg)
+                                4 -> {
+                                    diagnostics.append("Check license files:\n")
+                                    val licenseFile = File(kernelPath + "IDCardLicense.dat")
+                                    diagnostics.append("License file: ${if (licenseFile.exists()) "✅ Found" else "❌ Missing"}\n")
+                                }
+                                5 -> {
+                                    diagnostics.append("Check model files in assets folder\n")
+                                    diagnostics.append("Assets path: $kernelPath\n")
+                                }
+                                else -> {
+                                    diagnostics.append("Check SDK documentation for error code: $initRet\n")
+                                }
+                            }
+                            
+                            diagnostics.append("\n📁 FILES STATUS:\n")
+                            diagnostics.append("Assets copied: ✅\n")
+                            diagnostics.append("Config exists: ${if (configFile.exists()) "✅" else "❌"}\n")
+                            
+                            val licenseFile = File(kernelPath + "IDCardLicense.dat")
+                            diagnostics.append("License exists: ${if (licenseFile.exists()) "✅" else "❌"}\n")
+                            
+                            val deviceFile = File(kernelPath + "IDCardDevice.dat")
+                            diagnostics.append("Device file exists: ${if (deviceFile.exists()) "✅" else "❌"}\n")
+                            
+                            val fullDiagnostic = diagnostics.toString()
+                            Log.e(TAG, fullDiagnostic)
+                            
+                            // Return comprehensive error with all diagnostics
+                            val diagnosticData = hashMapOf<String, Any>(
+                                "errorCode" to initRet.toString(),
+                                "errorExplanation" to errorExplanation,
+                                "deviceOnline" to deviceOnline,
+                                "currentDevice" to currentDevice,
+                                "deviceType" to deviceType.toString(),
+                                "deviceSN" to deviceSN,
+                                "assetsPath" to kernelPath,
+                                "configExists" to configFile.exists().toString(),
+                                "fullDiagnostic" to fullDiagnostic
+                            )
+                            
+                            Handler(Looper.getMainLooper()).post {
+                                result.error("INIT_FAIL_DETAILED", fullDiagnostic, diagnosticData)
                             }
                             return@Thread
                         }

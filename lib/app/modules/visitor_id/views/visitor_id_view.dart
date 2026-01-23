@@ -122,7 +122,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
               color: Color(0xFF9E9E9E),
             ),
           ),
-                        const SizedBox(height: 20),
+          const SizedBox(height: 20),
                         
                         // Check SDK Status Button (for testing)
                         TextButton.icon(
@@ -135,8 +135,8 @@ class VisitorIdView extends GetView<VisitorIdController> {
                             foregroundColor: Colors.blue[700],
                           ),
                         ),
-                        
-                        // Scanner View Area
+          
+          // Scanner View Area
           Container(
             height: 250,
             width: double.infinity,
@@ -307,10 +307,120 @@ class VisitorIdView extends GetView<VisitorIdController> {
             return const SizedBox.shrink();
           }),
           
+          // Error Display (if any error occurred)
+          Obx(() {
+            if (controller.scanError.value.isNotEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.withOpacity(0.3), width: 2),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red, size: 24),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Error Details',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => controller.scanError.value = '',
+                          color: Colors.red,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      child: Text(
+                        controller.diagnosticLog.value.isNotEmpty 
+                            ? controller.diagnosticLog.value 
+                            : controller.scanError.value,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          color: Colors.black87,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          // Show full error in dialog
+                          Get.dialog(
+                            Dialog(
+                              child: Container(
+                                constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'Full Diagnostic Report',
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        child: Text(
+                                          controller.diagnosticLog.value.isNotEmpty 
+                                              ? controller.diagnosticLog.value 
+                                              : controller.scanError.value,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontFamily: 'monospace',
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: () => Get.back(),
+                                      child: const Text('Close'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.visibility, size: 18),
+                        label: const Text('View Full Report'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
+          
+          const SizedBox(height: 20),
+          
           // Scan Button
           Obx(() => SizedBox(
-  width: double.infinity,
-  child: ElevatedButton.icon(
+            width: double.infinity,
+            child: ElevatedButton.icon(
     onPressed: controller.isScanning.value
         ? null
         : () async {
@@ -336,7 +446,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
             );
           }
           // Error handling is done in controller via snackbar
-          },
+              },
     icon: controller.isScanning.value
         ? const SizedBox(
             width: 20,
@@ -347,25 +457,25 @@ class VisitorIdView extends GetView<VisitorIdController> {
             ),
           )
         : const Icon(Icons.camera_alt, size: 20),
-    label: Text(
+              label: Text(
       controller.isScanning.value
           ? 'Scanning...'.tr
           : 'Scan Passport'.tr,
       style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-    style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFF1976D2),
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      elevation: 0,
-    ),
-  ),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1976D2),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
 )),
 
           const SizedBox(height: 20),

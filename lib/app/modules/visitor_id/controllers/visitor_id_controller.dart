@@ -23,6 +23,9 @@ final passportData = <String, dynamic>{}.obs;
 // Error message
 final scanError = ''.obs;
 
+// Detailed diagnostic log for on-screen display
+final diagnosticLog = ''.obs;
+
 var passportNumber = ''.obs;
 var fullName = ''.obs;
 var nationality = ''.obs;
@@ -124,8 +127,26 @@ Future<void> scanPassport() async {
       print('Error Message: ${e.message}');
       print('Error Details: ${e.details}');
       
-      // Special handling for hardware required error
-      if (e.code == 'INIT_FAIL_HARDWARE_REQUIRED') {
+      // Show comprehensive diagnostic for INIT_FAIL_DETAILED
+      if (e.code == 'INIT_FAIL_DETAILED') {
+        title = 'SDK Diagnostic Report';
+        errorMessage = e.message ?? 'Initialization failed';
+        snackbarColor = Colors.red;
+        duration = 15; // Longer duration to read all info
+        
+        // Extract details if available
+        if (e.details != null && e.details is Map) {
+          final details = e.details as Map<String, dynamic>;
+          print('=== FULL DIAGNOSTIC DATA ===');
+          print('Error Code: ${details['errorCode']}');
+          print('Device Online: ${details['deviceOnline']}');
+          print('Current Device: ${details['currentDevice']}');
+          print('Device Type: ${details['deviceType']}');
+          print('Device SN: ${details['deviceSN']}');
+          print('Assets Path: ${details['assetsPath']}');
+          print('Config Exists: ${details['configExists']}');
+        }
+      } else if (e.code == 'INIT_FAIL_HARDWARE_REQUIRED') {
         title = 'Hardware Required';
         errorMessage = '''
 ⚠️ Scanner hardware not detected
@@ -152,6 +173,12 @@ This is EXPECTED when testing on:
         errorMessage = 'Scanner hardware not detected. This is normal on tablet - will work on SPS kiosk!';
         snackbarColor = Colors.orange;
         duration = 6;
+      } else if (e.code == 'INIT_FAIL') {
+        // Show full error message for any INIT_FAIL
+        title = 'Initialization Failed';
+        errorMessage = e.message ?? 'Unknown initialization error';
+        snackbarColor = Colors.red;
+        duration = 10;
       }
     } else {
       errorMessage = e.toString();
@@ -159,13 +186,23 @@ This is EXPECTED when testing on:
     
     scanError.value = errorMessage;
     
-    // Show error message using BotToast (safer than Get.snackbar)
+    // Store full diagnostic for on-screen display
+    if (e is PlatformException && e.code == 'INIT_FAIL_DETAILED') {
+      diagnosticLog.value = errorMessage; // This contains the full diagnostic report
+    } else {
+      diagnosticLog.value = '$title\n\n$errorMessage';
+    }
+    
+    // Show error in a dialog for better visibility (instead of toast)
+    _showErrorDialog(title, errorMessage, snackbarColor);
+    
+    // Also show toast as backup
     BotToast.showText(
-      text: '$title\n$errorMessage',
+      text: '$title\n\n$errorMessage',
       contentColor: snackbarColor,
-      textStyle: const TextStyle(color: Colors.white, fontSize: 14),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 12),
       duration: Duration(seconds: duration),
-      align: Alignment.bottomCenter,
+      align: Alignment.center,
     );
   } finally {
     isScanning.value = false;
@@ -186,6 +223,76 @@ This is EXPECTED when testing on:
     focusedController = textController;
     keyboardController.text = textController.text;
     keyboardController.selection = textController.selection;
+  }
+
+  void _showErrorDialog(String title, String message, Color color) {
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Title
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Get.back(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Error message (scrollable)
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontFamily: 'monospace',
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Close button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Get.back(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: color,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Close', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: true,
+    );
   }
 }
 

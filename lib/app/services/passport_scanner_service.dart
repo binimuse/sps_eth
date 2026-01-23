@@ -35,7 +35,7 @@ class PassportScannerService {
       final result = await _channel.invokeMethod('scanPassport');
       
       if (result is Map) {
-        return Map<String, dynamic>.from(result);
+      return Map<String, dynamic>.from(result);
       } else {
         throw PlatformException(
           code: 'INVALID_RESULT',
