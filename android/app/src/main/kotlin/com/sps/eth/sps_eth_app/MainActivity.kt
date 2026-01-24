@@ -393,12 +393,68 @@ class MainActivity : FlutterActivity() {
                                     val deviceList = usbManager.deviceList
                                     if (deviceList.isNotEmpty()) {
                                         usbDeviceInfo.append("📱 USB DEVICE INFORMATION:\n")
+                                        usbDeviceInfo.append("Found ${deviceList.size} USB device(s)\n\n")
                                         for ((index, device) in deviceList.values.withIndex()) {
                                             val hasPermission = usbManager.hasPermission(device)
                                             usbDeviceInfo.append("Device ${index + 1}:\n")
                                             usbDeviceInfo.append("  Name: ${device.deviceName}\n")
                                             usbDeviceInfo.append("  VID: 0x${device.vendorId.toString(16).uppercase()} (${device.vendorId})\n")
                                             usbDeviceInfo.append("  PID: 0x${device.productId.toString(16).uppercase()} (${device.productId})\n")
+                                            
+                                            // Check if it's a known scanner
+                                            val vidHex = device.vendorId.toString(16).uppercase().padStart(4, '0')
+                                            val pidHex = device.productId.toString(16).uppercase().padStart(4, '0')
+                                            when {
+                                                device.vendorId == 0x0638 -> {
+                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: SINOSECU Scanner (VID 0638)\n")
+                                                    when (device.productId) {
+                                                        0x0AD7 -> usbDeviceInfo.append("     Model: AVA5\n")
+                                                        0x1A2A -> usbDeviceInfo.append("     Model: AVA5 Plus\n")
+                                                        0x2D53 -> usbDeviceInfo.append("     Model: AVA5+\n")
+                                                        0x0A7E -> usbDeviceInfo.append("     Model: AVA6\n")
+                                                        0x2DE9 -> usbDeviceInfo.append("     Model: AVA6 Plus2\n")
+                                                        0x2B14 -> usbDeviceInfo.append("     Model: AW570\n")
+                                                        0x1A76 -> usbDeviceInfo.append("     Model: B660\n")
+                                                        0x2E2A -> usbDeviceInfo.append("     Model: B660+\n")
+                                                        0x2CD0 -> usbDeviceInfo.append("     Model: B6680\n")
+                                                        0x2BF3 -> usbDeviceInfo.append("     Model: D120+\n")
+                                                        0x0ADA -> usbDeviceInfo.append("     Model: D300+\n")
+                                                        0x2BAE -> usbDeviceInfo.append("     Model: L2230\n")
+                                                        0x0ADC -> usbDeviceInfo.append("     Model: D800II\n")
+                                                        0x2D56 -> usbDeviceInfo.append("     Model: D800II+\n")
+                                                        0x0AC0 -> usbDeviceInfo.append("     Model: DSL3100\n")
+                                                        0x2C95 -> usbDeviceInfo.append("     Model: DSL62\n")
+                                                        0x2BAB -> usbDeviceInfo.append("     Model: E2000\n")
+                                                        0x2B59 -> usbDeviceInfo.append("     Model: L1250\n")
+                                                        0x2C00 -> usbDeviceInfo.append("     Model: L1250+\n")
+                                                        0x2C60 -> usbDeviceInfo.append("     Model: L7280+\n")
+                                                        0x2BAF -> usbDeviceInfo.append("     Model: M110\n")
+                                                        0x2C55 -> usbDeviceInfo.append("     Model: M1260\n")
+                                                        0x2B15 -> usbDeviceInfo.append("     Model: TR582\n")
+                                                        0x2CE6 -> usbDeviceInfo.append("     Model: U350II\n")
+                                                        else -> usbDeviceInfo.append("     Model: Unknown (PID: 0x$pidHex)\n")
+                                                    }
+                                                }
+                                                device.vendorId == 0x0AC8 && device.productId == 0xC456 -> {
+                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: Scanner CR620+\n")
+                                                }
+                                                device.vendorId == 0x0828 && device.productId == 0x1002 -> {
+                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: ID Card Reader Camera\n")
+                                                }
+                                                device.vendorId == 0x0828 && device.productId == 0x1003 -> {
+                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: ID Card Reader Camera FR\n")
+                                                }
+                                                device.vendorId == 0x3150 && device.productId == 0x3320 -> {
+                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: ID Card Reader Camera FH\n")
+                                                }
+                                                device.vendorId == 0x0816 && device.productId == 0x0555 -> {
+                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: KSJ Camera\n")
+                                                }
+                                                else -> {
+                                                    usbDeviceInfo.append("  ⚠️ UNRECOGNIZED DEVICE\n")
+                                                }
+                                            }
+                                            
                                             usbDeviceInfo.append("  Class: ${device.deviceClass}\n")
                                             usbDeviceInfo.append("  Subclass: ${device.deviceSubclass}\n")
                                             usbDeviceInfo.append("  Protocol: ${device.deviceProtocol}\n")
@@ -412,8 +468,13 @@ class MainActivity : FlutterActivity() {
                                         }
                                     } else {
                                         usbDeviceInfo.append("📱 USB DEVICE INFORMATION:\n")
-                                        usbDeviceInfo.append("❌ No USB devices detected\n")
-                                        usbDeviceInfo.append("Check USB/OTG connection\n\n")
+                                        usbDeviceInfo.append("❌ No USB devices detected by Android\n")
+                                        usbDeviceInfo.append("\nPossible causes:\n")
+                                        usbDeviceInfo.append("1. Scanner not powered on\n")
+                                        usbDeviceInfo.append("2. USB cable not connected\n")
+                                        usbDeviceInfo.append("3. USB OTG/Host mode disabled\n")
+                                        usbDeviceInfo.append("4. Scanner needs kernel driver (not detected by Android)\n")
+                                        usbDeviceInfo.append("5. Wrong USB port (try different port)\n\n")
                                     }
                                 } else {
                                     usbDeviceInfo.append("📱 USB DEVICE INFORMATION:\n")
