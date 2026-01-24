@@ -1,12 +1,13 @@
 import 'package:dio/dio.dart' hide Headers;
 import 'package:retrofit/retrofit.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/models/id_integration_model.dart';
+import 'package:sps_eth_app/app/utils/constants.dart';
 
 part 'id_integration_service.g.dart';
 
 /// Service for ID Integration API (Fayda ID) using Retrofit
 /// Uses a different base URL than the main API
-@RestApi(baseUrl: "https://sps-admin.zorcloud.net/api/v1/")
+@RestApi(baseUrl: Constants.baseUrl)
 abstract class IdIntegrationService {
   factory IdIntegrationService(Dio dio) = _IdIntegrationService;
 

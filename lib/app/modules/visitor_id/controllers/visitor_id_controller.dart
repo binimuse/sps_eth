@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:bot_toast/bot_toast.dart';
 import 'package:sps_eth_app/app/services/passport_scanner_service.dart';
 
 
@@ -16,6 +15,7 @@ class VisitorIdController extends GetxController {
   FocusNode? focusedField = FocusNode();
 // Scan state
 final isScanning = false.obs;
+final scanSuccess = false.obs;
 
 // Passport result
 final passportData = <String, dynamic>{}.obs;
@@ -31,6 +31,7 @@ var fullName = ''.obs;
 var nationality = ''.obs;
 var dateOfBirth = ''.obs;
 var expiryDate = ''.obs;
+var scannedImageBase64 = ''.obs;
 
 // SDK Status for diagnostics
 final sdkStatus = <String, dynamic>{}.obs;
@@ -63,11 +64,39 @@ Future<void> scanPassport() async {
   try {
     isScanning.value = true;
     scanError.value = '';
+    scanSuccess.value = false;
     passportData.clear();
 
     print('=== Starting Passport Scan ===');
     
     final data = await PassportScannerService.scanPassport();
+
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('📦 DATA RECEIVED FROM NATIVE');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('Data type: ${data.runtimeType}');
+    print('Data keys: ${data.keys.toList()}');
+    print('Has imageBase64 key: ${data.containsKey("imageBase64")}');
+    
+    if (data.containsKey("imageBase64")) {
+      final imageBase64Raw = data["imageBase64"];
+      print('imageBase64 value type: ${imageBase64Raw.runtimeType}');
+      print('imageBase64 is null: ${imageBase64Raw == null}');
+      print('imageBase64 is empty: ${imageBase64Raw?.toString().isEmpty ?? true}');
+      if (imageBase64Raw != null && imageBase64Raw.toString().isNotEmpty) {
+        print('imageBase64 length: ${imageBase64Raw.toString().length} characters');
+        print('');
+        print('🔥🔥🔥 FULL BASE64 STRING RECEIVED IN FLUTTER 🔥🔥🔥');
+        print('════════════════════════════════════════════════════════════');
+        print(imageBase64Raw.toString());
+        print('════════════════════════════════════════════════════════════');
+        print('🔥🔥🔥 END OF BASE64 STRING 🔥🔥🔥');
+        print('');
+      }
+    } else {
+      print('❌ imageBase64 key NOT found in data from native!');
+    }
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     // Store all passport data
     passportData.value = Map<String, dynamic>.from(data);
@@ -78,6 +107,17 @@ Future<void> scanPassport() async {
     nationality.value = data['nationality']?.toString() ?? '';
     dateOfBirth.value = data['dateOfBirth']?.toString() ?? '';
     expiryDate.value = data['expiryDate']?.toString() ?? '';
+    scannedImageBase64.value = data['imageBase64']?.toString() ?? '';
+    
+    print('');
+    print('📸 FINAL IMAGE STATUS:');
+    if (scannedImageBase64.value.isNotEmpty) {
+      print('   ✅ Image base64 stored in controller: YES (${scannedImageBase64.value.length} chars)');
+      print('   ✅ Ready to display in UI');
+    } else {
+      print('   ❌ Image base64 received: NO - string is empty!');
+    }
+    print('');
 
     // Update text field if passport number found
     if (passportNumber.value.isNotEmpty) {
@@ -92,129 +132,93 @@ Future<void> scanPassport() async {
     print('Expiry Date: ${expiryDate.value}');
     print('All Data: $data');
 
-    // Show success message if we got at least passport number
-    if (passportNumber.value.isNotEmpty || fullName.value.isNotEmpty) {
-      BotToast.showText(
-        text: 'Passport scanned successfully',
-        contentColor: Colors.green,
-        textStyle: const TextStyle(color: Colors.white),
-        duration: const Duration(seconds: 2),
-        align: Alignment.bottomCenter,
-      );
+    // Check if we got data
+    if (passportNumber.value.isEmpty && fullName.value.isEmpty) {
+      scanError.value = 'Document scanned but no data extracted';
     } else {
-      scanError.value = 'Passport scanned but no data extracted';
-      BotToast.showText(
-        text: 'Passport scanned but some fields are missing',
-        contentColor: Colors.orange,
-        textStyle: const TextStyle(color: Colors.white),
-        duration: const Duration(seconds: 3),
-        align: Alignment.bottomCenter,
-      );
+      // Success! Show the scanned data
+      scanSuccess.value = true;
     }
 
   } catch (e) {
     print('=== Scan Failed ===');
     print('Error: $e');
     
-    String errorMessage = 'Scan failed';
+    // User-friendly message (shown on screen)
+    String userMessage = 'Unable to scan document. Please try again.';
     String title = 'Scan Failed';
     Color snackbarColor = Colors.red;
-    int duration = 4;
     
+    // Detailed technical log (console only)
     if (e is PlatformException) {
-      errorMessage = e.message ?? e.code;
-      print('Error Code: ${e.code}');
-      print('Error Message: ${e.message}');
+      print('╔════════════════════════════════════════════════════════════════');
+      print('║ ERROR CODE: ${e.code}');
+      print('║ ERROR MESSAGE: ${e.message}');
+      print('╚════════════════════════════════════════════════════════════════');
       
-      // Show comprehensive diagnostic for INIT_FAIL_DETAILED
+      // Log full diagnostic data to console
       if (e.code == 'INIT_FAIL_DETAILED') {
-        title = 'SDK Diagnostic Report';
-        errorMessage = e.message ?? 'Initialization failed';
-        snackbarColor = Colors.red;
-        duration = 15; // Longer duration to read all info
-        
-        // Extract details if available
         if (e.details != null && e.details is Map) {
           final details = Map<String, dynamic>.from(e.details as Map);
-          print('=== FULL DIAGNOSTIC DATA ===');
-          print('Error Code: ${details['errorCode']}');
-          
-          // Format deviceOnline status properly (0=offline, 1=online, 2+=error/unknown)
-          final deviceOnlineStatus = details['deviceOnline'];
-          String deviceOnlineText;
-          if (deviceOnlineStatus == 1) {
-            deviceOnlineText = '✅ YES (1)';
-          } else if (deviceOnlineStatus == 0) {
-            deviceOnlineText = '❌ NO (0)';
-          } else {
-            deviceOnlineText = '⚠️ UNKNOWN ($deviceOnlineStatus)';
-          }
-          print('Device Online: $deviceOnlineText');
-          
-          print('Current Device: ${details['currentDevice']}');
-          print('Device Type: ${details['deviceType']}');
-          print('Device SN: ${details['deviceSN']}');
-          print('Assets Path: ${details['assetsPath']}');
-          print('Config Exists: ${details['configExists']}');
+          print('');
+          print('═══════════════════════ FULL DIAGNOSTIC DATA ═══════════════════════');
+          details.forEach((key, value) {
+            print('$key: $value');
+          });
+          print('═════════════════════════════════════════════════════════════════════');
+          print('');
         }
-      } else if (e.code == 'INIT_FAIL_HARDWARE_REQUIRED') {
-        title = 'Hardware Required';
-        errorMessage = '''
-⚠️ Scanner hardware not detected
-
-This is EXPECTED when testing on:
-• Android tablet (no scanner)
-• Android emulator
-
-✅ This WILL work on:
-• SPS Smart Police Station kiosk
-• Device with scanner hardware
-
-📋 Status:
-• SDK loaded: ✅
-• Assets ready: ✅
-• Hardware: ❌ (required)
-
-💡 The app is ready - just needs real hardware!
-        ''';
-        snackbarColor = Colors.orange;
-        duration = 8;
-      } else if (e.code == 'INIT_FAIL' && e.message?.contains('Device initialization') == true) {
-        title = 'Hardware Required';
-        errorMessage = 'Scanner hardware not detected. This is normal on tablet - will work on SPS kiosk!';
-        snackbarColor = Colors.orange;
-        duration = 6;
-      } else if (e.code == 'INIT_FAIL') {
-        // Show full error message for any INIT_FAIL
-        title = 'Initialization Failed';
-        errorMessage = e.message ?? 'Unknown initialization error';
+        // User-friendly message
+        title = 'Scanner Initialization Failed';
+        userMessage = 'Unable to connect to scanner. Please check the device.';
         snackbarColor = Colors.red;
-        duration = 10;
+        
+      } else if (e.code == 'NO_DOC_DETAILED') {
+        if (e.details != null && e.details is Map) {
+          final details = Map<String, dynamic>.from(e.details as Map);
+          print('');
+          print('═══════════════════════ DETECTION FAILURE DETAILS ═══════════════════════');
+          details.forEach((key, value) {
+            print('$key: $value');
+          });
+          print('═════════════════════════════════════════════════════════════════════════');
+          print('');
+        }
+        // User-friendly message
+        title = 'No Document Detected';
+        userMessage = 'Please place your ID card on the scanner and try again.';
+        snackbarColor = Colors.orange;
+        
+      } else if (e.code == 'NO_DOC') {
+        title = 'No Document Detected';
+        userMessage = 'Please place your ID card on the scanner.';
+        snackbarColor = Colors.orange;
+        
+      } else if (e.code == 'RECOG_FAIL') {
+        title = 'Recognition Failed';
+        userMessage = 'Unable to read the document. Please ensure it is placed correctly.';
+        snackbarColor = Colors.orange;
+        
+      } else if (e.code == 'INIT_FAIL' || e.code == 'INIT_FAIL_HARDWARE_REQUIRED') {
+        title = 'Scanner Not Ready';
+        userMessage = 'Scanner device is not ready. Please contact support.';
+        snackbarColor = Colors.red;
+      }
+      
+      // Always log error details to console
+      if (e.details != null) {
+        print('ERROR DETAILS:');
+        print(e.details);
       }
     } else {
-      errorMessage = e.toString();
+      print('Non-PlatformException error: ${e.toString()}');
+      userMessage = 'An unexpected error occurred. Please try again.';
     }
     
-    scanError.value = errorMessage;
+    scanError.value = userMessage;
     
-    // Store full diagnostic for on-screen display
-    if (e is PlatformException && e.code == 'INIT_FAIL_DETAILED') {
-      diagnosticLog.value = errorMessage; // This contains the full diagnostic report
-    } else {
-      diagnosticLog.value = '$title\n\n$errorMessage';
-    }
-    
-    // Show error in a dialog for better visibility (instead of toast)
-    _showErrorDialog(title, errorMessage, snackbarColor);
-    
-    // Also show toast as backup
-    BotToast.showText(
-      text: '$title\n\n$errorMessage',
-      contentColor: snackbarColor,
-      textStyle: const TextStyle(color: Colors.white, fontSize: 12),
-      duration: Duration(seconds: duration),
-      align: Alignment.center,
-    );
+    // No popup - error is shown in the banner only
+    // All debugging info is in console logs
   } finally {
     isScanning.value = false;
   }
@@ -234,76 +238,6 @@ This is EXPECTED when testing on:
     focusedController = textController;
     keyboardController.text = textController.text;
     keyboardController.selection = textController.selection;
-  }
-
-  void _showErrorDialog(String title, String message, Color color) {
-    Get.dialog(
-      Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Title
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Get.back(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Error message (scrollable)
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Text(
-                    message,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontFamily: 'monospace',
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Close button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Get.back(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: color,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('Close', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      barrierDismissible: true,
-    );
   }
 }
 

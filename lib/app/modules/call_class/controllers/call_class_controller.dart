@@ -16,6 +16,7 @@ import 'package:sps_eth_app/app/utils/auth_util.dart';
 import 'package:sps_eth_app/app/utils/jwt_util.dart';
 import 'package:sps_eth_app/app/utils/device_id_util.dart';
 import 'package:sps_eth_app/app/utils/connectivity_util.dart';
+import 'package:sps_eth_app/app/utils/constants.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
 import 'package:sps_eth_app/app/common/widgets/line_busy_dialog.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
@@ -137,6 +138,9 @@ class CallClassController extends GetxController {
   // Fayda ID verification data
   final RxString faydaTransactionID = ''.obs;
   final Rx<Map<String, dynamic>> faydaData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  
+  // Passport/ID photo from scanner (base64)
+  String? _scannedIdPhoto;
 
   @override
   void onInit() {
@@ -192,6 +196,14 @@ class CallClassController extends GetxController {
           print('  - Name: ${faydaDataMap['name']}');
           print('  - Individual ID: ${faydaDataMap['individualId']}');
           print('  - Status: ${faydaDataMap['status']}');
+        }
+        
+        // Get scanned ID photo (base64) from passport scanner (if available)
+        if (args['idPhoto'] != null && args['idPhoto'].toString().isNotEmpty) {
+          _scannedIdPhoto = args['idPhoto'].toString();
+          print('📞 [INIT] Scanned ID Photo received: ${_scannedIdPhoto!.length} characters (base64)');
+        } else {
+          print('📞 [INIT] No scanned ID photo provided');
         }
         
         // Get preferred language from LanguageController if available
@@ -807,6 +819,10 @@ class CallClassController extends GetxController {
       print('✅ [REQUEST CALL] Permissions granted');
       print('📞 [REQUEST CALL] Calling Direct Call API...');
       
+      // Get device serial number
+      final deviceSerial = await DeviceIdUtil.getDeviceSerialNumber();
+      print('📱 [REQUEST CALL] Device Serial Number: $deviceSerial');
+      
       // Extract Fayda data if available
       final faydaDataMap = faydaData.value;
       String? idNumber;
@@ -836,7 +852,7 @@ class CallClassController extends GetxController {
         print('  - Photo URL: ${photoUrl != null ? "${photoUrl.substring(0, 20)}..." : "null"}');
       }
       
-      // Create request payload with isVisitor, preferredLanguage, and Fayda data
+      // Create request payload with isVisitor, preferredLanguage, Fayda data, scanned ID photo, and device serial
       final requestPayload = RequestCallRequest(
         isVisitor: _isVisitor,
         preferredLanguage: _preferredLanguage,
@@ -848,6 +864,8 @@ class CallClassController extends GetxController {
         nationality: nationality,
         phoneNumber: phoneNumber,
         address: address,
+        idPhoto: _scannedIdPhoto, // Add scanned ID photo (base64)
+        deviceSerialNumber: deviceSerial, // Add device serial number
       );
       
       // Print request payload details
@@ -889,6 +907,12 @@ class CallClassController extends GetxController {
         if (requestPayload.photoUrl != null) {
           print('📤 [REQUEST CALL]   "photoUrl": "${requestPayload.photoUrl!.substring(0, requestPayload.photoUrl!.length > 50 ? 50 : requestPayload.photoUrl!.length)}..."');
         }
+      }
+      if (requestPayload.idPhoto != null && requestPayload.idPhoto!.isNotEmpty) {
+        print('📤 [REQUEST CALL]   "idPhoto": "<base64 image ${requestPayload.idPhoto!.length} chars>"');
+      }
+      if (requestPayload.deviceSerialNumber != null && requestPayload.deviceSerialNumber!.isNotEmpty) {
+        print('📤 [REQUEST CALL]   "deviceSerialNumber": "${requestPayload.deviceSerialNumber}"');
       }
       print('📤 [REQUEST CALL] }');
       print('📤 [REQUEST CALL] ======================================');
@@ -1582,13 +1606,13 @@ class CallClassController extends GetxController {
       currentCameraIndex.value = (currentCameraIndex.value + 1) % availableCameraPositions.length;
       final nextPosition = availableCameraPositions[currentCameraIndex.value];
       
-      print('📷 [CAMERA] Switching to camera ${currentCameraIndex.value}: ${nextPosition}');
+      print('📷 [CAMERA] Switching to camera ${currentCameraIndex.value}: $nextPosition');
       
       // Switch camera by using setCameraPosition on the track
       try {
         // Try to set camera position directly on the track
         await cameraTrack.setCameraPosition(nextPosition);
-        print('✅ [CAMERA] Camera switched successfully to ${nextPosition}');
+        print('✅ [CAMERA] Camera switched successfully to $nextPosition');
         _updateLocalVideoTrack();
       } catch (e) {
         print('❌ [CAMERA ERROR] Error using setCameraPosition: $e');
@@ -2226,8 +2250,8 @@ class CallClassController extends GetxController {
       print('📋 [REPORT FETCH] Fetching report from admin API...');
       // Use Dio directly for admin API since it has a different base URL
       final dio = DioUtil().getDio(useAccessToken: true);
-      final adminBaseUrl = 'https://sps-admin.zorcloud.net/api/v1';
-      final response = await dio.get('$adminBaseUrl/reports/$reportId');
+    
+      final response = await dio.get('${Constants.baseUrl}/reports/$reportId');
       
       if (response.statusCode == 200 && response.data != null) {
         final responseData = response.data is Map

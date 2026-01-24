@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- USB device filter for passport scanner hardware -->
-    <!-- This allows the app to automatically request permission when device is connected -->
-    <!-- Add specific vendor/product IDs if known, or leave generic to catch all USB devices -->
+    <!-- USB device filter for Wintone passport scanner hardware -->
+    <!-- Wintone EZUsbDevice 1st/2nd Gen Camera -->
+    <usb-device vendor-id="2088" product-id="4098"/>  <!-- 0x828 = 2088, 0x1002 = 4098 -->
+    <usb-device vendor-id="2088" product-id="4112"/>  <!-- 0x828 = 2088, 0x1010 = 4112 -->
+    
+    <!-- Generic fallback for other passport scanners -->
     <usb-device class="255" subclass="255" protocol="255" />
 </resources>

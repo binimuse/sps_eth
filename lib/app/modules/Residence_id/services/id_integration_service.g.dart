@@ -10,7 +10,7 @@ part of 'id_integration_service.dart';
 
 class _IdIntegrationService implements IdIntegrationService {
   _IdIntegrationService(this._dio, {this.baseUrl, this.errorLogger}) {
-    baseUrl ??= 'https://sps-admin.zorcloud.net/api/v1/';
+    baseUrl ??= 'https://sps-api-test.aii.et/api/v1/';
   }
 
   final Dio _dio;

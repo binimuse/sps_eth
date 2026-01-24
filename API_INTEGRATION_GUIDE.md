@@ -9,7 +9,7 @@ This document outlines the standard patterns for implementing API integration in
 ### Base URL
 ```dart
 // lib/app/utils/constants.dart
-static const baseUrl = "https://sps-admin.zorcloud.net/api/v1/";
+static const baseUrl = "https://sps-api-test.aii.et/api/v1/";
 ```
 
 ### DioUtil Pattern
@@ -63,7 +63,7 @@ class {Feature} {
 
   // Computed properties (getters) if needed
   String? get imageUrl => imagePath != null
-      ? 'https://sps-admin.zorcloud.net/$imagePath'
+      ? 'https://sps-api-test.aii.et/$imagePath'
       : null;
 
   Map<String, dynamic> toJson() => _${Feature}ToJson(this);
@@ -551,7 +551,7 @@ import 'package:sps_eth_app/app/theme/app_colors.dart';
 
 ## 13. API Base URLs
 
-- Main API: `https://sps-admin.zorcloud.net/api/v1/`
+- Main API: `https://sps-api-test.aii.et/api/v1/`
 - Image Server: Update based on your backend configuration
 
 ## 14. Authentication Headers
