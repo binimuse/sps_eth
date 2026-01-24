@@ -7,6 +7,8 @@ import 'package:sps_eth_app/app/utils/dio_util.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/services/id_integration_service.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/models/id_integration_model.dart';
+import 'package:sps_eth_app/app/modules/Residence_id/views/widgets/residence_service_list_view.dart';
+import 'package:sps_eth_app/app/modules/Residence_id/views/widgets/residence_service_detail_view.dart';
 
 class ResidenceIdController extends GetxController {
   // Selected ID type
@@ -19,6 +21,9 @@ class ResidenceIdController extends GetxController {
   final RxString transactionID = ''.obs;
   final RxString maskedMobile = ''.obs;
 
+  // Service selection
+  final RxString selectedService = 'Crime Report'.obs;
+
   // Text controllers
   final phoneController = TextEditingController();
   final idController = TextEditingController();
@@ -27,6 +32,9 @@ class ResidenceIdController extends GetxController {
   
   // Service
   late final IdIntegrationService _idIntegrationService;
+  
+  // Store user data for later use
+  Map<String, dynamic>? _userData;
 
   @override
   void onInit() {
@@ -239,31 +247,29 @@ class ResidenceIdController extends GetxController {
         // Use transactionID from response if available, otherwise use the one from OTP request
         final finalTransactionID = response.transactionID ?? transactionID.value;
         
-        print('📞 [FAYDA VERIFY] Navigating to call class with:');
-        print('  - Transaction ID: $finalTransactionID');
-        print('  - Individual ID: $individualId');
-        print('  - Name: ${response.name}');
-        
-        // Navigate to call class with transactionID for direct video call
-        Get.toNamed(
-          Routes.CALL_CLASS,
-          arguments: {
-            'isVisitor': false,
-            'transactionID': finalTransactionID,
-            'faydaData': {
-              'individualId': individualId,
-              'name': response.name,
-              'nameAm': response.nameAm,
-              'dateOfBirth': response.dateOfBirth,
-              'status': response.status,
-              'nationality': response.nationality,
-              'gender': response.gender,
-              'phoneNumber': response.phoneNumber,
-              'address': response.address,
-              'photo': response.photo,
-            },
+        // Store user data for later use
+        _userData = {
+          'isVisitor': false,
+          'transactionID': finalTransactionID,
+          'idType': 'fayda',
+          'faydaData': {
+            'individualId': individualId,
+            'name': response.name,
+            'nameAm': response.nameAm,
+            'dateOfBirth': response.dateOfBirth,
+            'status': response.status,
+            'nationality': response.nationality,
+            'gender': response.gender,
+            'phoneNumber': response.phoneNumber,
+            'address': response.address,
+            'photo': response.photo,
           },
-        );
+        };
+        
+        print('📋 [FAYDA VERIFY] User data stored, navigating to service list');
+        
+        // Navigate to service list
+        Get.to(() => const ResidenceServiceListView());
       } else {
         // Error response
         final errorMessage = response.message ?? 
@@ -325,8 +331,16 @@ class ResidenceIdController extends GetxController {
         }
         return;
       }
+      
+      // Store user data for later use
+      _userData = {
+        'isVisitor': false,
+        'idType': 'residence',
+        'residenceId': value,
+      };
+      
       // Navigate to service list
-      Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
+      Get.to(() => const ResidenceServiceListView());
     } else if (selectedIdType.value == 'tin') {
       final value = tinController.text.trim();
       if (value.isEmpty) {
@@ -336,8 +350,53 @@ class ResidenceIdController extends GetxController {
         }
         return;
       }
+      
+      // Store user data for later use
+      _userData = {
+        'isVisitor': false,
+        'idType': 'tin',
+        'tinNumber': value,
+      };
+      
       // Navigate to service list
-      Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
+      Get.to(() => const ResidenceServiceListView());
     }
+  }
+  
+  /// Select a service from the list
+  void selectService(String service) {
+    selectedService.value = service;
+    print('📋 [SERVICE] Selected service: $service');
+    
+    // Navigate to service detail view
+    Get.to(() => const ResidenceServiceDetailView());
+  }
+  
+  /// Change selected service (when on detail page)
+  void changeSelectedService(String service) {
+    selectedService.value = service;
+    print('📋 [SERVICE] Changed service to: $service');
+  }
+  
+  /// Proceed to call class with all collected data
+  void proceedToCallClass() {
+    if (_userData == null) {
+      final context = Get.context;
+      if (context != null) {
+        AppToasts.showError('User data not found. Please start over.');
+      }
+      return;
+    }
+    
+    print('📞 [CALL CLASS] Proceeding with:');
+    print('  - Service: ${selectedService.value}');
+    print('  - ID Type: ${_userData!['idType']}');
+    
+    // Add selected service to user data
+    final callData = Map<String, dynamic>.from(_userData!);
+    callData['selectedService'] = selectedService.value;
+    
+    // Navigate to call class
+    Get.toNamed(Routes.CALL_CLASS, arguments: callData);
   }
 }

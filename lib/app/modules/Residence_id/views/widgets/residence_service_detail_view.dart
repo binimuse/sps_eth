@@ -4,10 +4,10 @@ import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
-import '../controllers/service_detail_controller.dart';
+import '../../controllers/residence_id_controller.dart';
 
-class ServiceDetailView extends GetView<ServiceDetailController> {
-  const ServiceDetailView({super.key});
+class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
+  const ResidenceServiceDetailView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +39,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                   height: viewportHeight,
                   child: SideInfoPanel(
                     title: 'SMART POLICE\nSTATION',
-                    description: 'Loreim re in charge of planning and managing marketing\ncampaigns that promote a company\'s brand. marketing\ncampaigns that promote a company\'s brand.',
+                    description: 'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
                     logoAsset: Assets.images.efpLogo.path,
                     illustrationAsset: Assets.images.law.path,
                   ),
@@ -134,7 +134,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                     title: 'Crime Report',
                                     description: 'Report crimes promptly and help maintain public safety.',
                                     image: Assets.images.crime.path,
-                                    onTap: () => controller.selectService('Crime Report'),
+                                    onTap: () => controller.changeSelectedService('Crime Report'),
                                     isSelected: controller.selectedService.value == 'Crime Report',
                                   )),
                                   const SizedBox(height: 16),
@@ -142,7 +142,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                     title: 'Traffic Incident Report',
                                     description: 'Official platform for monitoring and managing traffic incidents.',
                                     image: Assets.images.traffic.path,
-                                    onTap: () => controller.selectService('Traffic Incident Report'),
+                                    onTap: () => controller.changeSelectedService('Traffic Incident Report'),
                                     isSelected: controller.selectedService.value == 'Traffic Incident Report',
                                   )),
                                   const SizedBox(height: 16),
@@ -150,7 +150,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                     title: 'Incident Report',
                                     description: 'Ensuring accountability through proper incident documentation.',
                                     image: Assets.images.incident.path,
-                                    onTap: () => controller.selectService('Incident Report'),
+                                    onTap: () => controller.changeSelectedService('Incident Report'),
                                     isSelected: controller.selectedService.value == 'Incident Report',
                                   )),
                                 ],
@@ -188,31 +188,14 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                   ),
                                   const SizedBox(height: 16),
                                   // Fill out Form and Call for Assistance cards side by side
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: _buildActionCard(
-                                          title: 'Fill out Form',
-                                          description: 'Official platform for monitoring and managing traffic incidents.',
-                                          image: Assets.images.fill.path,
-                                          onTap: () {
-                                            Get.toNamed(Routes.FORM_CLASS);
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Flexible(
-                                        child: _buildActionCard(
-                                          title: 'Call for Assistance',
-                                          description: 'Ensuring accountability through proper incident documentation.',
-                                          image: Assets.images.callA.path,
-                                          onTap: () {
-                                         Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                  ),
+                                   _buildActionCard(
+                                     title: 'Call Officer',
+                                     description: 'Ensuring accountability through proper incident documentation.',
+                                     image: Assets.images.callA.path,
+                                     onTap: () {
+                                       controller.proceedToCallClass();
+                                     },
+                                   ),
                                 ],
                               ),
                             )),
@@ -440,6 +423,8 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
+     
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -517,4 +502,3 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
     );
   }
 }
-

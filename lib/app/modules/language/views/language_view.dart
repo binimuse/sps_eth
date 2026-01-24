@@ -104,7 +104,11 @@ class LanguageView extends GetView<LanguageController> {
                         side: const BorderSide(color: Color(0xFFCBDCE7)),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: () => Get.back(),
+                      onPressed: () {
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context);
+                        }
+                      },
                       icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
                       label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/app/services/passport_scanner_service.dart';
 
 
@@ -136,8 +137,24 @@ Future<void> scanPassport() async {
     if (passportNumber.value.isEmpty && fullName.value.isEmpty) {
       scanError.value = 'Document scanned but no data extracted';
     } else {
-      // Success! Show the scanned data
+      // Success! Automatically navigate to call class
       scanSuccess.value = true;
+      
+      // Navigate to call class with scanned data
+      Get.toNamed(
+        Routes.CALL_CLASS,
+        arguments: {
+          'isVisitor': true,
+          'autoStart': true,
+          'passportData': Map<String, dynamic>.from(passportData),
+          'passportNumber': passportNumber.value,
+          'fullName': fullName.value,
+          'nationality': nationality.value,
+          'dateOfBirth': dateOfBirth.value,
+          'expiryDate': expiryDate.value,
+          'idPhoto': scannedImageBase64.value, // Pass base64 image
+        },
+      );
     }
 
   } catch (e) {
@@ -146,8 +163,6 @@ Future<void> scanPassport() async {
     
     // User-friendly message (shown on screen)
     String userMessage = 'Unable to scan document. Please try again.';
-    String title = 'Scan Failed';
-    Color snackbarColor = Colors.red;
     
     // Detailed technical log (console only)
     if (e is PlatformException) {
@@ -169,9 +184,7 @@ Future<void> scanPassport() async {
           print('');
         }
         // User-friendly message
-        title = 'Scanner Initialization Failed';
         userMessage = 'Unable to connect to scanner. Please check the device.';
-        snackbarColor = Colors.red;
         
       } else if (e.code == 'NO_DOC_DETAILED') {
         if (e.details != null && e.details is Map) {
@@ -185,24 +198,16 @@ Future<void> scanPassport() async {
           print('');
         }
         // User-friendly message
-        title = 'No Document Detected';
         userMessage = 'Please place your ID card on the scanner and try again.';
-        snackbarColor = Colors.orange;
         
       } else if (e.code == 'NO_DOC') {
-        title = 'No Document Detected';
         userMessage = 'Please place your ID card on the scanner.';
-        snackbarColor = Colors.orange;
         
       } else if (e.code == 'RECOG_FAIL') {
-        title = 'Recognition Failed';
         userMessage = 'Unable to read the document. Please ensure it is placed correctly.';
-        snackbarColor = Colors.orange;
         
       } else if (e.code == 'INIT_FAIL' || e.code == 'INIT_FAIL_HARDWARE_REQUIRED') {
-        title = 'Scanner Not Ready';
         userMessage = 'Scanner device is not ready. Please contact support.';
-        snackbarColor = Colors.red;
       }
       
       // Always log error details to console

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:sps_eth_app/app/common/widgets/custom_loading_widget.dart';
 import 'package:sps_eth_app/app/utils/enums.dart';
-import '../controllers/residence_id_controller.dart';
+import '../../controllers/residence_id_controller.dart';
 
 class OtpVerificationView extends GetView<ResidenceIdController> {
   final String phoneNumber;
@@ -39,7 +39,11 @@ class OtpVerificationView extends GetView<ResidenceIdController> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Get.back(),
+                    onPressed: () {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      }
+                    },
                     color: Colors.grey,
                   ),
                 ],

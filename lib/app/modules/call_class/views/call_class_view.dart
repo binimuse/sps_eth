@@ -1332,3 +1332,4 @@ class _StatementDetailsView extends StatelessWidget {
     );
   }
 }
+

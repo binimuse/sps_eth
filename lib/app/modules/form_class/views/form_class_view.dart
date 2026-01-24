@@ -46,7 +46,11 @@ class FormClassView extends GetView<FormClassController> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        onPressed: () => Get.back(),
+                        onPressed: () {
+                          if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          }
+                        },
                         icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
                         label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
                       ),
@@ -153,7 +157,7 @@ class FormClassView extends GetView<FormClassController> {
                           // Form Section - takes more space now
                           Expanded(
                             flex: 7,
-                            child: _buildFormContent(),
+                            child: _buildFormContent(context),
                           ),
                           const SizedBox(width: 24),
                           // Progress Section only
@@ -353,23 +357,23 @@ class FormClassView extends GetView<FormClassController> {
     });
   }
 
-  Widget _buildFormContent() {
+  Widget _buildFormContent(BuildContext context) {
     return Obx(() {
       final step = controller.currentStep.value;
       switch (step) {
         case 1:
-          return _buildPersonalInfoForm();
+          return _buildPersonalInfoForm(context);
         case 2:
-          return _buildResidenceInfoForm();
+          return _buildResidenceInfoForm(context);
         case 3:
-          return _buildIncidentDetailsForm();
+          return _buildIncidentDetailsForm(context);
         default:
-          return _buildPersonalInfoForm();
+          return _buildPersonalInfoForm(context);
       }
     });
   }
 
-  Widget _buildPersonalInfoForm() {
+  Widget _buildPersonalInfoForm(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -400,14 +404,14 @@ class FormClassView extends GetView<FormClassController> {
           const SizedBox(height: 16),
           _buildDropdownField('Marital Status', controller.maritalStatusController),
           const SizedBox(height: 24),
-          _buildActionButtons(showSubmit: false),
+          _buildActionButtons(showSubmit: false, context: context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildResidenceInfoForm() {
+  Widget _buildResidenceInfoForm(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -448,14 +452,14 @@ class FormClassView extends GetView<FormClassController> {
             ],
           ),
           const SizedBox(height: 24),
-          _buildActionButtons(showSubmit: false),
+          _buildActionButtons(showSubmit: false, context: context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildIncidentDetailsForm() {
+  Widget _buildIncidentDetailsForm(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
@@ -498,7 +502,7 @@ class FormClassView extends GetView<FormClassController> {
             showScanOnly: true,
           ),
           const SizedBox(height: 24),
-          _buildActionButtons(showSubmit: true),
+          _buildActionButtons(showSubmit: true, context: context),
           ],
         ),
       ),
@@ -626,12 +630,16 @@ class FormClassView extends GetView<FormClassController> {
     );
   }
 
-  Widget _buildActionButtons({required bool showSubmit}) {
+  Widget _buildActionButtons({required bool showSubmit, required BuildContext context}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         OutlinedButton(
-          onPressed: () => Get.back(),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+          },
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: const Color(0xFF0F3955),
