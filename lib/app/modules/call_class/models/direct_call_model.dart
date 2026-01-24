@@ -47,11 +47,13 @@ class RequestCallRequest {
     this.idNumber,
     this.idType,
     this.photoUrl,
+    this.idPhoto,
     this.fullname,
     this.fullnameAm,
     this.nationality,
     this.phoneNumber,
     this.address,
+    this.deviceSerialNumber,
   });
 
   factory RequestCallRequest.fromJson(Map<String, dynamic> json) =>
@@ -62,11 +64,18 @@ class RequestCallRequest {
   final String? idNumber;
   final String? idType;
   final String? photoUrl;
+  final String? idPhoto; // Base64 encoded scanned document image
+  
+  @JsonKey(name: 'fullName')
   final String? fullname;
+  
+  @JsonKey(name: 'fullNameAm')
   final String? fullnameAm;
+  
   final String? nationality;
   final String? phoneNumber;
   final String? address;
+  final String? deviceSerialNumber;
 
   Map<String, dynamic> toJson() => _$RequestCallRequestToJson(this);
 }

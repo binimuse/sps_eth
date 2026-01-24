@@ -3,7 +3,7 @@ import 'package:json_annotation/json_annotation.dart';
 part 'report_response_model.g.dart';
 
 /// Report Response Model from Admin API
-/// Endpoint: https://sps-admin.zorcloud.net/api/v1/reports/{reportId}
+/// Endpoint: https://sps-api-test.aii.et/api/v1/reports/{reportId}
 @JsonSerializable()
 class ReportResponseWrapper {
   const ReportResponseWrapper({

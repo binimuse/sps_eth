@@ -129,5 +129,31 @@ class DeviceIdUtil {
       return false;
     }
   }
+  
+  /// Get device serial number
+  /// For kiosk machines, returns the Android serial number or a constant value
+  static Future<String> getDeviceSerialNumber() async {
+    try {
+      if (Platform.isAndroid) {
+        final androidInfo = await _deviceInfo.androidInfo;
+        // Try to get serial number (available on Android 8.0+)
+        final serialNumber = androidInfo.serialNumber;
+        if (serialNumber.isNotEmpty && serialNumber != 'unknown') {
+          print('📱 [DEVICE SERIAL] Got Android serial number: $serialNumber');
+          return serialNumber;
+        }
+      }
+      
+      // Fallback: use a constant for kiosk machines
+      const kioskSerialNumber = 'SPS-KIOSK-001';
+      print('📱 [DEVICE SERIAL] Using constant serial number: $kioskSerialNumber');
+      return kioskSerialNumber;
+    } catch (e) {
+      print('❌ [DEVICE SERIAL] Error getting serial number: $e');
+      // Fallback to constant
+      const kioskSerialNumber = 'SPS-KIOSK-001';
+      return kioskSerialNumber;
+    }
+  }
 }
 

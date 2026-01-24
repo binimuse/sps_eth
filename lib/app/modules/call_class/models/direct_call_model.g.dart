@@ -42,12 +42,32 @@ RequestCallRequest _$RequestCallRequestFromJson(Map<String, dynamic> json) =>
     RequestCallRequest(
       isVisitor: json['isVisitor'] as bool?,
       preferredLanguage: json['preferredLanguage'] as String?,
+      idNumber: json['idNumber'] as String?,
+      idType: json['idType'] as String?,
+      photoUrl: json['photoUrl'] as String?,
+      idPhoto: json['idPhoto'] as String?,
+      fullname: json['fullName'] as String?,
+      fullnameAm: json['fullNameAm'] as String?,
+      nationality: json['nationality'] as String?,
+      phoneNumber: json['phoneNumber'] as String?,
+      address: json['address'] as String?,
+      deviceSerialNumber: json['deviceSerialNumber'] as String?,
     );
 
 Map<String, dynamic> _$RequestCallRequestToJson(RequestCallRequest instance) =>
     <String, dynamic>{
       'isVisitor': instance.isVisitor,
       'preferredLanguage': instance.preferredLanguage,
+      'idNumber': instance.idNumber,
+      'idType': instance.idType,
+      'photoUrl': instance.photoUrl,
+      'idPhoto': instance.idPhoto,
+      'fullName': instance.fullname,
+      'fullNameAm': instance.fullnameAm,
+      'nationality': instance.nationality,
+      'phoneNumber': instance.phoneNumber,
+      'address': instance.address,
+      'deviceSerialNumber': instance.deviceSerialNumber,
     };
 
 RequestCallResponse _$RequestCallResponseFromJson(Map<String, dynamic> json) =>

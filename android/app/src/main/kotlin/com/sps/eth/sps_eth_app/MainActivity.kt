@@ -83,6 +83,10 @@ class MainActivity : FlutterActivity() {
     
     private fun requestUSBPermissions() {
         try {
+            // CRITICAL: Wintone devices require USB folder permissions
+            // Try to change /dev/bus/usb permissions (requires root on some devices)
+            trySetUSBPermissions()
+            
             val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
             if (usbManager == null) {
                 Log.e(TAG, "USB service not available")
@@ -97,14 +101,20 @@ class MainActivity : FlutterActivity() {
                 Log.w(TAG, "  1. USB/OTG cable connected")
                 Log.w(TAG, "  2. Scanner powered on")
                 Log.w(TAG, "  3. USB host mode enabled")
+                Log.w(TAG, "  4. USB folder permissions (Wintone requires chmod 777 /dev/bus/usb/)")
                 return
             }
             
             for (device in deviceList.values) {
                 val hasPermission = usbManager.hasPermission(device)
                 Log.d(TAG, "Device: ${device.deviceName}")
-                Log.d(TAG, "  VID: ${device.vendorId}, PID: ${device.productId}")
+                Log.d(TAG, "  VID: 0x${device.vendorId.toString(16)} (${device.vendorId}), PID: 0x${device.productId.toString(16)} (${device.productId})")
                 Log.d(TAG, "  Has Permission: $hasPermission")
+                
+                // Check if it's a Wintone device
+                if (device.vendorId == 0x0828 && (device.productId == 0x1002 || device.productId == 0x1010)) {
+                    Log.d(TAG, "  ✅ WINTONE DEVICE DETECTED!")
+                }
                 
                 if (!hasPermission) {
                     Log.d(TAG, "Requesting USB permission for: ${device.deviceName}")
@@ -135,6 +145,46 @@ class MainActivity : FlutterActivity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error requesting USB permissions: ${e.message}", e)
+        }
+    }
+    
+    /**
+     * Try to set USB folder permissions for Wintone devices
+     * This is critical for Wintone EZUsbDevice to work properly
+     */
+    private fun trySetUSBPermissions() {
+        try {
+            Log.d(TAG, "=== Checking USB Folder Permissions ===")
+            
+            // Check if /dev/bus/usb exists
+            val usbFolder = File("/dev/bus/usb")
+            if (!usbFolder.exists()) {
+                Log.w(TAG, "/dev/bus/usb folder does not exist")
+                return
+            }
+            
+            Log.d(TAG, "/dev/bus/usb exists: ${usbFolder.canRead()}")
+            
+            // Try to execute chmod command (requires root or system app)
+            try {
+                val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "chmod -R 777 /dev/bus/usb/"))
+                val exitCode = process.waitFor()
+                
+                if (exitCode == 0) {
+                    Log.d(TAG, "✅ Successfully changed USB folder permissions")
+                } else {
+                    Log.w(TAG, "⚠️ chmod command returned: $exitCode (may require root)")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Cannot change USB permissions (not root): ${e.message}")
+                Log.w(TAG, "   This is CRITICAL for Wintone devices!")
+                Log.w(TAG, "   The kiosk may need to:")
+                Log.w(TAG, "   1. Run as system app")
+                Log.w(TAG, "   2. Have root access")
+                Log.w(TAG, "   3. Have USB permissions pre-configured")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking USB permissions: ${e.message}", e)
         }
     }
 
@@ -366,6 +416,14 @@ class MainActivity : FlutterActivity() {
                             diagnostics.append("📋 INITIALIZATION STATUS:\n")
                             diagnostics.append("InitIDCard Result: $initRet\n")
                             diagnostics.append("Assets Path: $kernelPath\n")
+                            diagnostics.append("Android Version: ${Build.VERSION.SDK_INT} (${Build.VERSION.RELEASE})\n")
+                            diagnostics.append("Device Model: ${Build.MODEL}\n")
+                            diagnostics.append("Device Manufacturer: ${Build.MANUFACTURER}\n\n")
+                            
+                            diagnostics.append("📥 INITIDCARD PARAMETERS:\n")
+                            diagnostics.append("AuthID: \"\" (empty string)\n")
+                            diagnostics.append("Language: 1 (English)\n")
+                            diagnostics.append("Kernel Path: $kernelPath\n\n")
                             
                             val configFile = File(kernelPath + "IDCardConfig.ini")
                             diagnostics.append("Config File: ${if (configFile.exists()) "✅ Found" else "❌ Missing"}\n")
@@ -439,10 +497,12 @@ class MainActivity : FlutterActivity() {
                                                     usbDeviceInfo.append("  ✅ RECOGNIZED: Scanner CR620+\n")
                                                 }
                                                 device.vendorId == 0x0828 && device.productId == 0x1002 -> {
-                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: ID Card Reader Camera\n")
+                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: Wintone Passport Reader\n")
+                                                    usbDeviceInfo.append("     Type: EZUsbDevice (1st/2nd Gen Camera)\n")
                                                 }
                                                 device.vendorId == 0x0828 && device.productId == 0x1003 -> {
-                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: ID Card Reader Camera FR\n")
+                                                    usbDeviceInfo.append("  ✅ RECOGNIZED: Wintone Passport Reader FR\n")
+                                                    usbDeviceInfo.append("     Type: EZUsbDevice (1st/2nd Gen Camera)\n")
                                                 }
                                                 device.vendorId == 0x3150 && device.productId == 0x3320 -> {
                                                     usbDeviceInfo.append("  ✅ RECOGNIZED: ID Card Reader Camera FH\n")
@@ -510,24 +570,136 @@ class MainActivity : FlutterActivity() {
                             diagnostics.append("Device Type: $deviceType\n")
                             diagnostics.append("Device SN: $deviceSN\n\n")
                             
-                            // Recommendations based on error code
+                            // Recommendations based on error code and device type
                             diagnostics.append("💡 RECOMMENDATIONS:\n")
                             when (initRet) {
                                 2 -> {
-                                    if (deviceOnline == 1 || currentDevice != "None" && currentDevice != "Unknown") {
-                                        diagnostics.append("⚠️ Device DETECTED but init failed!\n")
-                                        diagnostics.append("Possible causes:\n")
-                                        diagnostics.append("1. USB permissions not granted\n")
-                                        diagnostics.append("2. Device driver not loaded\n")
-                                        diagnostics.append("3. License/authorization issue\n")
-                                        diagnostics.append("4. Device not properly initialized\n")
-                                    } else {
-                                        diagnostics.append("⚠️ Device NOT detected\n")
-                                        diagnostics.append("Check:\n")
-                                        diagnostics.append("1. USB/OTG cable connected?\n")
-                                        diagnostics.append("2. Scanner powered on?\n")
-                                        diagnostics.append("3. USB host mode enabled?\n")
-                                        diagnostics.append("4. USB permissions granted?\n")
+                                    // Check if we have Wintone device detected
+                                    try {
+                                        val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+                                        val deviceList = usbManager?.deviceList
+                                        val hasWintone = deviceList?.values?.any { 
+                                            it.vendorId == 0x0828 && (it.productId == 0x1002 || it.productId == 0x1003)
+                                        } ?: false
+                                        
+                                        if (hasWintone) {
+                                            diagnostics.append("✅ Wintone device DETECTED (VID:0x828, PID:0x1002)\n")
+                                            diagnostics.append("⚠️ But InitIDCard failed with error code 2\n\n")
+                                            
+                                            // Check USB permissions
+                                            diagnostics.append("1️⃣ USB PERMISSIONS CHECK:\n")
+                                            val wintoneDevice = deviceList?.values?.find { 
+                                                it.vendorId == 0x0828 && it.productId == 0x1002 
+                                            }
+                                            if (wintoneDevice != null) {
+                                                val hasPermission = usbManager?.hasPermission(wintoneDevice) ?: false
+                                                if (hasPermission) {
+                                                    diagnostics.append("   ✅ App USB Permission: GRANTED\n")
+                                                } else {
+                                                    diagnostics.append("   ❌ App USB Permission: NOT GRANTED\n")
+                                                    diagnostics.append("   → ACTION: Grant USB permission when prompted\n")
+                                                    diagnostics.append("   → Or manually grant in Settings → Apps → Permissions\n")
+                                                }
+                                            } else {
+                                                diagnostics.append("   ⚠️ Wintone device not in USB device list\n")
+                                            }
+                                            
+                                            // Check USB folder permissions (critical for Wintone)
+                                            val usbFolder = File("/dev/bus/usb")
+                                            if (usbFolder.exists()) {
+                                                if (usbFolder.canRead()) {
+                                                    diagnostics.append("   ✅ /dev/bus/usb: Readable\n")
+                                                } else {
+                                                    diagnostics.append("   ❌ /dev/bus/usb: NOT readable\n")
+                                                    diagnostics.append("   → CRITICAL: Wintone needs chmod 777 /dev/bus/usb/\n")
+                                                    diagnostics.append("   → Kiosk may need root or system app permissions\n")
+                                                }
+                                            } else {
+                                                diagnostics.append("   ❌ /dev/bus/usb: Folder not found\n")
+                                            }
+                                            diagnostics.append("\n")
+                                            
+                                            // Check device driver
+                                            diagnostics.append("2️⃣ DEVICE DRIVER CHECK:\n")
+                                            diagnostics.append("   SDK Device Type: $deviceType\n")
+                                            if (deviceType == 1) {
+                                                diagnostics.append("   ✅ SDK recognizes device (Type=1)\n")
+                                                diagnostics.append("   → Driver loaded but device init failed\n")
+                                            } else if (deviceType == -1 || deviceType == 0) {
+                                                diagnostics.append("   ❌ SDK does not recognize device\n")
+                                                diagnostics.append("   → ACTION: Device driver may not be loaded\n")
+                                                diagnostics.append("   → Check if .so libraries are correct architecture\n")
+                                            }
+                                            diagnostics.append("\n")
+                                            
+                                            // Check license
+                                            diagnostics.append("3️⃣ LICENSE/AUTHORIZATION CHECK:\n")
+                                            val licFile = File(kernelPath + "IDCardLicense.dat")
+                                            val deviceDatFile = File(kernelPath + "IDCardDevice.dat")
+                                            if (licFile.exists()) {
+                                                diagnostics.append("   ✅ IDCardLicense.dat: Found (${licFile.length()} bytes)\n")
+                                                // Check if license file is too small (likely invalid)
+                                                if (licFile.length() < 100) {
+                                                    diagnostics.append("   ⚠️ License file seems too small!\n")
+                                                    diagnostics.append("   → ACTION: Verify license file is valid\n")
+                                                }
+                                            } else {
+                                                diagnostics.append("   ❌ IDCardLicense.dat: MISSING\n")
+                                                diagnostics.append("   → ACTION: Copy valid license file to assets\n")
+                                            }
+                                            
+                                            if (deviceDatFile.exists()) {
+                                                diagnostics.append("   ✅ IDCardDevice.dat: Found (${deviceDatFile.length()} bytes)\n")
+                                            } else {
+                                                diagnostics.append("   ❌ IDCardDevice.dat: MISSING\n")
+                                                diagnostics.append("   → ACTION: Copy device config file to assets\n")
+                                            }
+                                            diagnostics.append("\n")
+                                            
+                                            // Check device initialization
+                                            diagnostics.append("4️⃣ DEVICE INITIALIZATION CHECK:\n")
+                                            diagnostics.append("   Current Device Name: ${if (currentDevice.isEmpty()) "EMPTY" else currentDevice}\n")
+                                            diagnostics.append("   Device SN: ${if (deviceSN.isEmpty()) "EMPTY" else deviceSN}\n")
+                                            diagnostics.append("   Device Online Status: $deviceOnline\n")
+                                            
+                                            if (currentDevice.isEmpty() && deviceSN.isEmpty()) {
+                                                diagnostics.append("   ❌ Device not properly initialized\n")
+                                                diagnostics.append("   → ACTION: Try these steps:\n")
+                                                diagnostics.append("      a) Unplug device, wait 5 sec, plug back in\n")
+                                                diagnostics.append("      b) Restart the app\n")
+                                                diagnostics.append("      c) Check if another app is using the device\n")
+                                                diagnostics.append("      d) Power cycle the scanner device\n")
+                                            } else {
+                                                diagnostics.append("   ⚠️ Device partially initialized but can't fully connect\n")
+                                                diagnostics.append("   → May indicate hardware communication issue\n")
+                                            }
+                                            diagnostics.append("\n")
+                                            
+                                            diagnostics.append("⚡ WINTONE SPECIFIC NOTES:\n")
+                                            diagnostics.append("   • EZUsbDevice type (1st/2nd Gen Camera)\n")
+                                            diagnostics.append("   • May require firmware initialization sequence\n")
+                                            diagnostics.append("   • Check IDCardConfig.ini has Wintone settings\n")
+                                            diagnostics.append("   • Verify Android 12 compatibility\n")
+                                        } else if (deviceOnline == 1 || (currentDevice != "None" && currentDevice != "Unknown" && deviceType == 1)) {
+                                            diagnostics.append("⚠️ Device DETECTED by SDK but init failed!\n")
+                                            diagnostics.append("SDK reports Device Type: $deviceType\n")
+                                            diagnostics.append("But Android USB shows: No devices\n\n")
+                                            diagnostics.append("Possible causes:\n")
+                                            diagnostics.append("1. Device uses kernel driver (bypasses Android USB)\n")
+                                            diagnostics.append("2. USB permissions not granted at OS level\n")
+                                            diagnostics.append("3. License/authorization file mismatch\n")
+                                            diagnostics.append("4. Device needs firmware initialization\n")
+                                        } else {
+                                            diagnostics.append("⚠️ Device NOT detected\n")
+                                            diagnostics.append("Check:\n")
+                                            diagnostics.append("1. USB/OTG cable connected?\n")
+                                            diagnostics.append("2. Scanner powered on?\n")
+                                            diagnostics.append("3. USB host mode enabled?\n")
+                                            diagnostics.append("4. USB permissions granted?\n")
+                                            diagnostics.append("5. Correct USB port (try different port)?\n")
+                                        }
+                                    } catch (e: Exception) {
+                                        diagnostics.append("⚠️ Error checking device details: ${e.message}\n")
                                     }
                                 }
                                 4 -> {
@@ -550,9 +722,28 @@ class MainActivity : FlutterActivity() {
                             
                             val licenseFile = File(kernelPath + "IDCardLicense.dat")
                             diagnostics.append("License exists: ${if (licenseFile.exists()) "✅" else "❌"}\n")
+                            if (licenseFile.exists()) {
+                                diagnostics.append("License size: ${licenseFile.length()} bytes\n")
+                            }
                             
                             val deviceFile = File(kernelPath + "IDCardDevice.dat")
                             diagnostics.append("Device file exists: ${if (deviceFile.exists()) "✅" else "❌"}\n")
+                            if (deviceFile.exists()) {
+                                diagnostics.append("Device file size: ${deviceFile.length()} bytes\n")
+                            }
+                            
+                            // Check for HardWareID.xml
+                            val hardwareIdFile = File(kernelPath + "HardWareID.xml")
+                            diagnostics.append("HardWareID.xml: ${if (hardwareIdFile.exists()) "✅" else "❌"}\n")
+                            
+                            // Count model files
+                            try {
+                                val kernelDir = File(kernelPath)
+                                val modelFiles = kernelDir.listFiles()?.size ?: 0
+                                diagnostics.append("Total files in kernel: $modelFiles\n")
+                            } catch (e: Exception) {
+                                diagnostics.append("Could not count files: ${e.message}\n")
+                            }
                             
                             val fullDiagnostic = diagnostics.toString()
                             Log.e(TAG, fullDiagnostic)
@@ -587,22 +778,276 @@ class MainActivity : FlutterActivity() {
 
                         // Set language to English (1 = English, 0 = Chinese)
                         api.SetLanguage(1)
+                        
+                        // CRITICAL: Check device status before detection (from working APK)
+                        // This handles device state issues that prevent detection
+                        Log.d(TAG, "Checking device status before detection...")
+                        val deviceCheckStatus = api.CheckDeviceOnlineEx()
+                        Log.d(TAG, "CheckDeviceOnlineEx returned: $deviceCheckStatus")
+                        
+                        when (deviceCheckStatus) {
+                            2 -> {
+                                // Device disconnected - need to free and reinit
+                                Log.w(TAG, "Device status = 2 (disconnected), reinitializing...")
+                                api.FreeIDCard()
+                                postError(result, "DEVICE_DISCONNECTED", "Device disconnected. Please reconnect and try again.")
+                                return@Thread
+                            }
+                            3 -> {
+                                // Device needs reinitialization
+                                Log.w(TAG, "Device status = 3 (needs reinit), reinitializing...")
+                                api.FreeIDCard()
+                                val reinitRet = api.InitIDCard("", 1, kernelPath)
+                                if (reinitRet != 0) {
+                                    postError(result, "REINIT_FAIL", "Device reinitialization failed: $reinitRet")
+                                    return@Thread
+                                }
+                                // Reload config after reinit
+                                val configFile = File(kernelPath + "IDCardConfig.ini")
+                                if (configFile.exists()) {
+                                    api.SetConfigByFile(configFile.absolutePath)
+                                }
+                                api.SetIOStatus(5, 1)
+                                Log.d(TAG, "Device reinitialized successfully")
+                            }
+                            1 -> {
+                                Log.d(TAG, "Device status OK (1)")
+                            }
+                            else -> {
+                                Log.w(TAG, "Unexpected device status: $deviceCheckStatus")
+                            }
+                        }
+                        
+                        // CRITICAL: Set IO status to enable scanner (Wintone requirement)
+                        // SetIOStatus(5, 1) turns on indicator light and enables detection
+                        // This is required before DetectDocument() for Wintone devices
+                        Log.d(TAG, "Setting IO status (indicator light)...")
+                        try {
+                            val ioRet = api.SetIOStatus(5, 1)
+                            Log.d(TAG, "SetIOStatus(5, 1) returned: $ioRet")
+                            if (ioRet != 0) {
+                                Log.w(TAG, "⚠️ SetIOStatus failed, but continuing...")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "⚠️ SetIOStatus not supported or failed: ${e.message}")
+                        }
 
                         // Detect document
-                        Log.d(TAG, "Detecting document...")
-                        val detect = api.DetectDocument()
-                        Log.d(TAG, "DetectDocument returned: $detect")
+                        Log.d(TAG, "=== Document Detection Phase ===")
+                        
+                        // CRITICAL: TH-AR190 (Device Type 16) is a FEEDER scanner
+                        // It may not support DetectDocument() or may need document fed first
+                        // Try AutoProcessIDCard directly for feeder-type scanners
+                        val deviceTypeCheck = api.GetDeviceType()
+                        val currentDeviceCheck = api.GetCurrentDevice()
+                        
+                        Log.d(TAG, "Device Type: $deviceTypeCheck, Device Name: $currentDeviceCheck")
+                        
+                        // For TH-AR190 (Device Type 16) feeder scanner, we skip DetectDocument
+                        // and proceed directly to AutoProcessIDCard
+                        var skipDetection = false
+                        if (deviceTypeCheck == 16 || currentDeviceCheck.contains("TH-AR", ignoreCase = true)) {
+                            Log.d(TAG, "⚠️ Detected FEEDER-TYPE scanner ($currentDeviceCheck)")
+                            Log.d(TAG, "⚠️ Skipping DetectDocument(), proceeding directly to AutoProcessIDCard")
+                            Log.d(TAG, "⚠️ USER MUST INSERT DOCUMENT INTO FEEDER BEFORE PRESSING SCAN!")
+                            skipDetection = true
+                        }
+                        
+                        if (!skipDetection) {
+                            // For camera-based scanners, use DetectDocument first
+                            Log.d(TAG, "Calling DetectDocument() for camera-based scanner...")
+                            val detect = api.DetectDocument()
+                            Log.d(TAG, "DetectDocument returned: $detect")
 
-                        if (detect != 1) {
-                            val errorMsg = when (detect) {
-                                0 -> "No document detected - Please place passport in scanner"
-                                -1 -> "Document detection failed"
-                                else -> "Document detection returned: $detect"
+                            if (detect != 1) {
+                            // Build detailed diagnostic for detection failure
+                            val detectionDiagnostics = StringBuilder()
+                            detectionDiagnostics.append("=== DOCUMENT DETECTION FAILED ===\n\n")
+                            
+                            detectionDiagnostics.append("📋 DETECTION STATUS:\n")
+                            detectionDiagnostics.append("DetectDocument() returned: $detect\n")
+                            val detectExplanation = when (detect) {
+                                0 -> "No document detected (scanner sees nothing)"
+                                -1 -> "Document detection error (SDK/hardware issue)"
+                                -2 -> "Device not ready or busy"
+                                -3 -> "Detection timeout"
+                                else -> "Unknown detection result"
                             }
-                            Log.e(TAG, errorMsg)
-                            postError(result, "NO_DOC", errorMsg)
+                            detectionDiagnostics.append("Meaning: $detectExplanation\n")
+                            detectionDiagnostics.append("\nReturn Value Guide:\n")
+                            detectionDiagnostics.append("  1 = Document detected (success)\n")
+                            detectionDiagnostics.append("  0 = No document in scanner view\n")
+                            detectionDiagnostics.append(" -1 = Detection error\n")
+                            detectionDiagnostics.append(" -2 = Device not ready\n")
+                            detectionDiagnostics.append(" -3 = Detection timeout\n\n")
+                            
+                            // Device information
+                            detectionDiagnostics.append("🔌 DEVICE INFORMATION:\n")
+                            try {
+                                val deviceOnline = api.CheckDeviceOnlineEx()
+                                val currentDevice = api.GetCurrentDevice()
+                                val deviceType = api.GetDeviceType()
+                                val deviceSN = api.GetDeviceSN()
+                                
+                                detectionDiagnostics.append("Device Online: ${if (deviceOnline == 1) "✅ YES (1)" else "⚠️ $deviceOnline"}\n")
+                                detectionDiagnostics.append("Current Device: ${currentDevice ?: "None"}\n")
+                                detectionDiagnostics.append("Device Type: $deviceType\n")
+                                detectionDiagnostics.append("Device SN: ${deviceSN ?: "None"}\n")
+                                
+                                // Add interpretation
+                                if (deviceOnline != 1) {
+                                    detectionDiagnostics.append("\n⚠️ WARNING: Device online status is $deviceOnline (expected 1)\n")
+                                    detectionDiagnostics.append("This may indicate device disconnected or busy\n")
+                                }
+                                detectionDiagnostics.append("\n")
+                            } catch (e: Exception) {
+                                detectionDiagnostics.append("Error checking device: ${e.message}\n\n")
+                            }
+                            
+                            // Check for Wintone-specific instructions
+                            try {
+                                val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+                                val deviceList = usbManager?.deviceList
+                                val hasWintone = deviceList?.values?.any { 
+                                    it.vendorId == 0x0828 && (it.productId == 0x1002 || it.productId == 0x1010)
+                                } ?: false
+                                
+                                if (hasWintone) {
+                                    detectionDiagnostics.append("📱 WINTONE DEVICE STATUS:\n")
+                                    detectionDiagnostics.append("✅ Hardware: Detected (VID:0x828, PID:0x1002)\n")
+                                    detectionDiagnostics.append("✅ SDK Init: Success (InitIDCard = 0)\n")
+                                    detectionDiagnostics.append("✅ IO Status: Set (SetIOStatus called)\n")
+                                    detectionDiagnostics.append("❌ Detection: Failed (DetectDocument = $detect)\n\n")
+                                    
+                                    // Specific advice based on return value
+                                    when (detect) {
+                                        0 -> {
+                                            detectionDiagnostics.append("💡 DETECTION RETURNED 0 (NO DOCUMENT):\n")
+                                            detectionDiagnostics.append("The scanner hardware is working but sees NO document.\n")
+                                            detectionDiagnostics.append("This is the most common issue with Wintone scanners.\n\n")
+                                            
+                                            detectionDiagnostics.append("⚠️ MOST COMMON CAUSES:\n\n")
+                                            
+                                            detectionDiagnostics.append("1️⃣ DOCUMENT NOT IN CAMERA VIEW (90% of cases)\n")
+                                            detectionDiagnostics.append("   → Wintone uses CAMERA, not feeder\n")
+                                            detectionDiagnostics.append("   → Document MUST be within camera frame\n")
+                                            detectionDiagnostics.append("   → Check if camera has LED indicator/light\n\n")
+                                            
+                                            detectionDiagnostics.append("2️⃣ SCANNER NOT TRIGGERED\n")
+                                            detectionDiagnostics.append("   → Some Wintone models need button press\n")
+                                            detectionDiagnostics.append("   → Check for physical scan button\n")
+                                            detectionDiagnostics.append("   → Try pressing button BEFORE placing doc\n\n")
+                                            
+                                            detectionDiagnostics.append("3️⃣ LIGHTING/FOCUS ISSUE\n")
+                                            detectionDiagnostics.append("   → Camera may need 2-3 sec to focus\n")
+                                            detectionDiagnostics.append("   → Room lighting may be too dark/bright\n")
+                                            detectionDiagnostics.append("   → Check if scanner has built-in light source\n\n")
+                                            
+                                            detectionDiagnostics.append("4️⃣ CONTINUOUS DETECTION MODE\n")
+                                            detectionDiagnostics.append("   → DetectDocument() may need to be called\n")
+                                            detectionDiagnostics.append("     in a loop until document appears\n")
+                                            detectionDiagnostics.append("   → Official sample may use polling loop\n\n")
+                                            
+                                            detectionDiagnostics.append("🔧 IMMEDIATE ACTIONS TO TRY:\n")
+                                            detectionDiagnostics.append("1. Press any physical button on scanner\n")
+                                            detectionDiagnostics.append("2. Place ID card FLAT on scanner surface\n")
+                                            detectionDiagnostics.append("3. Ensure scanner light/LED is ON\n")
+                                            detectionDiagnostics.append("4. Wait 3-5 seconds, press Scan again\n")
+                                            detectionDiagnostics.append("5. Try different document position\n")
+                                            detectionDiagnostics.append("6. Check if scanner has \"ready\" indicator\n\n")
+                                            
+                                            detectionDiagnostics.append("📸 CAMERA-BASED SCANNER NOTES:\n")
+                                            detectionDiagnostics.append("• Wintone is camera-based (not feeder)\n")
+                                            detectionDiagnostics.append("• Document must be visible to camera lens\n")
+                                            detectionDiagnostics.append("• May need manual trigger (button/software)\n")
+                                            detectionDiagnostics.append("• DetectDocument() checks camera feed\n")
+                                            detectionDiagnostics.append("• Returns 0 if camera sees blank/no document\n\n")
+                                        }
+                                        -1 -> {
+                                            detectionDiagnostics.append("💡 DETECTION RETURNED -1:\n")
+                                            detectionDiagnostics.append("This indicates a hardware or SDK error.\n\n")
+                                            detectionDiagnostics.append("TROUBLESHOOTING:\n")
+                                            detectionDiagnostics.append("1. Check device logs for hardware errors\n")
+                                            detectionDiagnostics.append("2. Scanner may need power cycle\n")
+                                            detectionDiagnostics.append("3. Camera may be blocked or damaged\n")
+                                            detectionDiagnostics.append("4. Check USB connection is secure\n\n")
+                                        }
+                                        -2 -> {
+                                            detectionDiagnostics.append("💡 DETECTION RETURNED -2:\n")
+                                            detectionDiagnostics.append("Device is busy or not ready.\n\n")
+                                            detectionDiagnostics.append("ACTIONS:\n")
+                                            detectionDiagnostics.append("1. Wait 5 seconds and try again\n")
+                                            detectionDiagnostics.append("2. Scanner may still be initializing\n")
+                                            detectionDiagnostics.append("3. Check if another app is using scanner\n\n")
+                                        }
+                                        else -> {
+                                            detectionDiagnostics.append("💡 UNKNOWN RETURN VALUE: $detect\n")
+                                            detectionDiagnostics.append("Check SDK documentation for this value.\n\n")
+                                        }
+                                    }
+                                    
+                                    detectionDiagnostics.append("💡 POSSIBLE CAUSES:\n")
+                                    detectionDiagnostics.append("1. No document (ID/Passport) placed on scanner\n")
+                                    detectionDiagnostics.append("2. Document not in scanner's view area\n")
+                                    detectionDiagnostics.append("3. Document not flat or aligned correctly\n")
+                                    detectionDiagnostics.append("4. Scanner lid not closed (if required)\n")
+                                    detectionDiagnostics.append("5. Lighting conditions not optimal\n")
+                                    detectionDiagnostics.append("6. Scanner camera may need warm-up time\n")
+                                    detectionDiagnostics.append("7. Document type not recognized (ID vs Passport)\n\n")
+                                    
+                                    detectionDiagnostics.append("🔧 TROUBLESHOOTING STEPS:\n")
+                                    detectionDiagnostics.append("• Place ID card or passport on scanner platform\n")
+                                    detectionDiagnostics.append("• For ID: Place photo-side facing up\n")
+                                    detectionDiagnostics.append("• For Passport: Place photo-page facing up\n")
+                                    detectionDiagnostics.append("• Align document with guide marks (if any)\n")
+                                    detectionDiagnostics.append("• Check indicator light is on/green\n")
+                                    detectionDiagnostics.append("• Wait 2-3 seconds after placing document\n")
+                                    detectionDiagnostics.append("• Ensure document is fully within scanner area\n")
+                                    detectionDiagnostics.append("• Try pressing scan button (if hardware has one)\n\n")
+                                    
+                                    detectionDiagnostics.append("⚡ WINTONE CAMERA NOTES:\n")
+                                    detectionDiagnostics.append("• Camera-based scanner (not document feeder)\n")
+                                    detectionDiagnostics.append("• Document must be visible to camera\n")
+                                    detectionDiagnostics.append("• Supports both ID cards and passports\n")
+                                    detectionDiagnostics.append("• DetectDocument() checks for any document\n")
+                                    detectionDiagnostics.append("• SetIOStatus(5,1) enables detection mode\n\n")
+                                    
+                                    detectionDiagnostics.append("📋 TEST CHECKLIST:\n")
+                                    detectionDiagnostics.append("□ Document is on scanner surface\n")
+                                    detectionDiagnostics.append("□ Document is face-up (photo visible)\n")
+                                    detectionDiagnostics.append("□ Scanner light/indicator is on\n")
+                                    detectionDiagnostics.append("□ Waited 2-3 seconds after placing\n")
+                                    detectionDiagnostics.append("□ Document is not bent or damaged\n")
+                                } else {
+                                    detectionDiagnostics.append("💡 INSTRUCTIONS:\n")
+                                    detectionDiagnostics.append("• Place passport on scanner\n")
+                                    detectionDiagnostics.append("• Ensure document is properly aligned\n")
+                                    detectionDiagnostics.append("• Check scanner is ready\n")
+                                }
+                            } catch (e: Exception) {
+                                detectionDiagnostics.append("Error checking device type: ${e.message}\n")
+                            }
+                            
+                            detectionDiagnostics.append("\n📊 SDK CONFIGURATION:\n")
+                            detectionDiagnostics.append("Config loaded: ${configFile.exists()}\n")
+                            detectionDiagnostics.append("Language: English (1)\n")
+                            detectionDiagnostics.append("Kernel Path: $kernelPath\n")
+                            
+                            val fullDetectionDiagnostic = detectionDiagnostics.toString()
+                            Log.e(TAG, fullDetectionDiagnostic)
+                            
+                            // Return detailed detection error
+                            Handler(Looper.getMainLooper()).post {
+                                result.error("NO_DOC_DETAILED", fullDetectionDiagnostic, hashMapOf(
+                                    "detectResult" to detect,
+                                    "detectExplanation" to detectExplanation
+                                ))
+                            }
                             api.FreeIDCard()
                             return@Thread
+                        }
+                        } else {
+                            Log.d(TAG, "Feeder-type scanner detected - skipping DetectDocument check")
                         }
 
                         // Try AutoProcessIDCard first (best for kiosk - auto-detects passport type)
@@ -641,6 +1086,97 @@ class MainActivity : FlutterActivity() {
 
                         Log.d(TAG, "Recognition successful! Reading fields...")
 
+                        // Get scanned document image as base64
+                        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                        Log.d(TAG, "📸 IMAGE CAPTURE PROCESS STARTING")
+                        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                        
+                        var imageBase64 = ""
+                        try {
+                            // Try only type 3 (VIZ area) - most reliable for feeder scanners
+                            val imageType = 3
+                            val typeName = "VIZ area"
+                            
+                            Log.d(TAG, "Files directory: ${filesDir}")
+                            Log.d(TAG, "Files directory exists: ${filesDir.exists()}")
+                            Log.d(TAG, "Files directory writable: ${filesDir.canWrite()}")
+                            
+                            Log.d(TAG, "")
+                            Log.d(TAG, "🔍 Attempting Image Type $imageType: $typeName")
+                            
+                            val tempPath = "${filesDir}/temp_scan_${imageType}.jpg"
+                            Log.d(TAG, "Target path: $tempPath")
+                            
+                            val saveResult = api.SaveImageEx(tempPath, imageType)
+                            Log.d(TAG, "SaveImageEx returned: $saveResult")
+                            
+                            // Log what each error code means
+                            when (saveResult) {
+                                0 -> Log.d(TAG, "✅ SaveImageEx SUCCESS")
+                                -1 -> Log.e(TAG, "❌ SaveImageEx ERROR: Invalid parameter")
+                                -2 -> Log.e(TAG, "❌ SaveImageEx ERROR: No image in memory")
+                                -3 -> Log.e(TAG, "❌ SaveImageEx ERROR: Image processing failed")
+                                -4 -> Log.e(TAG, "❌ SaveImageEx ERROR: File write failed (permissions/path issue)")
+                                else -> Log.e(TAG, "❌ SaveImageEx ERROR: Unknown error code $saveResult")
+                            }
+                            
+                            if (saveResult == 0) {
+                                val imageFile = File(tempPath)
+                                Log.d(TAG, "Checking saved file...")
+                                Log.d(TAG, "File exists: ${imageFile.exists()}")
+                                
+                                if (imageFile.exists()) {
+                                    Log.d(TAG, "File size: ${imageFile.length()} bytes")
+                                    Log.d(TAG, "File readable: ${imageFile.canRead()}")
+                                    
+                                    if (imageFile.length() > 0) {
+                                        val imageBytes = imageFile.readBytes()
+                                        imageBase64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
+                                        
+                                        Log.d(TAG, "✅✅✅ IMAGE CAPTURED SUCCESSFULLY! ✅✅✅")
+                                        Log.d(TAG, "Image type: $imageType ($typeName)")
+                                        Log.d(TAG, "Image bytes: ${imageBytes.size}")
+                                        Log.d(TAG, "Base64 length: ${imageBase64.length} chars")
+                                        
+                                        Log.d(TAG, "")
+                                        Log.d(TAG, "🔥🔥🔥 FULL BASE64 STRING BELOW 🔥🔥🔥")
+                                        Log.d(TAG, "════════════════════════════════════════════════════════════")
+                                        Log.d(TAG, imageBase64)
+                                        Log.d(TAG, "════════════════════════════════════════════════════════════")
+                                        Log.d(TAG, "🔥🔥🔥 END OF BASE64 STRING 🔥🔥🔥")
+                                        Log.d(TAG, "")
+                                        
+                                        imageFile.delete() // Clean up temp file
+                                        Log.d(TAG, "Temp file deleted: $tempPath")
+                                    } else {
+                                        Log.w(TAG, "⚠️ File is empty (0 bytes)")
+                                    }
+                                } else {
+                                    Log.w(TAG, "⚠️ File was not created at: $tempPath")
+                                }
+                            } else {
+                                Log.e(TAG, "❌ Failed to save image type $imageType")
+                            }
+                            
+                            Log.d(TAG, "")
+                            Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                            if (imageBase64.isEmpty()) {
+                                Log.e(TAG, "❌❌❌ FAILED TO CAPTURE IMAGE ❌❌❌")
+                                Log.e(TAG, "Image type 3 (VIZ area) failed. This could mean:")
+                                Log.e(TAG, "1. SDK doesn't have image in memory after recognition")
+                                Log.e(TAG, "2. File write permissions issue")
+                                Log.e(TAG, "3. TH-AR190 doesn't support image capture for this type")
+                            } else {
+                                Log.d(TAG, "✅✅✅ IMAGE READY FOR FLUTTER ✅✅✅")
+                                Log.d(TAG, "Base64 string length: ${imageBase64.length} characters")
+                            }
+                            Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                            
+                        } catch (e: Exception) {
+                            Log.e(TAG, "❌ EXCEPTION during image capture: ${e.message}", e)
+                            e.printStackTrace()
+                        }
+                        
                         // Read all fields from SDK
                         val allFields = HashMap<String, String>()
                         val passportData = HashMap<String, String>()
@@ -698,21 +1234,25 @@ class MainActivity : FlutterActivity() {
                         passportData["_allFields"] = allFields.toString()
                         passportData["_cardType"] = cardType[0].toString()
                         passportData["_documentName"] = api.GetIDCardName() ?: ""
-
-                        // Save passport image if available
-                        try {
-                            val imagePath = kernelPath + "passport_image.jpg"
-                            val saveRet = api.SaveImageEx(imagePath, 8) // 8 = document image
-                            if (saveRet == 0) {
-                                passportData["imagePath"] = imagePath
-                                Log.d(TAG, "Passport image saved: $imagePath")
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Failed to save image: ${e.message}")
+                        
+                        // Add scanned image as base64
+                        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                        Log.d(TAG, "📦 ADDING IMAGE TO PASSPORT DATA")
+                        if (imageBase64.isNotEmpty()) {
+                            passportData["imageBase64"] = imageBase64
+                            Log.d(TAG, "✅✅✅ Document image ADDED to passportData map!")
+                            Log.d(TAG, "Key: 'imageBase64'")
+                            Log.d(TAG, "Base64 length: ${imageBase64.length} characters")
+                            Log.d(TAG, "First 100 chars: ${imageBase64.take(100)}")
+                        } else {
+                            Log.e(TAG, "❌❌❌ NO IMAGE TO ADD - imageBase64 is empty!")
+                            Log.e(TAG, "Flutter will NOT receive any image data")
                         }
+                        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
                         Log.d(TAG, "=== Passport Scan Complete ===")
-                        Log.d(TAG, "Passport Data: $passportData")
+                        Log.d(TAG, "Passport Data keys: ${passportData.keys}")
+                        Log.d(TAG, "Has imageBase64: ${passportData.containsKey("imageBase64")}")
 
                         Handler(Looper.getMainLooper()).post {
                             result.success(passportData)
