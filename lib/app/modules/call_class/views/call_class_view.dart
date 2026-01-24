@@ -333,29 +333,8 @@ class CallClassView extends GetView<CallClassController> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Action tiles
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Obx(() {
-                              final tiles = controller.actionTiles;
-                              return Row(
-                                children: [
-                                  for (var i = 0; i < tiles.length; i++) ...[
-                                    Expanded(
-                                      child: _ActionTile(
-                                        config: tiles[i],
-                                      ),
-                                    ),
-                                    if (i != tiles.length - 1)
-                                      const SizedBox(width: 16),
-                                  ],
-                                ],
-                              );
-                            }),
-                          ),
-                        ],
-                      ),
+                      // Progress Bar
+                      _buildProgressBar(),
                     ],
                   ),
                 ),
@@ -372,6 +351,43 @@ class CallClassView extends GetView<CallClassController> {
                       child: IntrinsicHeight(
                         child: Column(
                           children: [
+                            // Show Fayda user data if available
+                            Obx(() {
+                              final faydaData = controller.faydaData.value;
+                              if (faydaData.isNotEmpty) {
+                                final rows = <InfoRow>[];
+                                if (faydaData['name'] != null) {
+                                  rows.add(InfoRow('Name', faydaData['name'].toString()));
+                                }
+                                if (faydaData['individualId'] != null) {
+                                  rows.add(InfoRow('FAN/FIN Number', faydaData['individualId'].toString()));
+                                }
+                                if (faydaData['dateOfBirth'] != null) {
+                                  rows.add(InfoRow('Date of Birth', faydaData['dateOfBirth'].toString()));
+                                }
+                                if (faydaData['gender'] != null) {
+                                  rows.add(InfoRow('Gender', faydaData['gender'].toString()));
+                                }
+                                if (faydaData['nationality'] != null) {
+                                  rows.add(InfoRow('Nationality', faydaData['nationality'].toString()));
+                                }
+                                if (faydaData['phoneNumber'] != null) {
+                                  rows.add(InfoRow('Phone Number', faydaData['phoneNumber'].toString()));
+                                }
+                                if (faydaData['status'] != null) {
+                                  rows.add(InfoRow('Status', faydaData['status'].toString()));
+                                }
+                                
+                                if (rows.isNotEmpty) {
+                                  return _InfoCard(
+                                    title: 'User Information',
+                                    rows: rows,
+                                  );
+                                }
+                              }
+                              return const SizedBox.shrink();
+                            }),
+                            const SizedBox(height: 12),
                             Obx(() {
                               if (controller.idInformation.isEmpty) {
                                 return Container(
@@ -615,6 +631,184 @@ class CallClassView extends GetView<CallClassController> {
       ),
     );
   }
+
+  Widget _buildProgressBar() {
+    return Obx(() {
+      final currentStep = controller.currentProgressStep.value;
+      final isConnecting = controller.isConnectingToOfficer.value;
+      final isReportInit = controller.isReportInitiated.value;
+      final isUploading = controller.isAttachmentUploading.value;
+
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.whiteOff,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title
+            Text(
+              'Call Progress',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.black,
+                fontFamily: 'DMSans',
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Progress Steps
+            Row(
+              children: [
+                // Step 1: Connect to Police Officer
+                Expanded(
+                  child: _buildProgressStep(
+                    stepNumber: 1,
+                    title: 'Connect to\nPolice Officer',
+                    isActive: currentStep >= 1,
+                    isCurrent: currentStep == 1,
+                    isLoading: isConnecting && currentStep == 1,
+                  ),
+                ),
+                // Connector Line
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    height: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: currentStep >= 2 
+                          ? AppColors.success 
+                          : AppColors.grayLighter,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                // Step 2: Report Initiated
+                Expanded(
+                  child: _buildProgressStep(
+                    stepNumber: 2,
+                    title: 'Report\nInitiated',
+                    isActive: currentStep >= 2,
+                    isCurrent: currentStep == 2,
+                    isLoading: isReportInit && currentStep == 2,
+                  ),
+                ),
+                // Connector Line
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    height: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: currentStep >= 3 
+                          ? AppColors.success 
+                          : AppColors.grayLighter,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                // Step 3: Attachment Upload
+                Expanded(
+                  child: _buildProgressStep(
+                    stepNumber: 3,
+                    title: 'Attachment\nUpload',
+                    isActive: currentStep >= 3,
+                    isCurrent: currentStep == 3,
+                    isLoading: isUploading && currentStep == 3,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildProgressStep({
+    required int stepNumber,
+    required String title,
+    required bool isActive,
+    required bool isCurrent,
+    required bool isLoading,
+  }) {
+    final stepColor = isActive ? AppColors.success : AppColors.grayLighter;
+    final textColor = isActive ? AppColors.successDark : AppColors.grayDefault;
+    final bgColor = isActive 
+        ? AppColors.successLight 
+        : AppColors.whiteOff;
+
+    return Column(
+      children: [
+        // Step Circle
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: bgColor,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: stepColor,
+              width: 3,
+            ),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (isLoading)
+                SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(stepColor),
+                  ),
+                )
+              else if (isActive)
+                Icon(
+                  Icons.check,
+                  color: stepColor,
+                  size: 24,
+                )
+              else
+                Text(
+                  '$stepNumber',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                    fontFamily: 'DMSans',
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Step Title
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+            color: textColor,
+            fontFamily: 'DMSans',
+            height: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 Widget _roundCtrl(IconData icon, {Color? color}) {
@@ -630,48 +824,6 @@ Widget _roundCtrl(IconData icon, {Color? color}) {
   );
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.config});
-
-  final ActionTileConfig config;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => config.onPressed(context),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.whiteOff,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(color: AppColors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 3)),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLighter,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(config.icon, size: 36, color: AppColors.primary),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              config.label,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _InfoCard extends StatelessWidget {
   final String title;
@@ -1110,7 +1262,7 @@ class _StatementDetailsView extends StatelessWidget {
                       _buildInfoRow('Status', statement.status!),
                   ],
                   
-                  // Report Submission Status
+                  // Report Submission Status (no buttons, just show status)
                   if (report?.submitted == true) ...[
                     const SizedBox(height: 16),
                     Container(

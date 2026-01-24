@@ -86,6 +86,40 @@ class ConnectivityUtil {
     }
   }
 
+  /// Wait for internet connection to come back
+  /// Returns true if internet comes back within timeout, false otherwise
+  /// 
+  /// [timeout] Maximum time to wait (default: 60 seconds)
+  Future<bool> waitForInternet({Duration timeout = const Duration(seconds: 60)}) async {
+    print('⏳ [CONNECTIVITY] Waiting for internet connection (timeout: ${timeout.inSeconds}s)...');
+    
+    // If already online, return immediately
+    if (isOnline.value) {
+      print('✅ [CONNECTIVITY] Already online, no need to wait');
+      return true;
+    }
+    
+    try {
+      // Wait for isOnline to become true
+      await isOnline.stream
+          .where((online) => online == true)
+          .first
+          .timeout(
+            timeout,
+            onTimeout: () {
+              print('⏰ [CONNECTIVITY] Timeout waiting for internet connection');
+              return false;
+            },
+          );
+      
+      print('✅ [CONNECTIVITY] Internet connection restored');
+      return true;
+    } catch (e) {
+      print('❌ [CONNECTIVITY] Error waiting for internet: $e');
+      return false;
+    }
+  }
+
   /// Dispose connectivity monitoring
   void dispose() {
     _connectivitySubscription?.cancel();

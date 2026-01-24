@@ -21,6 +21,9 @@ static const String fileViewer = 'http://5.75.142.45:9000/';
   static const accessToken = "ACCESS_TOKEN";
   static const refreshToken = "REFRESH_TOKEN";
   static const userData = "USER_DATA";
+  
+  // Kiosk Machine ID (Android ID for SPS kiosk identification)
+  static const String kioskMachineId = "KIOSK_MACHINE_ID";
 
   // Authentication endpoints
   static const signupUrl = "/auth/signup";

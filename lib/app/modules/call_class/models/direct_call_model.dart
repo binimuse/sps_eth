@@ -44,6 +44,14 @@ class RequestCallRequest {
   const RequestCallRequest({
     this.isVisitor,
     this.preferredLanguage,
+    this.idNumber,
+    this.idType,
+    this.photoUrl,
+    this.fullname,
+    this.fullnameAm,
+    this.nationality,
+    this.phoneNumber,
+    this.address,
   });
 
   factory RequestCallRequest.fromJson(Map<String, dynamic> json) =>
@@ -51,6 +59,14 @@ class RequestCallRequest {
 
   final bool? isVisitor;
   final String? preferredLanguage;
+  final String? idNumber;
+  final String? idType;
+  final String? photoUrl;
+  final String? fullname;
+  final String? fullnameAm;
+  final String? nationality;
+  final String? phoneNumber;
+  final String? address;
 
   Map<String, dynamic> toJson() => _$RequestCallRequestToJson(this);
 }
