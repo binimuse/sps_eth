@@ -24,8 +24,8 @@ void main() async {
   ]);
   await PreferenceUtils.init();
 
-  // Initialize and store Android ID for kiosk machine identification
-  await KioskMachineIdUtil.initializeAndStoreAndroidId();
+  // Initialize and store Android ID and Serial Number for kiosk machine identification
+  await KioskMachineIdUtil.initializeAndStoreDeviceInfo();
 
   // Set default language to English if no language preference exists
   final String savedLanguage = PreferenceUtils.getString(Constants.selectedLanguage, '');

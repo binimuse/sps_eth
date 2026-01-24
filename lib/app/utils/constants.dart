@@ -24,6 +24,7 @@ static const String fileViewer = 'http://5.75.142.45:9000/';
   
   // Kiosk Machine ID (Android ID for SPS kiosk identification)
   static const String kioskMachineId = "KIOSK_MACHINE_ID";
+  static const String kioskMachineSerialNumber = "KIOSK_MACHINE_SERIAL_NUMBER";
 
   // Authentication endpoints
   static const signupUrl = "/auth/signup";
