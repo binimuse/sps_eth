@@ -1237,6 +1237,9 @@ class CallClassController extends GetxController {
       _startConnectionTimeoutMonitor();
       
       // Add connection timeout (30 seconds)
+      // Configure audio capture options with enhanced noise cancellation
+      // These settings improve audio quality by reducing background noise,
+      // echo from speakers, and automatically adjusting microphone gain
       await _room!.connect(
         wsUrl,
         token,
@@ -1244,8 +1247,16 @@ class CallClassController extends GetxController {
           adaptiveStream: true,
           dynacast: true,
           defaultAudioCaptureOptions: AudioCaptureOptions(
+            // Echo cancellation: Prevents microphone from picking up audio from speakers
+            // This eliminates echo/feedback in video calls
             echoCancellation: true,
+            
+            // Noise suppression: Reduces background noise (traffic, music, voices, etc.)
+            // This improves audio clarity for other participants
             noiseSuppression: true,
+            
+            // Auto gain control: Automatically adjusts microphone sensitivity
+            // This ensures consistent audio levels regardless of distance from mic
             autoGainControl: true,
           ),
         ),

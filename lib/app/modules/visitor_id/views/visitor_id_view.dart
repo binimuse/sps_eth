@@ -133,7 +133,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
           
   // Scanner View Area with Animation
          Obx(() => Container(
-           height: 250,
+           height: 200,
            width: double.infinity,
            decoration: BoxDecoration(
              color: Colors.black.withOpacity(0.8),
@@ -334,78 +334,16 @@ class VisitorIdView extends GetView<VisitorIdController> {
   Widget _buildScanningAnimation() {
     return Stack(
       children: [
-        // Document icon sliding through
+        // GIF Animation - centered and fills the container
         Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.0, end: 1.0),
-                duration: const Duration(milliseconds: 1500),
-                curve: Curves.easeInOut,
-                builder: (context, value, child) {
-                  return Transform.translate(
-                    offset: Offset(0, -50 + (value * 100)),
-                    child: Opacity(
-                      opacity: 1.0 - (value * 0.3),
-                      child: Icon(
-                        Icons.credit_card,
-                        size: 80,
-                        color: const Color(0xFF1976D2).withOpacity(0.8),
-                      ),
-                    ),
-                  );
-                },
-                onEnd: () {
-                  // Animation will restart automatically
-                },
-              ),
-              const SizedBox(height: 20),
-              // Animated dots
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(3, (index) {
-                  return TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    duration: Duration(milliseconds: 600 + (index * 200)),
-                    curve: Curves.easeInOut,
-                    builder: (context, value, child) {
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF1976D2).withOpacity(value),
-                        ),
-                      );
-                    },
-                    onEnd: () {
-                      // Animation will restart automatically
-                    },
-                  );
-                }),
-              ),
-            ],
+          child: Image.asset(
+            'assets/images/scanning_animation.gif',
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
           ),
         ),
-        // Scanning lines
-        Positioned.fill(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 2000),
-            curve: Curves.linear,
-            builder: (context, value, child) {
-              return CustomPaint(
-                painter: ScanningLinePainter(progress: value),
-              );
-            },
-            onEnd: () {
-              // Animation will restart automatically
-            },
-          ),
-        ),
-        // Status text
+        // Status text overlay
         Positioned(
           bottom: 20,
           left: 0,
@@ -417,6 +355,13 @@ class VisitorIdView extends GetView<VisitorIdController> {
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
+                shadows: [
+                  Shadow(
+                    color: Colors.black54,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
             ),
           ),
@@ -460,39 +405,5 @@ class VisitorIdView extends GetView<VisitorIdController> {
     );
   }
 
-}
-
-// Custom painter for scanning line effect
-class ScanningLinePainter extends CustomPainter {
-  final double progress;
-
-  ScanningLinePainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        colors: [
-          Colors.transparent,
-          const Color(0xFF1976D2).withOpacity(0.3),
-          const Color(0xFF1976D2).withOpacity(0.8),
-          const Color(0xFF1976D2).withOpacity(0.3),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.fill;
-
-    final yPosition = size.height * progress;
-    final rect = Rect.fromLTWH(0, yPosition - 2, size.width, 4);
-    canvas.drawRect(rect, paint);
-  }
-
-  @override
-  bool shouldRepaint(ScanningLinePainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
 }
 

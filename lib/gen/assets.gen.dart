@@ -1073,6 +1073,10 @@ class $AssetsImagesGen {
   /// File path: assets/images/scanid.png
   AssetGenImage get scanid => const AssetGenImage('assets/images/scanid.png');
 
+  /// File path: assets/images/scanning_animation.gif
+  AssetGenImage get scanningAnimation =>
+      const AssetGenImage('assets/images/scanning_animation.gif');
+
   /// File path: assets/images/sps.png
   AssetGenImage get sps => const AssetGenImage('assets/images/sps.png');
 
@@ -1131,6 +1135,7 @@ class $AssetsImagesGen {
     recent1,
     recent2,
     scanid,
+    scanningAnimation,
     sps,
     sucess,
     tigregna,

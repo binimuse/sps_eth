@@ -27,6 +27,19 @@ The following packages have been added:
 
 ## Architecture
 
+### Audio Quality & Noise Cancellation
+
+The implementation includes comprehensive noise cancellation features to ensure crystal-clear audio:
+
+**Audio Capture Options** (configured in `RoomOptions`):
+- **Echo Cancellation** (`echoCancellation: true`) - Prevents microphone from picking up audio from speakers, eliminating echo/feedback
+- **Noise Suppression** (`noiseSuppression: true`) - Reduces background noise (traffic, music, voices, etc.) for improved clarity
+- **Auto Gain Control** (`autoGainControl: true`) - Automatically adjusts microphone sensitivity for consistent audio levels
+
+These settings are automatically applied when connecting to a LiveKit room and provide optimal audio quality for video conferencing.
+
+**Note**: If using LiveKit Cloud, enhanced noise cancellation (including background voice cancellation) is automatically available on the server side for even better audio quality.
+
 ### Service Layer
 
 **File**: `lib/app/modules/call_class/services/livekit_service.dart`
@@ -225,6 +238,13 @@ Request:
 - Check device hardware availability
 - Review LiveKit server logs
 
+### Audio Quality Issues
+- Noise cancellation is enabled by default (echo cancellation, noise suppression, auto gain control)
+- If using LiveKit Cloud, enhanced noise cancellation is automatically applied server-side
+- For self-hosted LiveKit servers, ensure you're using the latest version for best audio processing
+- Check microphone quality and positioning
+- Verify that audio capture options are properly configured in `RoomOptions`
+
 ## Next Steps
 
 1. **Backend Integration**: Implement the REST API endpoints as described above
@@ -238,4 +258,6 @@ Request:
 - [LiveKit Flutter Documentation](https://docs.livekit.io/home/quickstarts/flutter/)
 - [LiveKit Server Setup](https://docs.livekit.io/home/self-hosting/)
 - [LiveKit Access Token Guide](https://docs.livekit.io/home/security/access-tokens/)
+- [Noise & Echo Cancellation](https://docs.livekit.io/transport/media/noise-cancellation/) - Audio quality optimization
+- [Enhanced Noise Cancellation](https://docs.livekit.io/transport/media/enhanced-noise-cancellation/) - LiveKit Cloud features
 
