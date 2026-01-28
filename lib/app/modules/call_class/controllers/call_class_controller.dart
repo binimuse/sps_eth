@@ -8,6 +8,7 @@ import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocke
 import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
 import 'package:sps_eth_app/app/modules/call_class/models/report_response_model.dart';
 import 'package:sps_eth_app/app/modules/call_class/views/widgets/confirmation_page_view.dart';
+import 'package:sps_eth_app/app/modules/call_class/views/widgets/attachment_upload_popup.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/services/auth_service.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:sps_eth_app/app/utils/dio_util.dart';
@@ -145,8 +146,18 @@ class CallClassController extends GetxController {
   final RxString faydaTransactionID = ''.obs;
   final Rx<Map<String, dynamic>> faydaData = Rx<Map<String, dynamic>>(<String, dynamic>{});
   
+  // Residence ID verification data
+  final Rx<Map<String, dynamic>> residenceData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  
+  // TIN verification data
+  final Rx<Map<String, dynamic>> tinData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  
   // Passport/ID photo from scanner (base64)
   String? _scannedIdPhoto;
+  
+  // Attachment upload state
+  final Rx<AttachmentUploadLinkEvent?> currentUploadRequest = Rx<AttachmentUploadLinkEvent?>(null);
+  final RxBool isUploadDialogOpen = false.obs;
 
   @override
   void onInit() {
@@ -202,6 +213,28 @@ class CallClassController extends GetxController {
           print('  - Name: ${faydaDataMap['name']}');
           print('  - Individual ID: ${faydaDataMap['individualId']}');
           print('  - Status: ${faydaDataMap['status']}');
+        }
+        
+        // Get Residence ID data (if available)
+        if (args['residenceData'] != null && args['residenceData'] is Map) {
+          final residenceDataMap = Map<String, dynamic>.from(args['residenceData'] as Map);
+          residenceData.value = residenceDataMap;
+          print('📞 [INIT] Residence Data received:');
+          print('  - Full Name: ${residenceDataMap['fullName']}');
+          print('  - Residence ID: ${args['residenceId']}');
+          print('  - Gender: ${residenceDataMap['gender']}');
+          print('  - Nationality: ${residenceDataMap['nationality']}');
+        }
+        
+        // Get TIN data (if available)
+        if (args['tinData'] != null && args['tinData'] is Map) {
+          final tinDataMap = Map<String, dynamic>.from(args['tinData'] as Map);
+          tinData.value = tinDataMap;
+          print('📞 [INIT] TIN Data received:');
+          print('  - Full Name: ${tinDataMap['fullName']}');
+          print('  - TIN Number: ${args['tinNumber']}');
+          print('  - Type: ${tinDataMap['tpTypeDesc']}');
+          print('  - Region: ${tinDataMap['region']}');
         }
         
         // Get scanned ID photo (base64) from passport scanner (if available)
@@ -505,8 +538,71 @@ class CallClassController extends GetxController {
           callStatus.value = 'ended';
           // Clear ending call loading state when WebSocket confirms call ended
           isEndingCall.value = false;
+          // Clear upload request when call ends
+          currentUploadRequest.value = null;
           // _handleCallEnded will handle navigation based on whether report exists
           _handleCallEnded(shouldNavigate: true);
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploadLink = (event) {
+        print('📎 [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_LINK: reportId=${event.reportId}, url=${event.url?.substring(0, 50)}...');
+        print('📎 [WEBSOCKET EVENT] Description: ${event.description}');
+        print('📎 [WEBSOCKET EVENT] Attachment Type: ${event.attachmentType}');
+        print('📎 [WEBSOCKET EVENT] Expires At: ${event.expiresAt}');
+        
+        // Show upload popup
+        currentUploadRequest.value = event;
+        isUploadDialogOpen.value = true;
+        
+        // Show dialog
+        final context = Get.context;
+        if (context != null && !Get.isDialogOpen!) {
+          Get.dialog(
+            AttachmentUploadPopup(uploadLinkEvent: event),
+            barrierDismissible: false,
+          ).then((_) {
+            isUploadDialogOpen.value = false;
+          });
+        }
+        
+        // Show toast notification
+        if (context != null) {
+          AppToasts.showSuccess(event.description ?? 'Please upload the requested file');
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploaded = (event) {
+        print('✅ [WEBSOCKET EVENT] ATTACHMENT_UPLOADED: reportId=${event.reportId}, fileName=${event.fileName}');
+        
+        // Close upload popup
+        if (Get.isDialogOpen!) {
+          Get.back();
+        }
+        currentUploadRequest.value = null;
+        isUploadDialogOpen.value = false;
+        
+        // Show success message
+        final context = Get.context;
+        if (context != null) {
+          AppToasts.showSuccess('File uploaded successfully: ${event.fileName ?? "File"}');
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploadFailed = (event) {
+        print('❌ [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_FAILED: reportId=${event.reportId}, reason=${event.reason}');
+        
+        // Close upload popup
+        if (Get.isDialogOpen!) {
+          Get.back();
+        }
+        currentUploadRequest.value = null;
+        isUploadDialogOpen.value = false;
+        
+        // Show error message
+        final context = Get.context;
+        if (context != null) {
+          AppToasts.showError('Upload failed: ${event.reason ?? "Unknown error"}');
         }
       };
       
@@ -838,6 +934,7 @@ class CallClassController extends GetxController {
       String? nationality;
       String? phoneNumber;
       String? address;
+      String? idType;
       
       if (faydaDataMap.isNotEmpty && faydaTransactionID.value.isNotEmpty) {
         idNumber = faydaDataMap['individualId']?.toString();
@@ -847,6 +944,7 @@ class CallClassController extends GetxController {
         nationality = faydaDataMap['nationality']?.toString();
         phoneNumber = faydaDataMap['phoneNumber']?.toString();
         address = faydaDataMap['address']?.toString();
+        idType = 'fayda';
         
         print('📤 [REQUEST CALL] Fayda data extracted:');
         print('  - ID Number: $idNumber');
@@ -856,14 +954,81 @@ class CallClassController extends GetxController {
         print('  - Phone: $phoneNumber');
         print('  - Address: $address');
         print('  - Photo URL: ${photoUrl != null ? "${photoUrl.substring(0, 20)}..." : "null"}');
+      } else {
+        // Extract Residence ID data if available
+        final residenceDataMap = residenceData.value;
+        final args = Get.arguments;
+        if (residenceDataMap.isNotEmpty && args != null && args['residenceId'] != null) {
+          idNumber = args['residenceId']?.toString();
+          fullname = residenceDataMap['fullName']?.toString();
+          fullnameAm = residenceDataMap['fullNameAmh']?.toString();
+          nationality = residenceDataMap['nationality']?.toString();
+          phoneNumber = residenceDataMap['phoneNo']?.toString();
+          idType = 'residence';
+          
+          // Build address from residence data
+          final addressParts = <String>[];
+          if (residenceDataMap['houseNo'] != null && residenceDataMap['houseNo'].toString().isNotEmpty) {
+            addressParts.add(residenceDataMap['houseNo'].toString());
+          }
+          if (residenceDataMap['ppaCity'] != null && residenceDataMap['ppaCity'].toString().isNotEmpty) {
+            addressParts.add(residenceDataMap['ppaCity'].toString());
+          }
+          if (residenceDataMap['ppaCityAmh'] != null && residenceDataMap['ppaCityAmh'].toString().isNotEmpty) {
+            addressParts.add(residenceDataMap['ppaCityAmh'].toString());
+          }
+          if (addressParts.isNotEmpty) {
+            address = addressParts.join(', ');
+          }
+          
+          print('📤 [REQUEST CALL] Residence data extracted:');
+          print('  - ID Number: $idNumber');
+          print('  - Full Name: $fullname');
+          print('  - Full Name (Am): $fullnameAm');
+          print('  - Nationality: $nationality');
+          print('  - Phone: $phoneNumber');
+          print('  - Address: $address');
+        } else {
+          // Extract TIN data if available
+          final tinDataMap = tinData.value;
+          if (tinDataMap.isNotEmpty && args != null && args['tinNumber'] != null) {
+            idNumber = args['tinNumber']?.toString();
+            fullname = tinDataMap['fullName']?.toString();
+            fullnameAm = tinDataMap['fullNameF']?.toString();
+            phoneNumber = tinDataMap['phoneNumber']?.toString();
+            idType = 'tin';
+            
+            // Build address from TIN data
+            final addressParts = <String>[];
+            if (tinDataMap['cityName'] != null && tinDataMap['cityName'].toString().isNotEmpty) {
+              addressParts.add(tinDataMap['cityName'].toString());
+            }
+            if (tinDataMap['localityDesc'] != null && tinDataMap['localityDesc'].toString().isNotEmpty) {
+              addressParts.add(tinDataMap['localityDesc'].toString());
+            }
+            if (tinDataMap['kebeleDesc'] != null && tinDataMap['kebeleDesc'].toString().isNotEmpty) {
+              addressParts.add(tinDataMap['kebeleDesc'].toString());
+            }
+            if (addressParts.isNotEmpty) {
+              address = addressParts.join(', ');
+            }
+            
+            print('📤 [REQUEST CALL] TIN data extracted:');
+            print('  - ID Number: $idNumber');
+            print('  - Full Name: $fullname');
+            print('  - Full Name (Am): $fullnameAm');
+            print('  - Phone: $phoneNumber');
+            print('  - Address: $address');
+          }
+        }
       }
       
-      // Create request payload with isVisitor, preferredLanguage, Fayda data, scanned ID photo, and device serial
+      // Create request payload with isVisitor, preferredLanguage, ID data, scanned ID photo, and device serial
       final requestPayload = RequestCallRequest(
         isVisitor: _isVisitor,
         preferredLanguage: _preferredLanguage,
         idNumber: idNumber,
-        idType: faydaTransactionID.value.isNotEmpty ? 'fayda' : null,
+        idType: idType,
         photoUrl: photoUrl,
         fullname: fullname,
         fullnameAm: fullnameAm,

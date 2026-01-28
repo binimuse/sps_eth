@@ -75,10 +75,10 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                const Text(
-                                  'Service List of planning and managing that promote a company\'s brand.',
-                                  style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
-                                ),
+                                Obx(() => Text(
+                                  controller.getServiceDescription(),
+                                  style: const TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
+                                )),
                               ],
                             ),
                           )),
@@ -190,7 +190,7 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
                                   // Fill out Form and Call for Assistance cards side by side
                                    _buildActionCard(
                                      title: 'Call Officer',
-                                     description: 'Ensuring accountability through proper incident documentation.',
+                                     description: controller.getActionCardDescription(),
                                      image: Assets.images.callA.path,
                                      onTap: () {
                                        controller.proceedToCallClass();
@@ -304,10 +304,13 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
   }
 
   Widget _buildDetailCardContent() {
-    final serviceTitle = controller.selectedService.value;
-    
-    return Column(
+    return Obx(() {
+      final serviceTitle = controller.selectedService.value;
+      final requirements = controller.getServiceRequirements();
+      
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Title and subtitle
           Text(
@@ -319,9 +322,9 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Service List of planning and managing that promote a company\'s brand.',
-            style: TextStyle(
+          Text(
+            controller.getServiceDescription(),
+            style: const TextStyle(
               color: Color(0xFF4F6B7E),
               fontSize: 12,
             ),
@@ -372,9 +375,13 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
-              children: List.generate(4, (index) {
-                final isLast = index == 3;
+              mainAxisSize: MainAxisSize.min,
+              children: requirements.asMap().entries.map((entry) {
+                final index = entry.key;
+                final requirement = entry.value;
+                final isLast = index == requirements.length - 1;
                 return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -387,10 +394,10 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
                             color: Colors.green,
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Lorem Ipsum is a placeholder text commonly used in the design and publishing industries as a temporary filler.',
-                              style: TextStyle(
+                              requirement,
+                              style: const TextStyle(
                                 color: Color(0xFF4F6B7E),
                                 fontSize: 12,
                               ),
@@ -407,11 +414,12 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
                       ),
                   ],
                 );
-              }),
+              }).toList(),
             ),
           ),
         ],
       );
+    });
   }
 
   Widget _buildActionCard({

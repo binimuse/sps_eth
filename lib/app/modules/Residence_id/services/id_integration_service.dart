@@ -76,4 +76,75 @@ abstract class IdIntegrationService {
   /// }
   @POST("id-integration/nid/get-data")
   Future<FaydaVerifyResponse> verifyOtp(@Body() FaydaVerifyRequest request);
+
+  /// Get Residence ID registration data
+  /// 
+  /// Query parameter:
+  /// registrationId: Residence ID (e.g., "AA00004****")
+  /// 
+  /// Success response:
+  /// {
+  ///   "success": true,
+  ///   "data": [
+  ///     {
+  ///       "MemberType": "Resisdent",
+  ///       "LOCID": "SC10/W06",
+  ///       "FirstName": "MERWAN",
+  ///       "LastName": "MUKTAR",
+  ///       ...
+  ///     }
+  ///   ],
+  ///   "meta": {
+  ///     "timestamp": "2026-01-28T17:38:34.106Z",
+  ///     "requestId": "50179184-3b21-4404-9ac7-df0594b2c6ef"
+  ///   }
+  /// }
+  /// 
+  /// Error response:
+  /// {
+  ///   "statusCode": 400,
+  ///   "message": "Bad Request",
+  ///   "error": "Invalid input parameters",
+  ///   "timestamp": "2024-01-15T10:30:00.000Z"
+  /// }
+  @GET("id-integration/crrsa/registration")
+  Future<ResidenceRegistrationResponse> getResidenceRegistration(
+    @Query("registrationId") String registrationId,
+  );
+
+  /// Get TIN taxpayer data
+  /// 
+  /// Query parameter:
+  /// tin: TIN Number (e.g., "0078843311")
+  /// 
+  /// Success response:
+  /// {
+  ///   "success": true,
+  ///   "data": {
+  ///     "status": "success",
+  ///     "taxPayerDetails": {
+  ///       "CMP_TIN": "0078843311",
+  ///       "FIRST_NAME": "BINIYAM",
+  ///       "MIDDLE_NAME": "MUSEMA",
+  ///       "LAST_NAME": "HASHIM",
+  ///       ...
+  ///     }
+  ///   },
+  ///   "meta": {
+  ///     "timestamp": "2026-01-28T17:55:23.307Z",
+  ///     "requestId": "461dfb2f-b2f2-429c-b390-d6061b34209b"
+  ///   }
+  /// }
+  /// 
+  /// Error response:
+  /// {
+  ///   "statusCode": 400,
+  ///   "message": "Bad Request",
+  ///   "error": "Invalid input parameters",
+  ///   "timestamp": "2024-01-15T10:30:00.000Z"
+  /// }
+  @GET("id-integration/mor/taxpayer")
+  Future<TinTaxpayerResponse> getTaxpayer(
+    @Query("tin") String tin,
+  );
 }

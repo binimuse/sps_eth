@@ -415,3 +415,64 @@ class CallDetailsResponseWrapper {
   Map<String, dynamic> toJson() => _$CallDetailsResponseWrapperToJson(this);
 }
 
+// Attachment Upload Link Event (received when admin requests file upload)
+@JsonSerializable()
+class AttachmentUploadLinkEvent {
+  const AttachmentUploadLinkEvent({
+    this.reportId,
+    this.url,
+    this.expiresAt,
+    this.attachmentType,
+    this.description,
+  });
+
+  factory AttachmentUploadLinkEvent.fromJson(Map<String, dynamic> json) =>
+      _$AttachmentUploadLinkEventFromJson(json);
+
+  final String? reportId;
+  final String? url;
+  final String? expiresAt;
+  final String? attachmentType;
+  final String? description;
+
+  Map<String, dynamic> toJson() => _$AttachmentUploadLinkEventToJson(this);
+}
+
+// Attachment Uploaded Event (received when upload completes)
+@JsonSerializable()
+class AttachmentUploadedEvent {
+  const AttachmentUploadedEvent({
+    this.reportId,
+    this.attachmentId,
+    this.fileName,
+    this.attachmentType,
+  });
+
+  factory AttachmentUploadedEvent.fromJson(Map<String, dynamic> json) =>
+      _$AttachmentUploadedEventFromJson(json);
+
+  final String? reportId;
+  final String? attachmentId;
+  final String? fileName;
+  final String? attachmentType;
+
+  Map<String, dynamic> toJson() => _$AttachmentUploadedEventToJson(this);
+}
+
+// Attachment Upload Failed Event (received when upload fails)
+@JsonSerializable()
+class AttachmentUploadFailedEvent {
+  const AttachmentUploadFailedEvent({
+    this.reportId,
+    this.reason,
+  });
+
+  factory AttachmentUploadFailedEvent.fromJson(Map<String, dynamic> json) =>
+      _$AttachmentUploadFailedEventFromJson(json);
+
+  final String? reportId;
+  final String? reason;
+
+  Map<String, dynamic> toJson() => _$AttachmentUploadFailedEventToJson(this);
+}
+

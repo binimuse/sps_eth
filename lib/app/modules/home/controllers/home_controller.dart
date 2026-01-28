@@ -90,43 +90,45 @@ class HomeController extends GetxController {
   /// Handle back button press - show confirmation dialog
   Future<bool> onWillPop() async {
     final shouldExit = await Get.dialog<bool>(
-      AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: AppColors.danger),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Exit App?'.tr,
-                style: TextStyle(
-                  color: AppColors.danger,
-                  fontWeight: FontWeight.bold,
+      Builder(
+        builder: (dialogContext) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Exit App?'.tr,
+                  style: TextStyle(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to close the app?'.tr,
+            style: TextStyle(color: AppColors.grayDark),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                'Cancel'.tr,
+                style: TextStyle(color: AppColors.primary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: TextButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Exit'.tr),
             ),
           ],
         ),
-        content: Text(
-          'Are you sure you want to close the app?'.tr,
-          style: TextStyle(color: AppColors.grayDark),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: Text(
-              'Cancel'.tr,
-              style: TextStyle(color: AppColors.primary),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Get.back(result: true),
-            style: TextButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Exit'.tr),
-          ),
-        ],
       ),
       barrierDismissible: false,
     );

@@ -1153,12 +1153,23 @@ class $AssetsLottieGen {
   List<String> get values => [submitAnimation];
 }
 
+class $AssetsVideosGen {
+  const $AssetsVideosGen();
+
+  /// File path: assets/videos/scanning_animation.webm
+  String get scanningAnimation => 'assets/videos/scanning_animation.webm';
+
+  /// List of all assets
+  List<String> get values => [scanningAnimation];
+}
+
 class Assets {
   const Assets._();
 
   static const $AssetsIconsGen icons = $AssetsIconsGen();
   static const $AssetsImagesGen images = $AssetsImagesGen();
   static const $AssetsLottieGen lottie = $AssetsLottieGen();
+  static const $AssetsVideosGen videos = $AssetsVideosGen();
 }
 
 class AssetGenImage {

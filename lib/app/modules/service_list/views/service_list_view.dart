@@ -77,7 +77,7 @@ class ServiceListView extends GetView<ServiceListController> {
                                 ),
                                 SizedBox(height: 4),
                                 Text(
-                                  'Service List of planning and managing that promote a company\'s brand.',
+                                  'Access various police services including crime reporting, traffic incident reporting, and general incident documentation through our digital platform.',
                                   style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
                                 ),
                               ],
