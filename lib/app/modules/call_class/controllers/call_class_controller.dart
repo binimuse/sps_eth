@@ -560,9 +560,12 @@ class CallClassController extends GetxController {
         if (context != null && !Get.isDialogOpen!) {
           Get.dialog(
             AttachmentUploadPopup(uploadLinkEvent: event),
-            barrierDismissible: false,
+            barrierDismissible: true, // Allow closing by tapping outside
           ).then((_) {
+            // Update state when dialog is closed (either manually or automatically)
             isUploadDialogOpen.value = false;
+            // Optionally clear the upload request when manually closed
+            // currentUploadRequest.value = null; // Uncomment if you want to clear on manual close
           });
         }
         
@@ -575,34 +578,30 @@ class CallClassController extends GetxController {
       _webSocketService!.onAttachmentUploaded = (event) {
         print('✅ [WEBSOCKET EVENT] ATTACHMENT_UPLOADED: reportId=${event.reportId}, fileName=${event.fileName}');
         
-        // Close upload popup
-        if (Get.isDialogOpen!) {
-          Get.back();
-        }
+        // Close upload popup safely
+        _closeUploadDialogSafely();
         currentUploadRequest.value = null;
         isUploadDialogOpen.value = false;
         
         // Show success message
         final context = Get.context;
         if (context != null) {
-          AppToasts.showSuccess('File uploaded successfully: ${event.fileName ?? "File"}');
+          _showToastSafely(() => AppToasts.showSuccess('File uploaded successfully: ${event.fileName ?? "File"}'));
         }
       };
       
       _webSocketService!.onAttachmentUploadFailed = (event) {
         print('❌ [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_FAILED: reportId=${event.reportId}, reason=${event.reason}');
         
-        // Close upload popup
-        if (Get.isDialogOpen!) {
-          Get.back();
-        }
+        // Close upload popup safely
+        _closeUploadDialogSafely();
         currentUploadRequest.value = null;
         isUploadDialogOpen.value = false;
         
         // Show error message
         final context = Get.context;
         if (context != null) {
-          AppToasts.showError('Upload failed: ${event.reason ?? "Unknown error"}');
+          _showToastSafely(() => AppToasts.showError('Upload failed: ${event.reason ?? "Unknown error"}'));
         }
       };
       
@@ -2891,5 +2890,74 @@ class CallClassController extends GetxController {
 
   void clearMessage() {
     messageController.clear();
+  }
+
+  /// Safely close the upload dialog without triggering GetX overlay errors
+  void _closeUploadDialogSafely() {
+    // Use a delayed call to ensure the widget tree is stable
+    Future.delayed(const Duration(milliseconds: 100), () {
+      try {
+        final context = Get.context;
+        if (context != null) {
+          // Use Navigator directly to avoid GetX overlay controller issues
+          // Try rootNavigator first (for dialogs)
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
+            print('✅ [UPLOAD POPUP] Dialog closed using rootNavigator');
+            return;
+          }
+          
+          // Try regular navigator
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+            print('✅ [UPLOAD POPUP] Dialog closed using Navigator');
+            return;
+          }
+          
+          print('⚠️ [UPLOAD POPUP] Cannot pop dialog - no routes to pop');
+        } else {
+          print('⚠️ [UPLOAD POPUP] No context available to close dialog');
+        }
+      } catch (e) {
+        print('⚠️ [UPLOAD POPUP] Error closing dialog: $e');
+        // Last resort: try again after a longer delay
+        Future.delayed(const Duration(milliseconds: 300), () {
+          try {
+            final context = Get.context;
+            if (context != null) {
+              if (Navigator.of(context, rootNavigator: true).canPop()) {
+                Navigator.of(context, rootNavigator: true).pop();
+              } else if (Navigator.canPop(context)) {
+                Navigator.of(context).pop();
+              }
+            }
+          } catch (e2) {
+            print('⚠️ [UPLOAD POPUP] Retry failed: $e2');
+          }
+        });
+      }
+    });
+  }
+
+  /// Safely show toast by checking if context is available and delaying if needed
+  void _showToastSafely(VoidCallback showToast) {
+    // Delay to ensure widget tree is built
+    Future.delayed(const Duration(milliseconds: 300), () {
+      try {
+        if (Get.context != null) {
+          showToast();
+        } else {
+          // If context is still not available, try again after a longer delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (Get.context != null) {
+              showToast();
+            }
+          });
+        }
+      } catch (e) {
+        print('⚠️ [UPLOAD POPUP] Error showing toast: $e');
+        // Silently fail - error message is already shown in UI
+      }
+    });
   }
 }

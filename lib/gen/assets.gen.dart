@@ -1016,6 +1016,9 @@ class $AssetsImagesGen {
   /// File path: assets/images/fill.png
   AssetGenImage get fill => const AssetGenImage('assets/images/fill.png');
 
+  /// File path: assets/images/google.gif
+  AssetGenImage get google => const AssetGenImage('assets/images/google.gif');
+
   /// File path: assets/images/incident.png
   AssetGenImage get incident =>
       const AssetGenImage('assets/images/incident.png');
@@ -1118,6 +1121,7 @@ class $AssetsImagesGen {
     efpLogo,
     email,
     fill,
+    google,
     incident,
     insertcard,
     law,
