@@ -25,15 +25,15 @@ import 'package:sps_eth_app/app/modules/language/controllers/language_controller
 import 'package:sps_eth_app/app/modules/language/views/language_view.dart';
 
 class ChatMessage {
-  final String text;
-  final bool isFromOP; // true if from OP (Officer/Operator), false if from other party
-  final String time;
-
   ChatMessage({
     required this.text,
     required this.isFromOP,
     required this.time,
   });
+
+  final bool isFromOP; // true if from OP (Officer/Operator), false if from other party
+  final String text;
+  final String time;
 }
 
 class InfoRow {
@@ -49,115 +49,156 @@ class DocumentItem {
     required this.fileName,
   });
 
-  final String label;
   final String fileName;
+  final String label;
 }
 
 class CallClassController extends GetxController {
-  final messages = <ChatMessage>[].obs;
+  // Auto-start flag for home swipe
+  final RxBool autoStartCall = false.obs;
 
-  final messageController = TextEditingController();
+  // Camera selection
+  final RxList<CameraPosition> availableCameraPositions = <CameraPosition>[].obs;
 
-  final selectedLanguage = 'English'.obs;
-  final TextEditingController keyboardController = TextEditingController();
-  TextEditingController? focusedController;
-  FocusNode? focusedField = FocusNode();
+  // Media devices enumeration for debugging
+  final RxList<MediaDevice> availableCameras = <MediaDevice>[].obs;
 
+  final RxList<MediaDevice> availableMicrophones = <MediaDevice>[].obs;
+  // Call details from backend
+  final Rx<CallDetailsResponse?> callDetails = Rx<CallDetailsResponse?>(null);
+
+  final Rx<NetworkStatus> callNetworkStatus = NetworkStatus.IDLE.obs;
+  // Direct Call state
+  final RxString callStatus = 'idle'.obs; // idle, pending, connecting, active, ended
+
+  final RxString connectionStatus = 'Disconnected'.obs;
+  // Connectivity monitoring
+  final ConnectivityUtil connectivityUtil = ConnectivityUtil();
+
+  final RxString currentCameraDeviceId = ''.obs;
+  final RxInt currentCameraIndex = 0.obs;
+  final RxString currentMicrophoneDeviceId = ''.obs;
   // Progress tracking for call process
   final RxInt currentProgressStep = 0.obs; // 0: not started, 1: connecting, 2: report initiated, 3: attachment upload
-  final RxBool isConnectingToOfficer = false.obs;
-  final RxBool isReportInitiated = false.obs;
-  final RxBool isAttachmentUploading = false.obs;
+
+  final Rx<String?> currentRoomName = Rx<String?>('');
+  final Rx<String?> currentSessionId = Rx<String?>('');
+  // Attachment upload state
+  final Rx<AttachmentUploadLinkEvent?> currentUploadRequest = Rx<AttachmentUploadLinkEvent?>(null);
+
+  final Rx<String?> currentWsUrl = Rx<String?>('');
+  final RxString discussionDate = 'June 12, 2024'.obs;
+  final Rx<Map<String, dynamic>> faydaData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  // Fayda ID verification data
+  final RxString faydaTransactionID = ''.obs;
+
+  TextEditingController? focusedController;
+  FocusNode? focusedField = FocusNode();
+  final RxBool hasMultipleCameras = false.obs;
   final RxList<InfoRow> idInformation = <InfoRow>[].obs;
+  final Rx<IncomingCallEvent?> incomingCall = Rx<IncomingCallEvent?>(null);
+  // Anonymous login state
+  final RxBool isAnonymousLoginLoading = false.obs;
+
+  final RxBool isAttachmentUploading = false.obs;
+  final RxBool isAudioEnabled = true.obs;
+  final RxBool isConnected = false.obs;
+  final RxBool isConnectingToOfficer = false.obs;
+  final RxBool isEndingCall = false.obs; // Loading state for ending call
+  final RxBool isReportInitiated = false.obs;
+  final RxBool isUploadDialogOpen = false.obs;
+  final RxBool isVideoEnabled = true.obs;
+  final TextEditingController keyboardController = TextEditingController();
+  final Rx<VideoTrack?> localVideoTrack = Rx<VideoTrack?>(null);
+  final messageController = TextEditingController();
+  final messages = <ChatMessage>[].obs;
+  // For employee side
+  final RxList<PendingCall> pendingCalls = <PendingCall>[].obs;
+
+  final RxList<RemoteParticipant> remoteParticipants = <RemoteParticipant>[].obs;
+  /// Reactive remote video track so admin UI rebuilds when track becomes subscribed (fixes black screen)
+  final Rx<VideoTrack?> remoteVideoTrack = Rx<VideoTrack?>(null);
+
+  // Report and statement data from call details
+  final Rx<ReportInfo?> reportInfo = Rx<ReportInfo?>(null);
+
+  // Residence ID verification data
+  final Rx<Map<String, dynamic>> residenceData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+
+  final selectedLanguage = 'English'.obs;
+  final Rx<StatementInfo?> statementInfo = Rx<StatementInfo?>(null);
   final RxList<DocumentItem> supportingDocuments = <DocumentItem>[].obs;
   final RxString termsAndConditions =
       'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'
           .obs;
-  final RxString discussionDate = 'June 12, 2024'.obs;
-  
-  // Call details from backend
-  final Rx<CallDetailsResponse?> callDetails = Rx<CallDetailsResponse?>(null);
+
+  // TIN verification data
+  final Rx<Map<String, dynamic>> tinData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+
+  static const int _callDetailsPollInterval = 3; // seconds (reduced for faster updates)
+  static const Duration _remoteVideoTrackRetryInterval = Duration(milliseconds: 200);
+  static const int _remoteVideoTrackRetryMax = 20; // 200ms * 20 = 4s
+
+  // Call details polling
+  Timer? _callDetailsPollingTimer;
+
+  // Connection timeout monitor
+  Timer? _connectionTimeoutTimer;
 
   // Direct Call services
   final DirectCallService _directCallService = DirectCallService(
     DioUtil().getDio(useAccessToken: true),
   );
-  DirectCallWebSocketService? _webSocketService;
+
+  bool _isLoadingCallDetails = false; // Prevent overlapping requests
+  // Call request parameters
+  bool _isVisitor = false; // Default to false (residence/home)
+
+  LocalParticipant? _localParticipant;
+  String? _preferredLanguage; // Will be set if language was selected
+  final Map<RemoteParticipant, void Function()> _remoteParticipantListeners = {};
+  int _remoteVideoTrackRetryCount = 0;
+  /// Workaround for LiveKit Flutter #919: on Android, publication.track can be null after subscribe.
+  /// We retry _updateRemoteVideoTrack periodically until track appears or timeout.
+  Timer? _remoteVideoTrackRetryTimer;
+
+  /// Delayed sync of remote participants after connect (fixes admin black screen when admin joins after kiosk).
+  Timer? _remoteVideoTrackSyncTimer;
 
   // LiveKit related
   Room? _room;
-  LocalParticipant? _localParticipant;
-  final RxBool isConnected = false.obs;
-  final RxBool isVideoEnabled = true.obs;
-  final RxBool isAudioEnabled = true.obs;
-  final Rx<VideoTrack?> localVideoTrack = Rx<VideoTrack?>(null);
-  final RxList<RemoteParticipant> remoteParticipants = <RemoteParticipant>[].obs;
-  final RxString connectionStatus = 'Disconnected'.obs;
-  
-  // Camera selection
-  final RxList<CameraPosition> availableCameraPositions = <CameraPosition>[].obs;
-  final RxInt currentCameraIndex = 0.obs;
-  final RxBool hasMultipleCameras = false.obs;
-  
-  // Media devices enumeration for debugging
-  final RxList<MediaDevice> availableCameras = <MediaDevice>[].obs;
-  final RxList<MediaDevice> availableMicrophones = <MediaDevice>[].obs;
-  final RxString currentCameraDeviceId = ''.obs;
-  final RxString currentMicrophoneDeviceId = ''.obs;
-  
-  // Direct Call state
-  final RxString callStatus = 'idle'.obs; // idle, pending, connecting, active, ended
-  final Rx<String?> currentSessionId = Rx<String?>('');
-  final Rx<String?> currentRoomName = Rx<String?>('');
-  final Rx<String?> currentWsUrl = Rx<String?>('');
-  final Rx<NetworkStatus> callNetworkStatus = NetworkStatus.IDLE.obs;
-  final RxBool isEndingCall = false.obs; // Loading state for ending call
-  
-  // For employee side
-  final RxList<PendingCall> pendingCalls = <PendingCall>[].obs;
-  final Rx<IncomingCallEvent?> incomingCall = Rx<IncomingCallEvent?>(null);
-  
-  // Auto-start flag for home swipe
-  final RxBool autoStartCall = false.obs;
-  
-  // Connection timeout monitor
-  Timer? _connectionTimeoutTimer;
-  
-  // Anonymous login state
-  final RxBool isAnonymousLoginLoading = false.obs;
-  
-  // Connectivity monitoring
-  final ConnectivityUtil connectivityUtil = ConnectivityUtil();
-  
-  // Report and statement data from call details
-  final Rx<ReportInfo?> reportInfo = Rx<ReportInfo?>(null);
-  final Rx<StatementInfo?> statementInfo = Rx<StatementInfo?>(null);
-  
-  // Call details polling
-  Timer? _callDetailsPollingTimer;
-  static const int _callDetailsPollInterval = 3; // seconds (reduced for faster updates)
-  bool _isLoadingCallDetails = false; // Prevent overlapping requests
-  
-  // Call request parameters
-  bool _isVisitor = false; // Default to false (residence/home)
-  String? _preferredLanguage; // Will be set if language was selected
-  
-  // Fayda ID verification data
-  final RxString faydaTransactionID = ''.obs;
-  final Rx<Map<String, dynamic>> faydaData = Rx<Map<String, dynamic>>(<String, dynamic>{});
-  
-  // Residence ID verification data
-  final Rx<Map<String, dynamic>> residenceData = Rx<Map<String, dynamic>>(<String, dynamic>{});
-  
-  // TIN verification data
-  final Rx<Map<String, dynamic>> tinData = Rx<Map<String, dynamic>>(<String, dynamic>{});
-  
+
   // Passport/ID photo from scanner (base64)
   String? _scannedIdPhoto;
-  
-  // Attachment upload state
-  final Rx<AttachmentUploadLinkEvent?> currentUploadRequest = Rx<AttachmentUploadLinkEvent?>(null);
-  final RxBool isUploadDialogOpen = false.obs;
+
+  DirectCallWebSocketService? _webSocketService;
+
+  @override
+  void onClose() {
+    _connectionTimeoutTimer?.cancel();
+    _remoteVideoTrackRetryTimer?.cancel();
+    _remoteVideoTrackRetryTimer = null;
+    _remoteVideoTrackSyncTimer?.cancel();
+    _remoteVideoTrackSyncTimer = null;
+    _stopCallDetailsPolling();
+    for (var entry in _remoteParticipantListeners.entries.toList()) {
+      try {
+        entry.key.removeListener(entry.value);
+      } catch (_) {}
+    }
+    _remoteParticipantListeners.clear();
+    remoteVideoTrack.value = null;
+    disconnectFromRoom();
+    _webSocketService?.disconnect();
+    messageController.dispose();
+    keyboardController.dispose();
+    focusedField?.dispose();
+    // Dispose connectivity monitoring
+    connectivityUtil.dispose();
+    // Clear tokens when controller is closed
+    clearTokensOnExit();
+    super.onClose();
+  }
 
   @override
   void onInit() {
@@ -266,7 +307,7 @@ class CallClassController extends GetxController {
       AppToasts.showError('Failed to initialize call class: ${e.toString()}');
     }
   }
-  
+
   @override
   void onReady() {
     super.onReady();
@@ -278,573 +319,10 @@ class CallClassController extends GetxController {
       AppToasts.showError('Failed to initialize call class: ${error.toString()}');
     });
   }
-  
-  /// Check authentication before allowing access to video call
-  /// Uses anonymous login if not authenticated
-  Future<void> _checkAuthBeforeAccess() async {
-    try {
-      print('🔐 [AUTH CHECK] Starting authentication check...');
-      
-      // First check if user is already authenticated
-      final isAuthenticated = await AuthUtil().isFullyAuthenticated();
-      print('🔐 [AUTH CHECK] isFullyAuthenticated: $isAuthenticated');
-      
-      if (isAuthenticated) {
-        // Check if token is not expired
-        final token = await AuthUtil().getAccessToken();
-        if (token != null && !JwtUtil.isTokenExpired(token)) {
-          print('✅ [AUTH CHECK] User already authenticated with valid token');
-          print('✅ [AUTH CHECK] Token is valid, connecting WebSocket...');
-          // User is authenticated, connect WebSocket
-          await _checkAuthAndConnectWebSocket();
-          
-          // If auto-start is requested, automatically start the call
-          if (autoStartCall.value) {
-            print('📞 [AUTO START] Auto-starting call after authentication...');
-            try {
-              // Small delay to ensure WebSocket is connected
-              await Future.delayed(const Duration(milliseconds: 500));
-              await requestCall();
-            } catch (e, stackTrace) {
-              print('❌ [AUTO START] Error auto-starting call: $e');
-              print('❌ [AUTO START] Stack trace: $stackTrace');
-              AppToasts.showError('Failed to auto-start call: ${e.toString()}');
-            }
-          }
-          return;
-        }
-      }
-      
-      // User is not authenticated or token is expired, perform anonymous login
-      print('🔐 [ANONYMOUS LOGIN] User not authenticated, performing anonymous login...');
-      await _performAnonymousLogin();
-      
-    } catch (e, stackTrace) {
-      print('❌ [AUTH CHECK] Fatal error in _checkAuthBeforeAccess: $e');
-      print('❌ [AUTH CHECK] Stack trace: $stackTrace');
-      isAnonymousLoginLoading.value = false;
-      AppToasts.showError('Failed to initialize authentication: ${e.toString()}');
-      rethrow;
-    }
-  }
-  
-  /// Perform anonymous login using device ID
-  Future<void> _performAnonymousLogin() async {
-    try {
-      isAnonymousLoginLoading.value = true;
-      
-      // Get device ID from utility (for now returns common static ID)
-      final deviceId = await DeviceIdUtil.getDeviceId();
-      print('🔐 [ANONYMOUS LOGIN] Starting anonymous login with device ID: $deviceId');
-      
-      // Create Dio instance without access token (since we don't have one yet)
-      final dio = DioUtil().getDio(useAccessToken: false);
-      final authService = AuthService(dio);
-      
-      // Call anonymous login API
-      final response = await authService.anonymousLogin({
-        'deviceId': deviceId,
-      });
-      
-      print('🔐 [ANONYMOUS LOGIN] API response received');
-      print('  - success: ${response.success}');
-      print('  - accessToken: ${response.data?.accessToken != null ? "${response.data!.accessToken!.substring(0, 20)}..." : "null"}');
-      print('  - user: ${response.data?.user != null ? "exists" : "null"}');
-      
-      if (response.success != true || response.data == null) {
-        throw Exception('Anonymous login failed: Invalid response from server');
-      }
-      
-      final loginData = response.data!;
-      
-      if (loginData.accessToken == null || loginData.accessToken!.isEmpty) {
-        throw Exception('Anonymous login failed: Access token is missing');
-      }
-      
-      if (loginData.user == null) {
-        throw Exception('Anonymous login failed: User data is missing');
-      }
-      
-      // Convert user to Map for storage
-      final userMap = loginData.user!.toJson();
-      
-      // Save tokens and user info
-      print('💾 [ANONYMOUS LOGIN] Saving tokens and user data...');
-      await AuthUtil().saveTokenAndUserInfo(
-        accessToken: loginData.accessToken!,
-        refreshToken: loginData.refreshToken ?? '', // Anonymous login might not provide refresh token
-        user: userMap,
-      );
-      
-      // Verify token was saved
-      final savedToken = await AuthUtil().getAccessToken();
-      if (savedToken == null || savedToken != loginData.accessToken) {
-        throw Exception('Failed to save authentication token');
-      }
-      
-      print('✅ [ANONYMOUS LOGIN] Anonymous login successful');
-      print('✅ [ANONYMOUS LOGIN] Token saved, connecting WebSocket...');
-      
-      // Connect WebSocket
-      await _checkAuthAndConnectWebSocket();
-      
-      // If auto-start is requested, automatically start the call
-      if (autoStartCall.value) {
-        print('📞 [AUTO START] Auto-starting call after anonymous login...');
-        try {
-          // Small delay to ensure WebSocket is connected
-          await Future.delayed(const Duration(milliseconds: 500));
-          await requestCall();
-        } catch (e, stackTrace) {
-          print('❌ [AUTO START] Error auto-starting call: $e');
-          print('❌ [AUTO START] Stack trace: $stackTrace');
-          AppToasts.showError('Failed to auto-start call: ${e.toString()}');
-        }
-      }
-    } on dio.DioException catch (e) {
-      print('❌ [ANONYMOUS LOGIN] DioException: ${e.type}');
-      print('❌ [ANONYMOUS LOGIN] Status Code: ${e.response?.statusCode}');
-      print('❌ [ANONYMOUS LOGIN] Response: ${e.response?.data}');
-      print('❌ [ANONYMOUS LOGIN] Error: ${e.error}');
-      print('❌ [ANONYMOUS LOGIN] Message: ${e.message}');
-      
-      String errorMessage = 'Failed to authenticate. Please try again.';
-      
-      // Detect network connectivity errors
-      if (e.type == dio.DioExceptionType.connectionTimeout ||
-          e.type == dio.DioExceptionType.receiveTimeout ||
-          e.type == dio.DioExceptionType.sendTimeout) {
-        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
-      } else if (e.type == dio.DioExceptionType.connectionError) {
-        // Check for specific network unreachable errors
-        final errorString = e.error?.toString().toLowerCase() ?? '';
-        final messageString = e.message?.toLowerCase() ?? '';
-        
-        if (errorString.contains('network is unreachable') ||
-            errorString.contains('connection failed') ||
-            errorString.contains('socketexception') ||
-            messageString.contains('network is unreachable') ||
-            messageString.contains('connection failed')) {
-          errorMessage = 'No internet connection. Please check your network settings and try again.';
-          print('⚠️ [ANONYMOUS LOGIN] Network connectivity issue detected - device cannot reach the server');
-        } else {
-          errorMessage = 'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
-        }
-      } else if (e.response?.statusCode == 400 || e.response?.statusCode == 500) {
-        // Backend validation errors
-        try {
-          final responseData = e.response?.data;
-          if (responseData is Map<String, dynamic>) {
-            final error = responseData['error'];
-            if (error is Map && error.containsKey('message')) {
-              errorMessage = error['message'] ?? errorMessage;
-            } else if (responseData.containsKey('message')) {
-              errorMessage = responseData['message'] ?? errorMessage;
-            }
-          }
-        } catch (_) {}
-      }
-      
-      // Show user-friendly error message
-      AppToasts.showError(errorMessage);
-      rethrow;
-    } catch (e, stackTrace) {
-      print('❌ [ANONYMOUS LOGIN] Exception: $e');
-      print('❌ [ANONYMOUS LOGIN] Stack trace: $stackTrace');
-      AppToasts.showError('An unexpected error occurred during authentication. Please try again.');
-      rethrow;
-    } finally {
-      isAnonymousLoginLoading.value = false;
-    }
-  }
-  
-  /// Check authentication and connect WebSocket if authenticated
-  Future<void> _checkAuthAndConnectWebSocket() async {
-    try {
-      print('🔌 [WEBSOCKET] Checking authentication for WebSocket connection...');
-      final isAuthenticated = await AuthUtil().isFullyAuthenticated();
-      print('🔌 [WEBSOCKET] isAuthenticated: $isAuthenticated');
-      
-      if (isAuthenticated) {
-        // Also check if token is not expired
-        final token = await AuthUtil().getAccessToken();
-        print('🔌 [WEBSOCKET] Token exists: ${token != null}');
-        
-        if (token != null && !JwtUtil.isTokenExpired(token)) {
-          print('✅ [WEBSOCKET] Token valid, connecting WebSocket...');
-          await _connectWebSocket();
-        } else {
-          print('❌ [WEBSOCKET] Token expired or null, performing anonymous login...');
-          if (token != null) {
-            print('🔌 [WEBSOCKET] Token expired: ${JwtUtil.isTokenExpired(token)}');
-          }
-          // Perform anonymous login instead of showing login dialog
-          await _performAnonymousLogin();
-        }
-      } else {
-        print('❌ [WEBSOCKET] User not authenticated, WebSocket connection skipped');
-      }
-    } catch (e, stackTrace) {
-      print('❌ [WEBSOCKET] Error in _checkAuthAndConnectWebSocket: $e');
-      print('❌ [WEBSOCKET] Stack trace: $stackTrace');
-      AppToasts.showError('Failed to connect WebSocket: ${e.toString()}');
-      rethrow;
-    }
-  }
-  
-  /// Connect to Direct Call WebSocket
-  Future<void> _connectWebSocket() async {
-    print('🔌 [WEBSOCKET] Starting WebSocket connection...');
-    try {
-      _webSocketService = DirectCallWebSocketService();
-      print('🔌 [WEBSOCKET] WebSocket service created');
-      
-      // Set up event handlers
-      _webSocketService!.onIncomingCall = (event) {
-        print('📞 [WEBSOCKET EVENT] incomingCall: sessionId=${event.sessionId}, roomName=${event.roomName}, callerId=${event.callerId}');
-        incomingCall.value = event;
-        // Optionally refresh pending calls
-        _loadPendingCalls();
-      };
-      
-      _webSocketService!.onCallAccepted = (event) {
-        print('✅ [WEBSOCKET EVENT] callAccepted: sessionId=${event.sessionId}, roomName=${event.roomName}');
-        print('📊 [WEBSOCKET EVENT] Current sessionId: ${currentSessionId.value}');
-        if (event.sessionId == currentSessionId.value) {
-          print('✅ [WEBSOCKET EVENT] Session IDs match, updating call status to active');
-          callStatus.value = 'active';
-          connectionStatus.value = 'Connected';
-          // Start polling for call details when call is accepted (this includes report and statement)
-          if (event.sessionId != null && event.sessionId!.isNotEmpty) {
-            _startCallDetailsPolling();
-          }
-        } else {
-          print('⚠️ [WEBSOCKET EVENT] Session IDs do not match! Event: ${event.sessionId}, Current: ${currentSessionId.value}');
-        }
-      };
-      
-      _webSocketService!.onCallRejected = (event) {
-        print('❌ [WEBSOCKET EVENT] callRejected: sessionId=${event.sessionId}, message=${event.message}');
-        if (event.sessionId == currentSessionId.value) {
-          callStatus.value = 'ended';
-          _handleCallEnded(shouldNavigate: false);
-          AppToasts.showError(event.message ?? 'Call rejected');
-        }
-      };
-      
-      _webSocketService!.onCallEnded = (event) {
-        print('🔚 [WEBSOCKET EVENT] callEnded: sessionId=${event.sessionId}, duration=${event.duration}, message=${event.message}');
-        if (event.sessionId == currentSessionId.value) {
-          callStatus.value = 'ended';
-          // Clear ending call loading state when WebSocket confirms call ended
-          isEndingCall.value = false;
-          // Clear upload request when call ends
-          currentUploadRequest.value = null;
-          // _handleCallEnded will handle navigation based on whether report exists
-          _handleCallEnded(shouldNavigate: true);
-        }
-      };
-      
-      _webSocketService!.onAttachmentUploadLink = (event) {
-        print('📎 [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_LINK: reportId=${event.reportId}, url=${event.url?.substring(0, 50)}...');
-        print('📎 [WEBSOCKET EVENT] Description: ${event.description}');
-        print('📎 [WEBSOCKET EVENT] Attachment Type: ${event.attachmentType}');
-        print('📎 [WEBSOCKET EVENT] Expires At: ${event.expiresAt}');
-        
-        // Show upload popup
-        currentUploadRequest.value = event;
-        isUploadDialogOpen.value = true;
-        
-        // Show dialog
-        final context = Get.context;
-        if (context != null && !Get.isDialogOpen!) {
-          Get.dialog(
-            AttachmentUploadPopup(uploadLinkEvent: event),
-            barrierDismissible: true, // Allow closing by tapping outside
-          ).then((_) {
-            // Update state when dialog is closed (either manually or automatically)
-            isUploadDialogOpen.value = false;
-            // Optionally clear the upload request when manually closed
-            // currentUploadRequest.value = null; // Uncomment if you want to clear on manual close
-          });
-        }
-        
-        // Show toast notification
-        if (context != null) {
-          AppToasts.showSuccess(event.description ?? 'Please upload the requested file');
-        }
-      };
-      
-      _webSocketService!.onAttachmentUploaded = (event) {
-        print('✅ [WEBSOCKET EVENT] ATTACHMENT_UPLOADED: reportId=${event.reportId}, fileName=${event.fileName}');
-        
-        // Close upload popup safely
-        _closeUploadDialogSafely();
-        currentUploadRequest.value = null;
-        isUploadDialogOpen.value = false;
-        
-        // Show success message
-        final context = Get.context;
-        if (context != null) {
-          _showToastSafely(() => AppToasts.showSuccess('File uploaded successfully: ${event.fileName ?? "File"}'));
-        }
-      };
-      
-      _webSocketService!.onAttachmentUploadFailed = (event) {
-        print('❌ [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_FAILED: reportId=${event.reportId}, reason=${event.reason}');
-        
-        // Close upload popup safely
-        _closeUploadDialogSafely();
-        currentUploadRequest.value = null;
-        isUploadDialogOpen.value = false;
-        
-        // Show error message
-        final context = Get.context;
-        if (context != null) {
-          _showToastSafely(() => AppToasts.showError('Upload failed: ${event.reason ?? "Unknown error"}'));
-        }
-      };
-      
-      _webSocketService!.onConnected = () {
-        print('✅ [WEBSOCKET] Direct Call WebSocket connected successfully');
-        print('🔌 [WEBSOCKET] Socket ID: ${_webSocketService?.socketId}');
-      };
-      
-      _webSocketService!.onDisconnected = () {
-        print('❌ [WEBSOCKET] Direct Call WebSocket disconnected');
-      };
-      
-      _webSocketService!.onError = (error) {
-        print('❌ [WEBSOCKET ERROR] Error: $error');
-        
-        // Check if it's a network/internet error
-        final errorString = error.toString().toLowerCase();
-        final isNetworkError = errorString.contains('socketexception') ||
-            errorString.contains('failed host lookup') ||
-            errorString.contains('no address associated') ||
-            errorString.contains('network is unreachable') ||
-            errorString.contains('connection failed');
-        
-        if (isNetworkError && !connectivityUtil.isOnline.value) {
-          print('🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...');
-          // Wait for internet and retry connection
-          _waitForInternetAndRetryWebSocket();
-          return;
-        }
-        
-        // Don't show error toast for auth errors, perform anonymous login instead
-        if (errorString.contains('auth') || errorString.contains('unauthorized')) {
-          print('🔐 [WEBSOCKET ERROR] Auth error detected, performing anonymous login');
-          // Perform anonymous login
-          _performAnonymousLogin().catchError((authError) {
-            print('❌ [WEBSOCKET ERROR] Anonymous login failed: $authError');
-          });
-        }
-        // Only show critical WebSocket errors that affect functionality
-        // Non-critical errors are logged but not shown to user
-      };
-      
-      // Connect
-      print('🔌 [WEBSOCKET] Calling connect()...');
-      await _webSocketService!.connect();
-      print('🔌 [WEBSOCKET] connect() completed, isConnected: ${_webSocketService?.isConnected}');
-    } catch (e, stackTrace) {
-      print('❌ [WEBSOCKET ERROR] Exception connecting WebSocket: $e');
-      print('❌ [WEBSOCKET ERROR] Stack trace: $stackTrace');
-      final errorMessage = e.toString();
-      
-      // Check if it's a network/internet error
-      final errorString = errorMessage.toLowerCase();
-      final isNetworkError = errorString.contains('socketexception') ||
-          errorString.contains('failed host lookup') ||
-          errorString.contains('no address associated') ||
-          errorString.contains('network is unreachable') ||
-          errorString.contains('connection failed');
-      
-      if (isNetworkError && !connectivityUtil.isOnline.value) {
-        print('🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...');
-        // Wait for internet and retry connection
-        await _waitForInternetAndRetryWebSocket();
-        return;
-      }
-      
-      AppToasts.showError('WebSocket connection failed: $errorMessage');
-      if (errorString.contains('auth') || 
-          errorString.contains('token') ||
-          errorString.contains('unauthorized')) {
-        // Try anonymous login
-        try {
-          await _performAnonymousLogin();
-        } catch (authError) {
-          print('❌ [WEBSOCKET] Anonymous login failed: $authError');
-        }
-      }
-      rethrow;
-    }
-  }
-  
-  /// Wait for internet connection and retry WebSocket connection
-  Future<void> _waitForInternetAndRetryWebSocket() async {
-    try {
-      print('⏳ [WEBSOCKET RETRY] Waiting for internet connection...');
-      final internetRestored = await connectivityUtil.waitForInternet(
-        timeout: const Duration(seconds: 60),
-      );
-      
-      if (internetRestored) {
-        print('✅ [WEBSOCKET RETRY] Internet restored, retrying WebSocket connection...');
-        // Small delay to ensure connection is stable
-        await Future.delayed(const Duration(seconds: 2));
-        // Retry WebSocket connection
-        await _connectWebSocket();
-      } else {
-        print('⏰ [WEBSOCKET RETRY] Timeout waiting for internet, giving up');
-        AppToasts.showError('No internet connection. Please check your network and try again.');
-      }
-    } catch (e, stackTrace) {
-      print('❌ [WEBSOCKET RETRY] Error waiting for internet: $e');
-      print('❌ [WEBSOCKET RETRY] Stack trace: $stackTrace');
-      AppToasts.showError('Failed to reconnect. Please check your internet connection.');
-    }
-  }
-  
-  /// Wait for internet connection and retry call request
-  Future<void> _waitForInternetAndRetryCall() async {
-    try {
-      print('⏳ [REQUEST CALL RETRY] Waiting for internet connection...');
-      final internetRestored = await connectivityUtil.waitForInternet(
-        timeout: const Duration(seconds: 60),
-      );
-      
-      if (internetRestored) {
-        print('✅ [REQUEST CALL RETRY] Internet restored, retrying call request...');
-        // Small delay to ensure connection is stable
-        await Future.delayed(const Duration(seconds: 2));
-        // Retry call request
-        await requestCall();
-      } else {
-        print('⏰ [REQUEST CALL RETRY] Timeout waiting for internet, giving up');
-        callNetworkStatus.value = NetworkStatus.ERROR;
-        callStatus.value = 'idle';
-        AppToasts.showError('No internet connection. Please check your network and try again.');
-      }
-    } catch (e, stackTrace) {
-      print('❌ [REQUEST CALL RETRY] Error waiting for internet: $e');
-      print('❌ [REQUEST CALL RETRY] Stack trace: $stackTrace');
-      callNetworkStatus.value = NetworkStatus.ERROR;
-      callStatus.value = 'idle';
-      AppToasts.showError('Failed to reconnect. Please check your internet connection.');
-    }
-  }
-  
-  /// Check if user is authenticated before performing call operations
-  /// Performs anonymous login if not authenticated
-  Future<bool> _checkAuthentication() async {
-    final isAuthenticated = await AuthUtil().isFullyAuthenticated();
-    if (!isAuthenticated) {
-      // Perform anonymous login
-      try {
-        await _performAnonymousLogin();
-        return true;
-      } catch (e) {
-        print('❌ [AUTH] Anonymous login failed: $e');
-        return false;
-      }
-    }
-    
-    // Check if token is expired
-    final token = await AuthUtil().getAccessToken();
-    if (token == null || JwtUtil.isTokenExpired(token)) {
-      // Perform anonymous login
-      try {
-        await _performAnonymousLogin();
-        return true;
-      } catch (e) {
-        print('❌ [AUTH] Anonymous login failed: $e');
-        return false;
-      }
-    }
-    
-    return true;
-  }
-  
-  /// Load pending calls (Employee only)
-  Future<void> _loadPendingCalls() async {
-    // Check authentication first
-    final isAuthenticated = await _checkAuthentication();
-    if (!isAuthenticated) {
-      return;
-    }
-    
-    try {
-      final calls = await _directCallService.getPendingCalls();
-      pendingCalls.assignAll(calls);
-    } catch (e) {
-      print('Error loading pending calls: $e');
-      // If it's an auth error, perform anonymous login
-      if (e.toString().toLowerCase().contains('401') || 
-          e.toString().toLowerCase().contains('unauthorized')) {
-        try {
-          await _performAnonymousLogin();
-          // Retry loading pending calls after anonymous login
-          await _loadPendingCalls();
-        } catch (authError) {
-          print('❌ [PENDING CALLS] Anonymous login failed: $authError');
-        }
-      }
-    }
-  }
-  
+
   /// Public method to load pending calls (can be called from UI)
   Future<void> loadPendingCalls() async {
     await _loadPendingCalls();
-  }
-
-  void _loadInitialData() {
-    try {
-      messages.assignAll([
-        ChatMessage(
-          text:
-              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-          isFromOP: true,
-          time: '8:00 PM',
-        ),
-        ChatMessage(
-          text:
-              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-          isFromOP: false,
-          time: '8:00 PM',
-        ),
-        ChatMessage(
-          text:
-              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-          isFromOP: true,
-          time: '8:00 PM',
-        ),
-        ChatMessage(
-          text:
-              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
-          isFromOP: false,
-          time: '8:00 PM',
-        ),
-      ]);
-
-      // Progress will be updated via WebSocket integration later
-      // For now, initialize to step 0 (not started)
-      currentProgressStep.value = 0;
-      isConnectingToOfficer.value = false;
-      isReportInitiated.value = false;
-      isAttachmentUploading.value = false;
-
-      // ID Information and documents will be loaded from call details when call is active
-      // Keep empty initially, will be populated when call details are fetched
-      idInformation.clear();
-      supportingDocuments.clear();
-    } catch (e, stackTrace) {
-      print('❌ [INIT ERROR] Error loading initial data: $e');
-      print('❌ [INIT ERROR] Stack trace: $stackTrace');
-      AppToasts.showError('Failed to load initial data: ${e.toString()}');
-    }
   }
 
   /// Clear authentication tokens when leaving the call class view
@@ -857,28 +335,12 @@ class CallClassController extends GetxController {
       print('❌ [CLEAR TOKENS] Error clearing tokens: $e');
     }
   }
-  
+
   /// Handle back button press - clear tokens and navigate back
   Future<bool> onWillPop() async {
     print('🔙 [BACK BUTTON] Back button pressed, clearing tokens...');
     await clearTokensOnExit();
     return true; // Allow navigation
-  }
-
-  @override
-  void onClose() {
-    _connectionTimeoutTimer?.cancel();
-    _stopCallDetailsPolling();
-    disconnectFromRoom();
-    _webSocketService?.disconnect();
-    messageController.dispose();
-    keyboardController.dispose();
-    focusedField?.dispose();
-    // Dispose connectivity monitoring
-    connectivityUtil.dispose();
-    // Clear tokens when controller is closed
-    clearTokensOnExit();
-    super.onClose();
   }
 
   /// Request a call (Client/User role)
@@ -1367,191 +829,6 @@ class CallClassController extends GetxController {
     }
   }
 
-  /// Connect to LiveKit room (internal helper)
-  Future<void> _connectToLiveKitRoom({
-    required String wsUrl,
-    required String token,
-    required String roomName,
-  }) async {
-    print('🎥 [LIVEKIT] ========== Starting LiveKit Connection ==========');
-    print('🎥 [LIVEKIT] wsUrl: $wsUrl');
-    print('🎥 [LIVEKIT] roomName: $roomName');
-    print('🎥 [LIVEKIT] token: ${token.substring(0, 20)}...');
-    
-    try {
-      // Create room
-      print('🎥 [LIVEKIT] Creating Room instance...');
-      _room = Room();
-      print('🎥 [LIVEKIT] Room instance created');
-
-      // Set up event listeners BEFORE connecting to catch connection errors
-      print('🎥 [LIVEKIT] Setting up event listeners...');
-      _room!.addListener(_onRoomChanged);
-      _room!.addListener(() {
-        _onRemoteParticipantsChanged();
-      });
-      print('🎥 [LIVEKIT] Event listeners set up');
-
-      // Connect to room with timeout
-      print('🎥 [LIVEKIT] Calling room.connect()...');
-      connectionStatus.value = 'Connecting...';
-      callStatus.value = 'connecting';
-      
-      // Start connection timeout monitor
-      _startConnectionTimeoutMonitor();
-      
-      // Add connection timeout (30 seconds)
-      // Configure audio capture options with enhanced noise cancellation
-      // These settings improve audio quality by reducing background noise,
-      // echo from speakers, and automatically adjusting microphone gain
-      await _room!.connect(
-        wsUrl,
-        token,
-        roomOptions: const RoomOptions(
-          adaptiveStream: true,
-          dynacast: true,
-          defaultAudioCaptureOptions: AudioCaptureOptions(
-            // Echo cancellation: Prevents microphone from picking up audio from speakers
-            // This eliminates echo/feedback in video calls
-            echoCancellation: true,
-            
-            // Noise suppression: Reduces background noise (traffic, music, voices, etc.)
-            // This improves audio clarity for other participants
-            noiseSuppression: true,
-            
-            // Auto gain control: Automatically adjusts microphone sensitivity
-            // This ensures consistent audio levels regardless of distance from mic
-            autoGainControl: true,
-          ),
-        ),
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          print('❌ [LIVEKIT] Connection timeout after 30 seconds');
-          throw TimeoutException('Connection timeout: Failed to connect to video call server within 30 seconds. Please check your internet connection and try again.');
-        },
-      );
-      
-      print('🎥 [LIVEKIT] room.connect() completed');
-
-      // Wait a bit for connection state to stabilize
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Check if connection actually succeeded
-      if (_room!.connectionState != ConnectionState.connected) {
-        print('❌ [LIVEKIT] Connection state is not connected: ${_room!.connectionState}');
-        throw Exception('Connection failed: Room state is ${_room!.connectionState}');
-      }
-
-      _localParticipant = _room!.localParticipant;
-      print('🎥 [LIVEKIT] Local participant: ${_localParticipant != null ? "exists" : "null"}');
-      
-      if (_localParticipant == null) {
-        print('❌ [LIVEKIT] Local participant is null after connection');
-        throw Exception('Connection failed: Local participant is null');
-      }
-      
-      print('🎥 [LIVEKIT] Local participant identity: ${_localParticipant!.identity}');
-      print('🎥 [LIVEKIT] Local participant sid: ${_localParticipant!.sid}');
-
-      isConnected.value = true;
-      connectionStatus.value = 'Connected';
-      callStatus.value = 'active';
-      print('🎥 [LIVEKIT] Connection state updated - isConnected: ${isConnected.value}');
-      print('🎥 [LIVEKIT] Room connection state: ${_room!.connectionState}');
-      
-      // Start polling for call details when call becomes active (this includes report and statement)
-      final sessionId = currentSessionId.value;
-      if (sessionId != null && sessionId.isNotEmpty) {
-        _startCallDetailsPolling();
-      }
-
-      // Enable camera and microphone
-      print('🎥 [LIVEKIT] Enabling video...');
-      try {
-        await enableVideo();
-        print('🎥 [LIVEKIT] Video enabled: ${isVideoEnabled.value}');
-      } catch (e) {
-        print('⚠️ [LIVEKIT] Warning: Failed to enable video: $e');
-        // Error toast already shown in enableVideo()
-      }
-      
-      print('🎥 [LIVEKIT] Enabling audio...');
-      try {
-        await enableAudio();
-        print('🎥 [LIVEKIT] Audio enabled: ${isAudioEnabled.value}');
-      } catch (e) {
-        print('⚠️ [LIVEKIT] Warning: Failed to enable audio: $e');
-        // Error toast already shown in enableAudio()
-      }
-
-      // Get local video track
-      print('🎥 [LIVEKIT] Updating local video track...');
-      _updateLocalVideoTrack();
-      print('🎥 [LIVEKIT] Local video track: ${localVideoTrack.value != null ? "exists" : "null"}');
-      
-      // Log room participants
-      print('🎥 [LIVEKIT] Remote participants count: ${_room!.remoteParticipants.length}');
-      print('🎥 [LIVEKIT] ========== LiveKit Connection Complete ==========');
-      
-      // Cancel timeout monitor since connection succeeded
-      _connectionTimeoutTimer?.cancel();
-      _connectionTimeoutTimer = null;
-    } on TimeoutException catch (e) {
-      print('❌ [LIVEKIT ERROR] Connection timeout: $e');
-      _connectionTimeoutTimer?.cancel();
-      _connectionTimeoutTimer = null;
-      connectionStatus.value = 'Connection timeout';
-      isConnected.value = false;
-      callStatus.value = 'idle';
-      callNetworkStatus.value = NetworkStatus.ERROR;
-      AppToasts.showError('Failed to connect to video call server. This may be due to slow internet connection or server issues.');
-      await _handleCallEnded(shouldNavigate: false);
-    } catch (e, stackTrace) {
-      print('❌ [LIVEKIT ERROR] Exception connecting to LiveKit: $e');
-      print('❌ [LIVEKIT ERROR] Stack trace: $stackTrace');
-      connectionStatus.value = 'Connection failed';
-      isConnected.value = false;
-      callStatus.value = 'idle';
-      
-      // Show user-friendly error message
-      String errorMessage = 'Failed to connect to video call';
-      if (e.toString().contains('timeout')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('network') || e.toString().contains('socket')) {
-        errorMessage = 'Network error. Please check your internet connection.';
-      } else if (e.toString().contains('permission') || e.toString().contains('camera') || e.toString().contains('microphone')) {
-        errorMessage = 'Camera or microphone permission error. Please grant permissions and try again.';
-      } else if (e.toString().contains('token') || e.toString().contains('auth')) {
-        errorMessage = 'Authentication error. Please try logging in again.';
-      }
-      
-      AppToasts.showError(errorMessage);
-      _connectionTimeoutTimer?.cancel();
-      _connectionTimeoutTimer = null;
-      await _handleCallEnded(shouldNavigate: false);
-    }
-  }
-  
-  /// Start connection timeout monitor
-  /// This will show an error if connection is stuck in "connecting" state for too long
-  void _startConnectionTimeoutMonitor() {
-    _connectionTimeoutTimer?.cancel();
-    
-    _connectionTimeoutTimer = Timer(const Duration(seconds: 35), () {
-      // Check if still connecting after timeout
-      if (callStatus.value == 'connecting' && 
-          (connectionStatus.value == 'Connecting...' || connectionStatus.value == 'Reconnecting...')) {
-        print('❌ [CONNECTION TIMEOUT] Connection stuck in connecting state for 35 seconds');
-        AppToasts.showError('Connection is taking too long. Please check your internet and try again.');
-        callNetworkStatus.value = NetworkStatus.ERROR;
-        callStatus.value = 'idle';
-        connectionStatus.value = 'Connection timeout';
-        _handleCallEnded(shouldNavigate: false);
-      }
-    });
-  }
-
   /// Disconnect from room
   Future<void> disconnectFromRoom() async {
     print('🔌 [DISCONNECT] Disconnecting from LiveKit room...');
@@ -1604,6 +881,17 @@ class CallClassController extends GetxController {
         isConnected.value = false;
         connectionStatus.value = 'Disconnected';
         localVideoTrack.value = null;
+        for (var entry in _remoteParticipantListeners.entries.toList()) {
+          try {
+            entry.key.removeListener(entry.value);
+          } catch (_) {}
+        }
+        _remoteParticipantListeners.clear();
+        _remoteVideoTrackRetryTimer?.cancel();
+        _remoteVideoTrackRetryTimer = null;
+        _remoteVideoTrackSyncTimer?.cancel();
+        _remoteVideoTrackSyncTimer = null;
+        remoteVideoTrack.value = null;
         remoteParticipants.clear();
         print('🔌 [DISCONNECT] Cleanup completed');
       } else {
@@ -1624,137 +912,11 @@ class CallClassController extends GetxController {
     }
   }
 
-  /// Enumerate available cameras by testing different positions
-  /// For multiple front cameras, we'll add front position multiple times
-  /// and cycle through them using device switching
-  Future<void> _enumerateCameras() async {
-    try {
-      print('📷 [CAMERA] Enumerating available cameras...');
-      
-      // Test which camera positions are available
-      final positions = <CameraPosition>[];
-      
-      // Add front camera (may have multiple front cameras on some devices)
-      positions.add(CameraPosition.front);
-      
-      // Try to add back camera if available
-      // Note: On devices with only front cameras, back might not be available
-      // but we'll add it anyway and handle errors gracefully
-      positions.add(CameraPosition.back);
-      
-      // For devices with multiple front cameras (like smart police station machines),
-      // we'll add front position again to allow cycling through front cameras
-      // The actual device switching will be handled in switchCamera()
-      positions.add(CameraPosition.front); // Second front camera option
-      
-      availableCameraPositions.assignAll(positions);
-      hasMultipleCameras.value = positions.length > 1;
-      currentCameraIndex.value = 0;
-      
-      print('📷 [CAMERA] Available camera positions: ${positions.length}');
-      for (var i = 0; i < positions.length; i++) {
-        print('📷 [CAMERA] Position $i: ${positions[i]}');
-      }
-      
-      if (hasMultipleCameras.value) {
-        print('📷 [CAMERA] Multiple cameras detected, camera switching enabled');
-      }
-    } catch (e, stackTrace) {
-      print('❌ [CAMERA ERROR] Error enumerating cameras: $e');
-      print('❌ [CAMERA ERROR] Stack trace: $stackTrace');
-      // Continue without camera enumeration - single camera assumed
-      availableCameraPositions.clear();
-      hasMultipleCameras.value = false;
-    }
-  }
-  
-  /// Enumerate actual media devices (cameras and microphones) for debugging
-  Future<void> _enumerateMediaDevices() async {
-    try {
-      print('🎬 [MEDIA DEVICES] Enumerating media devices...');
-      
-      // Get all media devices using LiveKit's Hardware class
-      final devices = await Hardware.instance.enumerateDevices();
-      
-      print('🎬 [MEDIA DEVICES] Total devices found: ${devices.length}');
-      
-      // Filter cameras
-      final cameras = devices.where((d) => d.kind == 'videoinput').toList();
-      availableCameras.assignAll(cameras);
-      
-      print('📷 [MEDIA DEVICES] Cameras found: ${cameras.length}');
-      for (var i = 0; i < cameras.length; i++) {
-        print('📷 [MEDIA DEVICES] Camera $i:');
-        print('   - Device ID: ${cameras[i].deviceId}');
-        print('   - Label: ${cameras[i].label}');
-        print('   - Kind: ${cameras[i].kind}');
-      }
-      
-      // Filter microphones
-      final microphones = devices.where((d) => d.kind == 'audioinput').toList();
-      availableMicrophones.assignAll(microphones);
-      
-      print('🎤 [MEDIA DEVICES] Microphones found: ${microphones.length}');
-      for (var i = 0; i < microphones.length; i++) {
-        print('🎤 [MEDIA DEVICES] Microphone $i:');
-        print('   - Device ID: ${microphones[i].deviceId}');
-        print('   - Label: ${microphones[i].label}');
-        print('   - Kind: ${microphones[i].kind}');
-      }
-      
-      // Try to detect current camera device ID
-      if (_localParticipant != null) {
-        final videoTrack = _localParticipant!.videoTrackPublications
-            .where((pub) => pub.source == TrackSource.camera)
-            .map((pub) => pub.track)
-            .whereType<LocalVideoTrack>()
-            .firstOrNull;
-        
-        if (videoTrack != null) {
-          // Get device ID from track settings
-          final settings = videoTrack.mediaStreamTrack.getSettings();
-          final deviceId = settings['deviceId'];
-          final facingMode = settings['facingMode'];
-          
-          print('📷 [MEDIA DEVICES] Track settings:');
-          print('   - deviceId: $deviceId');
-          print('   - facingMode: $facingMode');
-          
-          if (deviceId != null) {
-            currentCameraDeviceId.value = deviceId.toString();
-            print('📷 [MEDIA DEVICES] Current camera device ID (from track): ${currentCameraDeviceId.value}');
-          }
-          
-          // Try to match by label if device IDs don't match
-          // Look for camera with matching facing mode or position
-          if (facingMode != null && cameras.isNotEmpty) {
-            final isFrontCamera = facingMode.toString().toLowerCase().contains('user') || 
-                                   facingMode.toString().toLowerCase().contains('front');
-            final matchingCamera = cameras.firstWhere(
-              (cam) => isFrontCamera 
-                  ? cam.label.toLowerCase().contains('front')
-                  : cam.label.toLowerCase().contains('back'),
-              orElse: () => cameras.first,
-            );
-            
-            if (matchingCamera.deviceId != currentCameraDeviceId.value) {
-              print('📷 [MEDIA DEVICES] Using label-based match: ${matchingCamera.deviceId} (${matchingCamera.label})');
-              currentCameraDeviceId.value = matchingCamera.deviceId;
-            }
-          }
-        }
-      }
-      
-      print('✅ [MEDIA DEVICES] Media device enumeration complete');
-    } catch (e, stackTrace) {
-      print('❌ [MEDIA DEVICES ERROR] Error enumerating media devices: $e');
-      print('❌ [MEDIA DEVICES ERROR] Stack trace: $stackTrace');
-    }
-  }
-
   /// Enable video
+  /// On kiosks with two front cameras, we prefer the second front camera by deviceId
+  /// (typically the user-facing one; the first may be document/scanner).
   Future<void> enableVideo() async {
-    print('🎥 [VIDEO] Enabling video...');
+    print('🎥 [VIDEO] ========== ENABLE VIDEO (admin sees this stream) ==========');
     try {
       if (_localParticipant != null) {
         // Enumerate cameras first if not already done
@@ -1762,18 +924,83 @@ class CallClassController extends GetxController {
           await _enumerateCameras();
         }
         
+        // Enumerate actual devices BEFORE creating track for kiosk debug (multiple front cameras)
+        print('🎥 [VIDEO] Enumerating cameras before creating track (kiosk debug)...');
+        List<MediaDevice> allCameras = [];
+        try {
+          final devices = await Hardware.instance.enumerateDevices();
+          allCameras = devices.where((d) => d.kind == 'videoinput').toList();
+          print('🎥 [VIDEO] ========== CAMERA ENUMERATION (KIOSK DEBUG) ==========');
+          print('🎥 [VIDEO] Total videoinput devices: ${allCameras.length}');
+          for (var i = 0; i < allCameras.length; i++) {
+            final c = allCameras[i];
+            final labelLower = c.label.toLowerCase();
+            final isFront = labelLower.contains('front') || labelLower.contains('user') || labelLower.contains('face');
+            print('🎥 [VIDEO] Camera[$i] deviceId=${c.deviceId} label="${c.label}" kind=${c.kind} isFrontLike=$isFront');
+          }
+          final frontCameras = allCameras.where((c) {
+            final l = c.label.toLowerCase();
+            return l.contains('front') || l.contains('user') || l.contains('face');
+          }).toList();
+          if (frontCameras.isEmpty) {
+            print('🎥 [VIDEO] No cameras with front/user/face in label; using CameraPosition.front (SDK default)');
+          } else {
+            print('🎥 [VIDEO] Front-like cameras count: ${frontCameras.length}');
+            for (var i = 0; i < frontCameras.length; i++) {
+              print('🎥 [VIDEO]   Front[$i]: deviceId=${frontCameras[i].deviceId} label="${frontCameras[i].label}"');
+            }
+          }
+          print('🎥 [VIDEO] =========================================================');
+        } catch (e) {
+          print('⚠️ [VIDEO] Could not enumerate devices before track: $e');
+        }
+        
         print('🎥 [VIDEO] Local participant exists');
         print('🎥 [VIDEO] Current video publications BEFORE: ${_localParticipant!.videoTrackPublications.length}');
         
-        // Create and publish camera track manually to ensure it's sent to server
-        print('🎥 [VIDEO] Creating camera track with front camera...');
-        final cameraTrack = await LocalVideoTrack.createCameraTrack(
-          const CameraCaptureOptions(
-            cameraPosition: CameraPosition.front,
-            params: VideoParametersPresets.h720_169,
-          ),
+        // On kiosks with 2+ front cameras, prefer second front camera by deviceId (usually user-facing)
+        String? preferredDeviceId;
+        if (allCameras.isNotEmpty) {
+          final frontLike = allCameras.where((c) {
+            final l = c.label.toLowerCase();
+            return l.contains('front') || l.contains('user') || l.contains('face');
+          }).toList();
+          if (frontLike.length >= 2) {
+            preferredDeviceId = frontLike[1].deviceId;
+            print('🎥 [VIDEO] KIOSK: 2+ front cameras detected, using SECOND front camera by deviceId: $preferredDeviceId (label: "${frontLike[1].label}")');
+          } else if (frontLike.length == 1) {
+            preferredDeviceId = frontLike[0].deviceId;
+            print('🎥 [VIDEO] Single front camera, using deviceId: $preferredDeviceId');
+          }
+        }
+        
+        // Create and publish camera track (with optional deviceId for kiosk)
+        final captureOptions = CameraCaptureOptions(
+          cameraPosition: CameraPosition.front,
+          deviceId: preferredDeviceId,
+          params: VideoParametersPresets.h720_169,
         );
-        print('✅ [VIDEO] Camera track created: ${cameraTrack.mediaStreamTrack.id}');
+        print('🎥 [VIDEO] Creating camera track: position=front deviceId=${preferredDeviceId ?? "null (SDK default)"}');
+        final cameraTrack = await LocalVideoTrack.createCameraTrack(captureOptions);
+        print('✅ [VIDEO] Camera track created: trackId=${cameraTrack.mediaStreamTrack.id}');
+        
+        // Log which camera the track is actually using (getSettings)
+        try {
+          final settings = cameraTrack.mediaStreamTrack.getSettings();
+          final actualDeviceId = settings['deviceId']?.toString();
+          final facingMode = settings['facingMode']?.toString();
+          final trackLabel = cameraTrack.mediaStreamTrack.label;
+          print('🎥 [VIDEO] ========== ACTIVE CAMERA FOR STREAM (what admin sees) ==========');
+          print('🎥 [VIDEO] deviceId: $actualDeviceId');
+          print('🎥 [VIDEO] label: $trackLabel');
+          print('🎥 [VIDEO] facingMode: $facingMode');
+          print('🎥 [VIDEO] =================================================================');
+          if (actualDeviceId != null) {
+            currentCameraDeviceId.value = actualDeviceId;
+          }
+        } catch (e) {
+          print('⚠️ [VIDEO] Could not read track getSettings(): $e');
+        }
         
         // Explicitly publish the track to ensure it's sent to LiveKit server
         print('🎥 [VIDEO] Publishing camera track to LiveKit server...');
@@ -1805,6 +1032,11 @@ class CallClassController extends GetxController {
             print('🎥 [VIDEO]   - Track ID: ${track.mediaStreamTrack.id}');
             print('🎥 [VIDEO]   - Track enabled: ${track.mediaStreamTrack.enabled}');
             print('🎥 [VIDEO]   - Track label: ${track.mediaStreamTrack.label}');
+            try {
+              final s = track.mediaStreamTrack.getSettings();
+              print('🎥 [VIDEO]   - Track deviceId (stream): ${s['deviceId']}');
+              print('🎥 [VIDEO]   - Track facingMode: ${s['facingMode']}');
+            } catch (_) {}
           }
         }
         print('🎥 [VIDEO] ================================================');
@@ -1949,21 +1181,33 @@ class CallClassController extends GetxController {
         _updateLocalVideoTrack();
       } catch (e) {
         print('❌ [CAMERA ERROR] Error using setCameraPosition: $e');
-        // Fallback: Disable and re-enable with new position
+        // Fallback: Disable and re-enable with new position (and deviceId for kiosk 2 front cameras)
         try {
-          // Disable current camera
           await _localParticipant!.setCameraEnabled(false);
           await Future.delayed(const Duration(milliseconds: 200));
           
-          // Create new capture options with the next camera position
+          // On kiosk with 2 front cameras: use deviceId so we actually switch to the other front camera
+          String? deviceIdForPosition;
+          if (availableCameras.isNotEmpty && (nextPosition == CameraPosition.front)) {
+            final frontLike = availableCameras
+                .where((c) => c.label.toLowerCase().contains('front') ||
+                    c.label.toLowerCase().contains('user') ||
+                    c.label.toLowerCase().contains('face'))
+                .toList();
+            if (frontLike.length >= 2) {
+              final idx = currentCameraIndex.value % frontLike.length;
+              deviceIdForPosition = frontLike[idx].deviceId;
+              print('📷 [CAMERA] Fallback: using front camera[$idx] deviceId=$deviceIdForPosition label="${frontLike[idx].label}"');
+            }
+          }
+          
           final newOptions = CameraCaptureOptions(
             cameraPosition: nextPosition,
+            deviceId: deviceIdForPosition,
           );
           
-          // Create new track with new camera position
           final newTrack = await LocalVideoTrack.createCameraTrack(newOptions);
           
-          // Stop old track if it exists
           final oldTrackPub = _localParticipant!.videoTrackPublications
               .where((pub) => pub.source == TrackSource.camera)
               .firstOrNull;
@@ -1975,12 +1219,9 @@ class CallClassController extends GetxController {
             }
           }
           
-          // Publish new track
           await _localParticipant!.publishVideoTrack(newTrack);
+          print('✅ [CAMERA] Camera switched using createCameraTrack (deviceId=${deviceIdForPosition ?? "null"})');
           
-          print('✅ [CAMERA] Camera switched using createCameraTrack method');
-          
-          // Wait a bit for track to update
           await Future.delayed(const Duration(milliseconds: 200));
           _updateLocalVideoTrack();
         } catch (e2) {
@@ -1991,41 +1232,6 @@ class CallClassController extends GetxController {
       print('❌ [CAMERA ERROR] Error switching camera: $e');
       print('❌ [CAMERA ERROR] Stack trace: $stackTrace');
     }
-  }
-
-  /// Update local video track
-  void _updateLocalVideoTrack() {
-    if (_localParticipant == null) {
-      print('⚠️ [LOCAL TRACK] Local participant is null');
-      localVideoTrack.value = null;
-      return;
-    }
-    
-    print('🎥 [LOCAL TRACK] Updating local video track...');
-    print('🎥 [LOCAL TRACK] Video track publications: ${_localParticipant!.videoTrackPublications.length}');
-    
-    for (var pub in _localParticipant!.videoTrackPublications) {
-      print('🎥 [LOCAL TRACK] - Publication: sid=${pub.sid}, source=${pub.source}, subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}');
-      if (pub.track != null) {
-        final track = pub.track;
-        if (track is LocalVideoTrack) {
-          print('🎥 [LOCAL TRACK]   - Track details: sid=${track.sid}, muted=${track.muted}');
-        }
-      }
-    }
-    
-    final videoTrack = _localParticipant!.videoTrackPublications
-        .where((pub) => pub.subscribed)
-        .map((pub) => pub.track)
-        .whereType<LocalVideoTrack>()
-        .firstOrNull;
-    
-    print('🎥 [LOCAL TRACK] Found local video track: ${videoTrack != null}');
-    if (videoTrack != null) {
-      print('🎥 [LOCAL TRACK] Video track muted: ${videoTrack.muted}');
-    }
-    
-    localVideoTrack.value = videoTrack;
   }
 
   /// Get remote video track for a participant
@@ -2046,97 +1252,6 @@ class CallClassController extends GetxController {
     print('🎥 [REMOTE TRACK] Found remote video track: ${videoTrack != null}');
     
     return videoTrack;
-  }
-
-  /// Room event handler
-  void _onRoomChanged() {
-    if (_room == null) {
-      print('⚠️ [ROOM EVENT] Room is null');
-      return;
-    }
-
-    print('🔄 [ROOM EVENT] Room changed - ConnectionState: ${_room!.connectionState}');
-    
-    final previousState = connectionStatus.value;
-    
-    // Update connection status
-    if (_room!.connectionState == ConnectionState.connected) {
-      print('✅ [ROOM EVENT] Room connected');
-      connectionStatus.value = 'Connected';
-      isConnected.value = true;
-      callStatus.value = 'active';
-      // Start polling for call details if we have a session ID
-      final sessionId = currentSessionId.value;
-      if (sessionId != null && sessionId.isNotEmpty && callDetails.value == null) {
-        _startCallDetailsPolling();
-      }
-    } else if (_room!.connectionState == ConnectionState.disconnected) {
-      print('❌ [ROOM EVENT] Room disconnected');
-      connectionStatus.value = 'Disconnected';
-      isConnected.value = false;
-      // Only show error if we were previously connected (not if we're just starting)
-      if (previousState == 'Connected') {
-        // Only show toast if we have a valid context (avoid overlay errors)
-        try {
-          AppToasts.showError('Connection lost. Please try again.');
-        } catch (e) {
-          print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
-        }
-        callStatus.value = 'idle';
-        _handleCallEnded(shouldNavigate: false);
-      }
-    } else if (_room!.connectionState == ConnectionState.connecting) {
-      print('🔄 [ROOM EVENT] Room connecting...');
-      connectionStatus.value = 'Connecting...';
-      callStatus.value = 'connecting';
-    } else if (_room!.connectionState == ConnectionState.reconnecting) {
-      print('🔄 [ROOM EVENT] Room reconnecting...');
-      connectionStatus.value = 'Reconnecting...';
-    }
-
-    // Check for connection errors
-    if (_room!.connectionState == ConnectionState.disconnected && 
-        (previousState == 'Connecting...' || previousState == 'Reconnecting...')) {
-      print('❌ [ROOM EVENT] Connection failed during connect/reconnect');
-      // Only show toast if we have a valid context (avoid overlay errors)
-      try {
-        AppToasts.showError('Failed to connect. Please check your internet and try again.');
-      } catch (e) {
-        print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
-      }
-      callStatus.value = 'idle';
-      callNetworkStatus.value = NetworkStatus.ERROR;
-    }
-
-    print('🔄 [ROOM EVENT] Remote participants: ${_room!.remoteParticipants.length}');
-    print('🔄 [ROOM EVENT] Local participant: ${_room!.localParticipant != null ? "exists" : "null"}');
-
-    // Update local video track
-    _updateLocalVideoTrack();
-  }
-
-  /// Remote participants event handler
-  void _onRemoteParticipantsChanged() {
-    if (_room == null) {
-      print('⚠️ [PARTICIPANTS] Room is null');
-      return;
-    }
-    
-    final participants = _room!.remoteParticipants.values.toList();
-    print('👥 [PARTICIPANTS] Remote participants changed: ${participants.length}');
-    
-    for (var participant in participants) {
-      print('👥 [PARTICIPANTS] - Identity: ${participant.identity}, SID: ${participant.sid}');
-      print('👥 [PARTICIPANTS] - Video tracks: ${participant.videoTrackPublications.length}');
-      print('👥 [PARTICIPANTS] - Audio tracks: ${participant.audioTrackPublications.length}');
-      
-      for (var videoPub in participant.videoTrackPublications) {
-        print('👥 [PARTICIPANTS]   Video track: subscribed=${videoPub.subscribed}, muted=${videoPub.muted}, track=${videoPub.track != null}');
-      }
-    }
-    
-    remoteParticipants.assignAll(participants);
-    print('👥 [PARTICIPANTS] Updated remoteParticipants list: ${remoteParticipants.length}');
   }
 
   void sendMessage() {
@@ -2225,6 +1340,1239 @@ class CallClassController extends GetxController {
     }
   }
 
+  /// Confirm report submission - navigate to confirmation page and end call
+  Future<void> confirmReportSubmission() async {
+    try {
+      final reportId = reportInfo.value?.id;
+      if (reportId == null || reportId.isEmpty) {
+        AppToasts.showError('Report ID not found');
+        return;
+      }
+      
+      print('✅ [REPORT CONFIRM] Confirming report submission: $reportId');
+      
+      // Fetch and show report in confirmation page
+      await _fetchAndShowReport(reportId);
+      
+      // End the call after showing confirmation page (without navigation since we're already showing confirmation page)
+      await disconnectFromRoom();
+      callStatus.value = 'ended';
+      
+      // Clear call details
+      callDetails.value = null;
+      reportInfo.value = null;
+      statementInfo.value = null;
+      
+      currentSessionId.value = '';
+      currentRoomName.value = '';
+      currentWsUrl.value = '';
+      
+      // Stop polling
+      _stopCallDetailsPolling();
+      
+      print('✅ [REPORT CONFIRM] Call ended and confirmation page shown');
+    } catch (e, stackTrace) {
+      print('❌ [REPORT CONFIRM] Error confirming report: $e');
+      print('❌ [REPORT CONFIRM] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to confirm report: ${e.toString()}');
+    }
+  }
+
+  /// Reject report submission - stay on page (API integration to be added later)
+  Future<void> rejectReportSubmission() async {
+    try {
+      final reportId = reportInfo.value?.id;
+      if (reportId == null || reportId.isEmpty) {
+        AppToasts.showError('Report ID not found');
+        return;
+      }
+      
+      print('❌ [REPORT REJECT] Rejecting report submission: $reportId');
+      
+      // TODO: Integrate API call to reject report
+      // For now, just show a message and stay on the page
+      AppToasts.showWarning('Report rejection will be processed. API integration pending.');
+      
+      // Stay on the page - no navigation
+    } catch (e, stackTrace) {
+      print('❌ [REPORT REJECT] Error rejecting report: $e');
+      print('❌ [REPORT REJECT] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to reject report: ${e.toString()}');
+    }
+  }
+
+  // Removed draft polling - now using call details endpoint which includes report and statement
+  // Old draft polling methods removed - data comes from call details every 10 seconds
+  
+  // Removed: _startDraftPolling, _stopDraftPolling, _scheduleNextPoll, _pollDraft methods
+  // These are no longer needed as we get report and statement data from call details endpoint
+
+  void confirmTerms() async {
+    // Check authentication before confirming terms
+    final isAuthenticated = await _checkAuthentication();
+    if (!isAuthenticated) {
+      return;
+    }
+    
+    // After confirming terms, request a call (Client role)
+    // The system will automatically assign an employee
+    await requestCall();
+  }
+
+  void onTakePhoto() {
+    // Placeholder for future photo capture integration
+  }
+
+  void onFlashDocuments() {
+    // Placeholder for future flash document handling
+  }
+
+  void onPaymentReceipt() {
+    // Placeholder for future payment receipt handling
+  }
+
+  void setFocusedField(
+    FocusNode? focusNode,
+    TextEditingController textController,
+  ) {
+    focusedField = focusNode;
+    focusedController = textController;
+    keyboardController
+      ..text = textController.text
+      ..selection = textController.selection;
+  }
+
+  void onKeyboardKeyPressed(String key) {
+    final controller = focusedController;
+    if (controller == null) return;
+
+    final text = controller.text;
+    final selection = controller.selection;
+
+    if (key == 'backspace') {
+      if (selection.start > 0) {
+        final newText =
+            text.substring(0, selection.start - 1) + text.substring(selection.end);
+        controller
+          ..text = newText
+          ..selection = TextSelection.collapsed(offset: selection.start - 1);
+      }
+    } else if (key == 'space') {
+      final newText =
+          '${text.substring(0, selection.start)} ${text.substring(selection.end)}';
+      controller
+        ..text = newText
+        ..selection = TextSelection.collapsed(offset: selection.start + 1);
+    } else if (key == 'left') {
+      if (selection.start > 0) {
+        controller.selection =
+            TextSelection.collapsed(offset: selection.start - 1);
+      }
+    } else if (key == 'right') {
+      if (selection.end < text.length) {
+        controller.selection =
+            TextSelection.collapsed(offset: selection.end + 1);
+      }
+    } else if (key == 'enter') {
+      final newText =
+          '${text.substring(0, selection.start)}\n${text.substring(selection.end)}';
+      controller
+        ..text = newText
+        ..selection = TextSelection.collapsed(offset: selection.start + 1);
+    } else if (key == '123') {
+      // Future enhancement: switch keyboard layout
+    } else {
+      final newText =
+          text.substring(0, selection.start) + key + text.substring(selection.end);
+      controller
+        ..text = newText
+        ..selection = TextSelection.collapsed(offset: selection.start + key.length);
+    }
+
+    keyboardController
+      ..text = controller.text
+      ..selection = controller.selection;
+  }
+
+  void clearMessage() {
+    messageController.clear();
+  }
+
+  /// Check authentication before allowing access to video call
+  /// Uses anonymous login if not authenticated
+  Future<void> _checkAuthBeforeAccess() async {
+    try {
+      print('🔐 [AUTH CHECK] Starting authentication check...');
+      
+      // First check if user is already authenticated
+      final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+      print('🔐 [AUTH CHECK] isFullyAuthenticated: $isAuthenticated');
+      
+      if (isAuthenticated) {
+        // Check if token is not expired
+        final token = await AuthUtil().getAccessToken();
+        if (token != null && !JwtUtil.isTokenExpired(token)) {
+          print('✅ [AUTH CHECK] User already authenticated with valid token');
+          print('✅ [AUTH CHECK] Token is valid, connecting WebSocket...');
+          // User is authenticated, connect WebSocket
+          await _checkAuthAndConnectWebSocket();
+          
+          // If auto-start is requested, automatically start the call
+          if (autoStartCall.value) {
+            print('📞 [AUTO START] Auto-starting call after authentication...');
+            try {
+              // Small delay to ensure WebSocket is connected
+              await Future.delayed(const Duration(milliseconds: 500));
+              await requestCall();
+            } catch (e, stackTrace) {
+              print('❌ [AUTO START] Error auto-starting call: $e');
+              print('❌ [AUTO START] Stack trace: $stackTrace');
+              AppToasts.showError('Failed to auto-start call: ${e.toString()}');
+            }
+          }
+          return;
+        }
+      }
+      
+      // User is not authenticated or token is expired, perform anonymous login
+      print('🔐 [ANONYMOUS LOGIN] User not authenticated, performing anonymous login...');
+      await _performAnonymousLogin();
+      
+    } catch (e, stackTrace) {
+      print('❌ [AUTH CHECK] Fatal error in _checkAuthBeforeAccess: $e');
+      print('❌ [AUTH CHECK] Stack trace: $stackTrace');
+      isAnonymousLoginLoading.value = false;
+      AppToasts.showError('Failed to initialize authentication: ${e.toString()}');
+      rethrow;
+    }
+  }
+
+  /// Perform anonymous login using device ID
+  Future<void> _performAnonymousLogin() async {
+    try {
+      isAnonymousLoginLoading.value = true;
+      
+      // Get device ID from utility (for now returns common static ID)
+      final deviceId = await DeviceIdUtil.getDeviceId();
+      print('🔐 [ANONYMOUS LOGIN] Starting anonymous login with device ID: $deviceId');
+      
+      // Create Dio instance without access token (since we don't have one yet)
+      final dio = DioUtil().getDio(useAccessToken: false);
+      final authService = AuthService(dio);
+      
+      // Call anonymous login API
+      final response = await authService.anonymousLogin({
+        'deviceId': deviceId,
+      });
+      
+      print('🔐 [ANONYMOUS LOGIN] API response received');
+      print('  - success: ${response.success}');
+      print('  - accessToken: ${response.data?.accessToken != null ? "${response.data!.accessToken!.substring(0, 20)}..." : "null"}');
+      print('  - user: ${response.data?.user != null ? "exists" : "null"}');
+      
+      if (response.success != true || response.data == null) {
+        throw Exception('Anonymous login failed: Invalid response from server');
+      }
+      
+      final loginData = response.data!;
+      
+      if (loginData.accessToken == null || loginData.accessToken!.isEmpty) {
+        throw Exception('Anonymous login failed: Access token is missing');
+      }
+      
+      if (loginData.user == null) {
+        throw Exception('Anonymous login failed: User data is missing');
+      }
+      
+      // Convert user to Map for storage
+      final userMap = loginData.user!.toJson();
+      
+      // Save tokens and user info
+      print('💾 [ANONYMOUS LOGIN] Saving tokens and user data...');
+      await AuthUtil().saveTokenAndUserInfo(
+        accessToken: loginData.accessToken!,
+        refreshToken: loginData.refreshToken ?? '', // Anonymous login might not provide refresh token
+        user: userMap,
+      );
+      
+      // Verify token was saved
+      final savedToken = await AuthUtil().getAccessToken();
+      if (savedToken == null || savedToken != loginData.accessToken) {
+        throw Exception('Failed to save authentication token');
+      }
+      
+      print('✅ [ANONYMOUS LOGIN] Anonymous login successful');
+      print('✅ [ANONYMOUS LOGIN] Token saved, connecting WebSocket...');
+      
+      // Connect WebSocket
+      await _checkAuthAndConnectWebSocket();
+      
+      // If auto-start is requested, automatically start the call
+      if (autoStartCall.value) {
+        print('📞 [AUTO START] Auto-starting call after anonymous login...');
+        try {
+          // Small delay to ensure WebSocket is connected
+          await Future.delayed(const Duration(milliseconds: 500));
+          await requestCall();
+        } catch (e, stackTrace) {
+          print('❌ [AUTO START] Error auto-starting call: $e');
+          print('❌ [AUTO START] Stack trace: $stackTrace');
+          AppToasts.showError('Failed to auto-start call: ${e.toString()}');
+        }
+      }
+    } on dio.DioException catch (e) {
+      print('❌ [ANONYMOUS LOGIN] DioException: ${e.type}');
+      print('❌ [ANONYMOUS LOGIN] Status Code: ${e.response?.statusCode}');
+      print('❌ [ANONYMOUS LOGIN] Response: ${e.response?.data}');
+      print('❌ [ANONYMOUS LOGIN] Error: ${e.error}');
+      print('❌ [ANONYMOUS LOGIN] Message: ${e.message}');
+      
+      String errorMessage = 'Failed to authenticate. Please try again.';
+      
+      // Detect network connectivity errors
+      if (e.type == dio.DioExceptionType.connectionTimeout ||
+          e.type == dio.DioExceptionType.receiveTimeout ||
+          e.type == dio.DioExceptionType.sendTimeout) {
+        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
+      } else if (e.type == dio.DioExceptionType.connectionError) {
+        // Check for specific network unreachable errors
+        final errorString = e.error?.toString().toLowerCase() ?? '';
+        final messageString = e.message?.toLowerCase() ?? '';
+        
+        if (errorString.contains('network is unreachable') ||
+            errorString.contains('connection failed') ||
+            errorString.contains('socketexception') ||
+            messageString.contains('network is unreachable') ||
+            messageString.contains('connection failed')) {
+          errorMessage = 'No internet connection. Please check your network settings and try again.';
+          print('⚠️ [ANONYMOUS LOGIN] Network connectivity issue detected - device cannot reach the server');
+        } else {
+          errorMessage = 'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
+        }
+      } else if (e.response?.statusCode == 400 || e.response?.statusCode == 500) {
+        // Backend validation errors
+        try {
+          final responseData = e.response?.data;
+          if (responseData is Map<String, dynamic>) {
+            final error = responseData['error'];
+            if (error is Map && error.containsKey('message')) {
+              errorMessage = error['message'] ?? errorMessage;
+            } else if (responseData.containsKey('message')) {
+              errorMessage = responseData['message'] ?? errorMessage;
+            }
+          }
+        } catch (_) {}
+      }
+      
+      // Show user-friendly error message
+      AppToasts.showError(errorMessage);
+      rethrow;
+    } catch (e, stackTrace) {
+      print('❌ [ANONYMOUS LOGIN] Exception: $e');
+      print('❌ [ANONYMOUS LOGIN] Stack trace: $stackTrace');
+      AppToasts.showError('An unexpected error occurred during authentication. Please try again.');
+      rethrow;
+    } finally {
+      isAnonymousLoginLoading.value = false;
+    }
+  }
+
+  /// Check authentication and connect WebSocket if authenticated
+  Future<void> _checkAuthAndConnectWebSocket() async {
+    try {
+      print('🔌 [WEBSOCKET] Checking authentication for WebSocket connection...');
+      final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+      print('🔌 [WEBSOCKET] isAuthenticated: $isAuthenticated');
+      
+      if (isAuthenticated) {
+        // Also check if token is not expired
+        final token = await AuthUtil().getAccessToken();
+        print('🔌 [WEBSOCKET] Token exists: ${token != null}');
+        
+        if (token != null && !JwtUtil.isTokenExpired(token)) {
+          print('✅ [WEBSOCKET] Token valid, connecting WebSocket...');
+          await _connectWebSocket();
+        } else {
+          print('❌ [WEBSOCKET] Token expired or null, performing anonymous login...');
+          if (token != null) {
+            print('🔌 [WEBSOCKET] Token expired: ${JwtUtil.isTokenExpired(token)}');
+          }
+          // Perform anonymous login instead of showing login dialog
+          await _performAnonymousLogin();
+        }
+      } else {
+        print('❌ [WEBSOCKET] User not authenticated, WebSocket connection skipped');
+      }
+    } catch (e, stackTrace) {
+      print('❌ [WEBSOCKET] Error in _checkAuthAndConnectWebSocket: $e');
+      print('❌ [WEBSOCKET] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to connect WebSocket: ${e.toString()}');
+      rethrow;
+    }
+  }
+
+  /// Connect to Direct Call WebSocket
+  Future<void> _connectWebSocket() async {
+    print('🔌 [WEBSOCKET] Starting WebSocket connection...');
+    try {
+      _webSocketService = DirectCallWebSocketService();
+      print('🔌 [WEBSOCKET] WebSocket service created');
+      
+      // Set up event handlers
+      _webSocketService!.onIncomingCall = (event) {
+        print('📞 [WEBSOCKET EVENT] incomingCall: sessionId=${event.sessionId}, roomName=${event.roomName}, callerId=${event.callerId}');
+        incomingCall.value = event;
+        // Optionally refresh pending calls
+        _loadPendingCalls();
+      };
+      
+      _webSocketService!.onCallAccepted = (event) {
+        print('✅ [WEBSOCKET EVENT] callAccepted: sessionId=${event.sessionId}, roomName=${event.roomName}');
+        print('📊 [WEBSOCKET EVENT] Current sessionId: ${currentSessionId.value}');
+        if (event.sessionId == currentSessionId.value) {
+          print('✅ [WEBSOCKET EVENT] Session IDs match, updating call status to active');
+          callStatus.value = 'active';
+          connectionStatus.value = 'Connected';
+          // Start polling for call details when call is accepted (this includes report and statement)
+          if (event.sessionId != null && event.sessionId!.isNotEmpty) {
+            _startCallDetailsPolling();
+          }
+        } else {
+          print('⚠️ [WEBSOCKET EVENT] Session IDs do not match! Event: ${event.sessionId}, Current: ${currentSessionId.value}');
+        }
+      };
+      
+      _webSocketService!.onCallRejected = (event) {
+        print('❌ [WEBSOCKET EVENT] callRejected: sessionId=${event.sessionId}, message=${event.message}');
+        if (event.sessionId == currentSessionId.value) {
+          callStatus.value = 'ended';
+          _handleCallEnded(shouldNavigate: false);
+          AppToasts.showError(event.message ?? 'Call rejected');
+        }
+      };
+      
+      _webSocketService!.onCallEnded = (event) {
+        print('🔚 [WEBSOCKET EVENT] callEnded: sessionId=${event.sessionId}, duration=${event.duration}, message=${event.message}');
+        if (event.sessionId == currentSessionId.value) {
+          callStatus.value = 'ended';
+          // Clear ending call loading state when WebSocket confirms call ended
+          isEndingCall.value = false;
+          // Clear upload request when call ends
+          currentUploadRequest.value = null;
+          // _handleCallEnded will handle navigation based on whether report exists
+          _handleCallEnded(shouldNavigate: true);
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploadLink = (event) {
+        print('📎 [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_LINK: reportId=${event.reportId}, url=${event.url?.substring(0, 50)}...');
+        print('📎 [WEBSOCKET EVENT] Description: ${event.description}');
+        print('📎 [WEBSOCKET EVENT] Attachment Type: ${event.attachmentType}');
+        print('📎 [WEBSOCKET EVENT] Expires At: ${event.expiresAt}');
+        
+        // Show upload popup
+        currentUploadRequest.value = event;
+        isUploadDialogOpen.value = true;
+        
+        // Show dialog
+        final context = Get.context;
+        if (context != null && !Get.isDialogOpen!) {
+          Get.dialog(
+            AttachmentUploadPopup(uploadLinkEvent: event),
+            barrierDismissible: true, // Allow closing by tapping outside
+          ).then((_) {
+            // Update state when dialog is closed (either manually or automatically)
+            isUploadDialogOpen.value = false;
+            // Optionally clear the upload request when manually closed
+            // currentUploadRequest.value = null; // Uncomment if you want to clear on manual close
+          });
+        }
+        
+        // Show toast notification
+        if (context != null) {
+          AppToasts.showSuccess(event.description ?? 'Please upload the requested file');
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploaded = (event) {
+        print('✅ [WEBSOCKET EVENT] ATTACHMENT_UPLOADED: reportId=${event.reportId}, fileName=${event.fileName}');
+        
+        // Close upload popup safely
+        _closeUploadDialogSafely();
+        currentUploadRequest.value = null;
+        isUploadDialogOpen.value = false;
+        
+        // Show success message
+        final context = Get.context;
+        if (context != null) {
+          _showToastSafely(() => AppToasts.showSuccess('File uploaded successfully: ${event.fileName ?? "File"}'));
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploadFailed = (event) {
+        print('❌ [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_FAILED: reportId=${event.reportId}, reason=${event.reason}');
+        
+        // Close upload popup safely
+        _closeUploadDialogSafely();
+        currentUploadRequest.value = null;
+        isUploadDialogOpen.value = false;
+        
+        // Show error message
+        final context = Get.context;
+        if (context != null) {
+          _showToastSafely(() => AppToasts.showError('Upload failed: ${event.reason ?? "Unknown error"}'));
+        }
+      };
+      
+      _webSocketService!.onConnected = () {
+        print('✅ [WEBSOCKET] Direct Call WebSocket connected successfully');
+        print('🔌 [WEBSOCKET] Socket ID: ${_webSocketService?.socketId}');
+      };
+      
+      _webSocketService!.onDisconnected = () {
+        print('❌ [WEBSOCKET] Direct Call WebSocket disconnected');
+      };
+      
+      _webSocketService!.onError = (error) {
+        print('❌ [WEBSOCKET ERROR] Error: $error');
+        
+        // Check if it's a network/internet error
+        final errorString = error.toString().toLowerCase();
+        final isNetworkError = errorString.contains('socketexception') ||
+            errorString.contains('failed host lookup') ||
+            errorString.contains('no address associated') ||
+            errorString.contains('network is unreachable') ||
+            errorString.contains('connection failed');
+        
+        if (isNetworkError && !connectivityUtil.isOnline.value) {
+          print('🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...');
+          // Wait for internet and retry connection
+          _waitForInternetAndRetryWebSocket();
+          return;
+        }
+        
+        // Don't show error toast for auth errors, perform anonymous login instead
+        if (errorString.contains('auth') || errorString.contains('unauthorized')) {
+          print('🔐 [WEBSOCKET ERROR] Auth error detected, performing anonymous login');
+          // Perform anonymous login
+          _performAnonymousLogin().catchError((authError) {
+            print('❌ [WEBSOCKET ERROR] Anonymous login failed: $authError');
+          });
+        }
+        // Only show critical WebSocket errors that affect functionality
+        // Non-critical errors are logged but not shown to user
+      };
+      
+      // Connect
+      print('🔌 [WEBSOCKET] Calling connect()...');
+      await _webSocketService!.connect();
+      print('🔌 [WEBSOCKET] connect() completed, isConnected: ${_webSocketService?.isConnected}');
+    } catch (e, stackTrace) {
+      print('❌ [WEBSOCKET ERROR] Exception connecting WebSocket: $e');
+      print('❌ [WEBSOCKET ERROR] Stack trace: $stackTrace');
+      final errorMessage = e.toString();
+      
+      // Check if it's a network/internet error
+      final errorString = errorMessage.toLowerCase();
+      final isNetworkError = errorString.contains('socketexception') ||
+          errorString.contains('failed host lookup') ||
+          errorString.contains('no address associated') ||
+          errorString.contains('network is unreachable') ||
+          errorString.contains('connection failed');
+      
+      if (isNetworkError && !connectivityUtil.isOnline.value) {
+        print('🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...');
+        // Wait for internet and retry connection
+        await _waitForInternetAndRetryWebSocket();
+        return;
+      }
+      
+      AppToasts.showError('WebSocket connection failed: $errorMessage');
+      if (errorString.contains('auth') || 
+          errorString.contains('token') ||
+          errorString.contains('unauthorized')) {
+        // Try anonymous login
+        try {
+          await _performAnonymousLogin();
+        } catch (authError) {
+          print('❌ [WEBSOCKET] Anonymous login failed: $authError');
+        }
+      }
+      rethrow;
+    }
+  }
+
+  /// Wait for internet connection and retry WebSocket connection
+  Future<void> _waitForInternetAndRetryWebSocket() async {
+    try {
+      print('⏳ [WEBSOCKET RETRY] Waiting for internet connection...');
+      final internetRestored = await connectivityUtil.waitForInternet(
+        timeout: const Duration(seconds: 60),
+      );
+      
+      if (internetRestored) {
+        print('✅ [WEBSOCKET RETRY] Internet restored, retrying WebSocket connection...');
+        // Small delay to ensure connection is stable
+        await Future.delayed(const Duration(seconds: 2));
+        // Retry WebSocket connection
+        await _connectWebSocket();
+      } else {
+        print('⏰ [WEBSOCKET RETRY] Timeout waiting for internet, giving up');
+        AppToasts.showError('No internet connection. Please check your network and try again.');
+      }
+    } catch (e, stackTrace) {
+      print('❌ [WEBSOCKET RETRY] Error waiting for internet: $e');
+      print('❌ [WEBSOCKET RETRY] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to reconnect. Please check your internet connection.');
+    }
+  }
+
+  /// Wait for internet connection and retry call request
+  Future<void> _waitForInternetAndRetryCall() async {
+    try {
+      print('⏳ [REQUEST CALL RETRY] Waiting for internet connection...');
+      final internetRestored = await connectivityUtil.waitForInternet(
+        timeout: const Duration(seconds: 60),
+      );
+      
+      if (internetRestored) {
+        print('✅ [REQUEST CALL RETRY] Internet restored, retrying call request...');
+        // Small delay to ensure connection is stable
+        await Future.delayed(const Duration(seconds: 2));
+        // Retry call request
+        await requestCall();
+      } else {
+        print('⏰ [REQUEST CALL RETRY] Timeout waiting for internet, giving up');
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        callStatus.value = 'idle';
+        AppToasts.showError('No internet connection. Please check your network and try again.');
+      }
+    } catch (e, stackTrace) {
+      print('❌ [REQUEST CALL RETRY] Error waiting for internet: $e');
+      print('❌ [REQUEST CALL RETRY] Stack trace: $stackTrace');
+      callNetworkStatus.value = NetworkStatus.ERROR;
+      callStatus.value = 'idle';
+      AppToasts.showError('Failed to reconnect. Please check your internet connection.');
+    }
+  }
+
+  /// Check if user is authenticated before performing call operations
+  /// Performs anonymous login if not authenticated
+  Future<bool> _checkAuthentication() async {
+    final isAuthenticated = await AuthUtil().isFullyAuthenticated();
+    if (!isAuthenticated) {
+      // Perform anonymous login
+      try {
+        await _performAnonymousLogin();
+        return true;
+      } catch (e) {
+        print('❌ [AUTH] Anonymous login failed: $e');
+        return false;
+      }
+    }
+    
+    // Check if token is expired
+    final token = await AuthUtil().getAccessToken();
+    if (token == null || JwtUtil.isTokenExpired(token)) {
+      // Perform anonymous login
+      try {
+        await _performAnonymousLogin();
+        return true;
+      } catch (e) {
+        print('❌ [AUTH] Anonymous login failed: $e');
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  /// Load pending calls (Employee only)
+  Future<void> _loadPendingCalls() async {
+    // Check authentication first
+    final isAuthenticated = await _checkAuthentication();
+    if (!isAuthenticated) {
+      return;
+    }
+    
+    try {
+      final calls = await _directCallService.getPendingCalls();
+      pendingCalls.assignAll(calls);
+    } catch (e) {
+      print('Error loading pending calls: $e');
+      // If it's an auth error, perform anonymous login
+      if (e.toString().toLowerCase().contains('401') || 
+          e.toString().toLowerCase().contains('unauthorized')) {
+        try {
+          await _performAnonymousLogin();
+          // Retry loading pending calls after anonymous login
+          await _loadPendingCalls();
+        } catch (authError) {
+          print('❌ [PENDING CALLS] Anonymous login failed: $authError');
+        }
+      }
+    }
+  }
+
+  void _loadInitialData() {
+    try {
+      messages.assignAll([
+        ChatMessage(
+          text:
+              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
+          isFromOP: true,
+          time: '8:00 PM',
+        ),
+        ChatMessage(
+          text:
+              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
+          isFromOP: false,
+          time: '8:00 PM',
+        ),
+        ChatMessage(
+          text:
+              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
+          isFromOP: true,
+          time: '8:00 PM',
+        ),
+        ChatMessage(
+          text:
+              "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s",
+          isFromOP: false,
+          time: '8:00 PM',
+        ),
+      ]);
+
+      // Progress will be updated via WebSocket integration later
+      // For now, initialize to step 0 (not started)
+      currentProgressStep.value = 0;
+      isConnectingToOfficer.value = false;
+      isReportInitiated.value = false;
+      isAttachmentUploading.value = false;
+
+      // ID Information and documents will be loaded from call details when call is active
+      // Keep empty initially, will be populated when call details are fetched
+      idInformation.clear();
+      supportingDocuments.clear();
+    } catch (e, stackTrace) {
+      print('❌ [INIT ERROR] Error loading initial data: $e');
+      print('❌ [INIT ERROR] Stack trace: $stackTrace');
+      AppToasts.showError('Failed to load initial data: ${e.toString()}');
+    }
+  }
+
+  /// Connect to LiveKit room (internal helper)
+  Future<void> _connectToLiveKitRoom({
+    required String wsUrl,
+    required String token,
+    required String roomName,
+  }) async {
+    print('🎥 [LIVEKIT] ========== Starting LiveKit Connection ==========');
+    print('🎥 [LIVEKIT] wsUrl: $wsUrl');
+    print('🎥 [LIVEKIT] roomName: $roomName');
+    print('🎥 [LIVEKIT] token: ${token.substring(0, 20)}...');
+    
+    try {
+      // Create room
+      print('🎥 [LIVEKIT] Creating Room instance...');
+      _room = Room();
+      print('🎥 [LIVEKIT] Room instance created');
+
+      // Set up event listeners BEFORE connecting to catch connection errors
+      print('🎥 [LIVEKIT] Setting up event listeners...');
+      _room!.addListener(_onRoomChanged);
+      _room!.addListener(() {
+        _onRemoteParticipantsChanged();
+      });
+      print('🎥 [LIVEKIT] Event listeners set up');
+
+      // Connect to room with timeout
+      print('🎥 [LIVEKIT] Calling room.connect()...');
+      connectionStatus.value = 'Connecting...';
+      callStatus.value = 'connecting';
+      
+      // Start connection timeout monitor
+      _startConnectionTimeoutMonitor();
+      
+      // Add connection timeout (30 seconds)
+      // Configure audio capture options with enhanced noise cancellation
+      // These settings improve audio quality by reducing background noise,
+      // echo from speakers, and automatically adjusting microphone gain
+      await _room!.connect(
+        wsUrl,
+        token,
+        roomOptions: const RoomOptions(
+          adaptiveStream: true,
+          dynacast: true,
+          defaultAudioCaptureOptions: AudioCaptureOptions(
+            // Echo cancellation: Prevents microphone from picking up audio from speakers
+            // This eliminates echo/feedback in video calls
+            echoCancellation: true,
+            
+            // Noise suppression: Reduces background noise (traffic, music, voices, etc.)
+            // This improves audio clarity for other participants
+            noiseSuppression: true,
+            
+            // Auto gain control: Automatically adjusts microphone sensitivity
+            // This ensures consistent audio levels regardless of distance from mic
+            autoGainControl: true,
+          ),
+        ),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          print('❌ [LIVEKIT] Connection timeout after 30 seconds');
+          throw TimeoutException('Connection timeout: Failed to connect to video call server within 30 seconds. Please check your internet connection and try again.');
+        },
+      );
+      
+      print('🎥 [LIVEKIT] room.connect() completed');
+
+      // Wait a bit for connection state to stabilize
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Check if connection actually succeeded
+      if (_room!.connectionState != ConnectionState.connected) {
+        print('❌ [LIVEKIT] Connection state is not connected: ${_room!.connectionState}');
+        throw Exception('Connection failed: Room state is ${_room!.connectionState}');
+      }
+
+      _localParticipant = _room!.localParticipant;
+      print('🎥 [LIVEKIT] Local participant: ${_localParticipant != null ? "exists" : "null"}');
+      
+      if (_localParticipant == null) {
+        print('❌ [LIVEKIT] Local participant is null after connection');
+        throw Exception('Connection failed: Local participant is null');
+      }
+      
+      print('🎥 [LIVEKIT] Local participant identity: ${_localParticipant!.identity}');
+      print('🎥 [LIVEKIT] Local participant sid: ${_localParticipant!.sid}');
+
+      isConnected.value = true;
+      connectionStatus.value = 'Connected';
+      callStatus.value = 'active';
+      
+      print('🎥 [LIVEKIT] Connection state updated - isConnected: ${isConnected.value}');
+      print('🎥 [LIVEKIT] Room connection state: ${_room!.connectionState}');
+      
+      // Start polling for call details when call becomes active (this includes report and statement)
+      final sessionId = currentSessionId.value;
+      if (sessionId != null && sessionId.isNotEmpty) {
+        _startCallDetailsPolling();
+      }
+
+      // Enable camera and microphone (this stream is what admin/officer sees)
+      print('🎥 [LIVEKIT] Enabling video (kiosk: use second front camera if 2 front cameras)...');
+      try {
+        await enableVideo();
+        print('🎥 [LIVEKIT] Video enabled: ${isVideoEnabled.value}');
+      } catch (e) {
+        print('⚠️ [LIVEKIT] Warning: Failed to enable video: $e');
+        // Error toast already shown in enableVideo()
+      }
+      
+      print('🎥 [LIVEKIT] Enabling audio...');
+      try {
+        await enableAudio();
+        print('🎥 [LIVEKIT] Audio enabled: ${isAudioEnabled.value}');
+      } catch (e) {
+        print('⚠️ [LIVEKIT] Warning: Failed to enable audio: $e');
+        // Error toast already shown in enableAudio()
+      }
+
+      // Get local video track
+      print('🎥 [LIVEKIT] Updating local video track...');
+      _updateLocalVideoTrack();
+      print('🎥 [LIVEKIT] Local video track: ${localVideoTrack.value != null ? "exists" : "null"}');
+      
+      // Log room participants
+      print('🎥 [LIVEKIT] Remote participants count: ${_room!.remoteParticipants.length}');
+      print('🎥 [LIVEKIT] ========== LiveKit Connection Complete ==========');
+      
+      // Cancel timeout monitor since connection succeeded
+      _connectionTimeoutTimer?.cancel();
+      _connectionTimeoutTimer = null;
+    } on TimeoutException catch (e) {
+      print('❌ [LIVEKIT ERROR] Connection timeout: $e');
+      _connectionTimeoutTimer?.cancel();
+      _connectionTimeoutTimer = null;
+      connectionStatus.value = 'Connection timeout';
+      isConnected.value = false;
+      callStatus.value = 'idle';
+      callNetworkStatus.value = NetworkStatus.ERROR;
+      AppToasts.showError('Failed to connect to video call server. This may be due to slow internet connection or server issues.');
+      await _handleCallEnded(shouldNavigate: false);
+    } catch (e, stackTrace) {
+      print('❌ [LIVEKIT ERROR] Exception connecting to LiveKit: $e');
+      print('❌ [LIVEKIT ERROR] Stack trace: $stackTrace');
+      connectionStatus.value = 'Connection failed';
+      isConnected.value = false;
+      callStatus.value = 'idle';
+      
+      // Show user-friendly error message
+      String errorMessage = 'Failed to connect to video call';
+      if (e.toString().contains('timeout')) {
+        errorMessage = 'Connection timeout. Please check your internet connection.';
+      } else if (e.toString().contains('network') || e.toString().contains('socket')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (e.toString().contains('permission') || e.toString().contains('camera') || e.toString().contains('microphone')) {
+        errorMessage = 'Camera or microphone permission error. Please grant permissions and try again.';
+      } else if (e.toString().contains('token') || e.toString().contains('auth')) {
+        errorMessage = 'Authentication error. Please try logging in again.';
+      }
+      
+      AppToasts.showError(errorMessage);
+      _connectionTimeoutTimer?.cancel();
+      _connectionTimeoutTimer = null;
+      await _handleCallEnded(shouldNavigate: false);
+    }
+  }
+
+  /// Start connection timeout monitor
+  /// This will show an error if connection is stuck in "connecting" state for too long
+  void _startConnectionTimeoutMonitor() {
+    _connectionTimeoutTimer?.cancel();
+    
+    _connectionTimeoutTimer = Timer(const Duration(seconds: 35), () {
+      // Check if still connecting after timeout
+      if (callStatus.value == 'connecting' && 
+          (connectionStatus.value == 'Connecting...' || connectionStatus.value == 'Reconnecting...')) {
+        print('❌ [CONNECTION TIMEOUT] Connection stuck in connecting state for 35 seconds');
+        AppToasts.showError('Connection is taking too long. Please check your internet and try again.');
+        callNetworkStatus.value = NetworkStatus.ERROR;
+        callStatus.value = 'idle';
+        connectionStatus.value = 'Connection timeout';
+        _handleCallEnded(shouldNavigate: false);
+      }
+    });
+  }
+
+  /// Enumerate available cameras by testing different positions
+  /// For multiple front cameras, we'll add front position multiple times
+  /// and cycle through them using device switching
+  Future<void> _enumerateCameras() async {
+    try {
+      print('📷 [CAMERA] Enumerating available cameras...');
+      
+      // Test which camera positions are available
+      final positions = <CameraPosition>[];
+      
+      // Add front camera (may have multiple front cameras on some devices)
+      positions.add(CameraPosition.front);
+      
+      // Try to add back camera if available
+      // Note: On devices with only front cameras, back might not be available
+      // but we'll add it anyway and handle errors gracefully
+      positions.add(CameraPosition.back);
+      
+      // For devices with multiple front cameras (like smart police station machines),
+      // we'll add front position again to allow cycling through front cameras
+      // The actual device switching will be handled in switchCamera()
+      positions.add(CameraPosition.front); // Second front camera option
+      
+      availableCameraPositions.assignAll(positions);
+      hasMultipleCameras.value = positions.length > 1;
+      currentCameraIndex.value = 0;
+      
+      print('📷 [CAMERA] Available camera positions: ${positions.length}');
+      for (var i = 0; i < positions.length; i++) {
+        print('📷 [CAMERA] Position $i: ${positions[i]}');
+      }
+      
+      if (hasMultipleCameras.value) {
+        print('📷 [CAMERA] Multiple cameras detected, camera switching enabled');
+      }
+    } catch (e, stackTrace) {
+      print('❌ [CAMERA ERROR] Error enumerating cameras: $e');
+      print('❌ [CAMERA ERROR] Stack trace: $stackTrace');
+      // Continue without camera enumeration - single camera assumed
+      availableCameraPositions.clear();
+      hasMultipleCameras.value = false;
+    }
+  }
+
+  /// Enumerate actual media devices (cameras and microphones) for debugging
+  Future<void> _enumerateMediaDevices() async {
+    try {
+      print('🎬 [MEDIA DEVICES] Enumerating media devices...');
+      
+      // Get all media devices using LiveKit's Hardware class
+      final devices = await Hardware.instance.enumerateDevices();
+      
+      print('🎬 [MEDIA DEVICES] Total devices found: ${devices.length}');
+      
+      // Filter cameras
+      final cameras = devices.where((d) => d.kind == 'videoinput').toList();
+      availableCameras.assignAll(cameras);
+      
+      print('📷 [MEDIA DEVICES] Cameras found: ${cameras.length}');
+      for (var i = 0; i < cameras.length; i++) {
+        print('📷 [MEDIA DEVICES] Camera $i:');
+        print('   - Device ID: ${cameras[i].deviceId}');
+        print('   - Label: ${cameras[i].label}');
+        print('   - Kind: ${cameras[i].kind}');
+      }
+      
+      // Filter microphones
+      final microphones = devices.where((d) => d.kind == 'audioinput').toList();
+      availableMicrophones.assignAll(microphones);
+      
+      print('🎤 [MEDIA DEVICES] Microphones found: ${microphones.length}');
+      for (var i = 0; i < microphones.length; i++) {
+        print('🎤 [MEDIA DEVICES] Microphone $i:');
+        print('   - Device ID: ${microphones[i].deviceId}');
+        print('   - Label: ${microphones[i].label}');
+        print('   - Kind: ${microphones[i].kind}');
+      }
+      
+      // Try to detect current camera device ID
+      if (_localParticipant != null) {
+        final videoTrack = _localParticipant!.videoTrackPublications
+            .where((pub) => pub.source == TrackSource.camera)
+            .map((pub) => pub.track)
+            .whereType<LocalVideoTrack>()
+            .firstOrNull;
+        
+        if (videoTrack != null) {
+          // Get device ID from track settings
+          final settings = videoTrack.mediaStreamTrack.getSettings();
+          final deviceId = settings['deviceId'];
+          final facingMode = settings['facingMode'];
+          
+          print('📷 [MEDIA DEVICES] Track settings:');
+          print('   - deviceId: $deviceId');
+          print('   - facingMode: $facingMode');
+          
+          if (deviceId != null) {
+            currentCameraDeviceId.value = deviceId.toString();
+            print('📷 [MEDIA DEVICES] Current camera device ID (from track): ${currentCameraDeviceId.value}');
+          }
+          
+          // Try to match by label if device IDs don't match
+          // Look for camera with matching facing mode or position
+          if (facingMode != null && cameras.isNotEmpty) {
+            final isFrontCamera = facingMode.toString().toLowerCase().contains('user') || 
+                                   facingMode.toString().toLowerCase().contains('front');
+            final matchingCamera = cameras.firstWhere(
+              (cam) => isFrontCamera 
+                  ? cam.label.toLowerCase().contains('front')
+                  : cam.label.toLowerCase().contains('back'),
+              orElse: () => cameras.first,
+            );
+            
+            if (matchingCamera.deviceId != currentCameraDeviceId.value) {
+              print('📷 [MEDIA DEVICES] Using label-based match: ${matchingCamera.deviceId} (${matchingCamera.label})');
+              currentCameraDeviceId.value = matchingCamera.deviceId;
+            }
+          }
+        }
+      }
+      
+      print('✅ [MEDIA DEVICES] Media device enumeration complete');
+    } catch (e, stackTrace) {
+      print('❌ [MEDIA DEVICES ERROR] Error enumerating media devices: $e');
+      print('❌ [MEDIA DEVICES ERROR] Stack trace: $stackTrace');
+    }
+  }
+
+  /// Update local video track
+  void _updateLocalVideoTrack() {
+    if (_localParticipant == null) {
+      print('⚠️ [LOCAL TRACK] Local participant is null');
+      localVideoTrack.value = null;
+      return;
+    }
+    
+    print('🎥 [LOCAL TRACK] Updating local video track...');
+    print('🎥 [LOCAL TRACK] Video track publications: ${_localParticipant!.videoTrackPublications.length}');
+    
+    for (var pub in _localParticipant!.videoTrackPublications) {
+      print('🎥 [LOCAL TRACK] - Publication: sid=${pub.sid}, source=${pub.source}, subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}');
+      if (pub.track != null) {
+        final track = pub.track;
+        if (track is LocalVideoTrack) {
+          print('🎥 [LOCAL TRACK]   - Track details: sid=${track.sid}, muted=${track.muted}');
+        }
+      }
+    }
+    
+    final videoTrack = _localParticipant!.videoTrackPublications
+        .where((pub) => pub.subscribed)
+        .map((pub) => pub.track)
+        .whereType<LocalVideoTrack>()
+        .firstOrNull;
+    
+    print('🎥 [LOCAL TRACK] Found local video track: ${videoTrack != null}');
+    if (videoTrack != null) {
+      print('🎥 [LOCAL TRACK] Video track muted: ${videoTrack.muted}');
+    }
+    
+    localVideoTrack.value = videoTrack;
+  }
+
+  /// Room event handler
+  void _onRoomChanged() {
+    if (_room == null) {
+      print('⚠️ [ROOM EVENT] Room is null');
+      return;
+    }
+
+    print('🔄 [ROOM EVENT] Room changed - ConnectionState: ${_room!.connectionState}');
+    
+    final previousState = connectionStatus.value;
+    
+    // Update connection status
+    if (_room!.connectionState == ConnectionState.connected) {
+      print('✅ [ROOM EVENT] Room connected');
+      connectionStatus.value = 'Connected';
+      isConnected.value = true;
+      callStatus.value = 'active';
+      // Sync remote participants immediately (fixes admin black screen when admin joins after kiosk)
+      _onRemoteParticipantsChanged();
+      // Delayed sync to catch late-arriving participant/track updates (LiveKit can notify track after connect)
+      _remoteVideoTrackSyncTimer?.cancel();
+      _remoteVideoTrackSyncTimer = Timer(const Duration(milliseconds: 500), () {
+        _remoteVideoTrackSyncTimer = null;
+        if (_room != null && _room!.connectionState == ConnectionState.connected) {
+          _onRemoteParticipantsChanged();
+          print('🎥 [REMOTE TRACK] Delayed sync after connect (admin black screen fix)');
+        }
+      });
+      // Start polling for call details if we have a session ID
+      final sessionId = currentSessionId.value;
+      if (sessionId != null && sessionId.isNotEmpty && callDetails.value == null) {
+        _startCallDetailsPolling();
+      }
+    } else if (_room!.connectionState == ConnectionState.disconnected) {
+      print('❌ [ROOM EVENT] Room disconnected');
+      connectionStatus.value = 'Disconnected';
+      isConnected.value = false;
+      // Only show error if we were previously connected (not if we're just starting)
+      if (previousState == 'Connected') {
+        // Only show toast if we have a valid context (avoid overlay errors)
+        try {
+          AppToasts.showError('Connection lost. Please try again.');
+        } catch (e) {
+          print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
+        }
+        callStatus.value = 'idle';
+        _handleCallEnded(shouldNavigate: false);
+      }
+    } else if (_room!.connectionState == ConnectionState.connecting) {
+      print('🔄 [ROOM EVENT] Room connecting...');
+      connectionStatus.value = 'Connecting...';
+      callStatus.value = 'connecting';
+    } else if (_room!.connectionState == ConnectionState.reconnecting) {
+      print('🔄 [ROOM EVENT] Room reconnecting...');
+      connectionStatus.value = 'Reconnecting...';
+    }
+
+    // Check for connection errors
+    if (_room!.connectionState == ConnectionState.disconnected && 
+        (previousState == 'Connecting...' || previousState == 'Reconnecting...')) {
+      print('❌ [ROOM EVENT] Connection failed during connect/reconnect');
+      // Only show toast if we have a valid context (avoid overlay errors)
+      try {
+        AppToasts.showError('Failed to connect. Please check your internet and try again.');
+      } catch (e) {
+        print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
+      }
+      callStatus.value = 'idle';
+      callNetworkStatus.value = NetworkStatus.ERROR;
+    }
+
+    print('🔄 [ROOM EVENT] Remote participants: ${_room!.remoteParticipants.length}');
+    print('🔄 [ROOM EVENT] Local participant: ${_room!.localParticipant != null ? "exists" : "null"}');
+
+    // Update local video track
+    _updateLocalVideoTrack();
+  }
+
+  /// Update reactive remote video track (so admin UI rebuilds when track becomes available).
+  /// Workaround for LiveKit Flutter #919 (Android): publication.track can be null after subscribe;
+  /// we retry periodically until the SDK sets it.
+  void _updateRemoteVideoTrack() {
+    if (remoteParticipants.isEmpty) {
+      _remoteVideoTrackRetryTimer?.cancel();
+      _remoteVideoTrackRetryTimer = null;
+      _remoteVideoTrackRetryCount = 0;
+      remoteVideoTrack.value = null;
+      return;
+    }
+    final track = getRemoteVideoTrack(remoteParticipants.first);
+    if (track != null) {
+      _remoteVideoTrackRetryTimer?.cancel();
+      _remoteVideoTrackRetryTimer = null;
+      _remoteVideoTrackRetryCount = 0;
+      if (track != remoteVideoTrack.value) {
+        remoteVideoTrack.value = track;
+        print('🎥 [REMOTE TRACK] Updated remoteVideoTrack: true');
+      }
+      return;
+    }
+    // Track is null but we may have a subscribed video publication (SDK sets track async on Android)
+    final hasSubscribedVideo = remoteParticipants.any((p) => p.videoTrackPublications.any((pub) => pub.subscribed));
+    if (hasSubscribedVideo && _remoteVideoTrackRetryTimer == null) {
+      _remoteVideoTrackRetryCount = 0;
+      _remoteVideoTrackRetryTimer = Timer.periodic(_remoteVideoTrackRetryInterval, (_) {
+        _remoteVideoTrackRetryCount++;
+        if (_remoteVideoTrackRetryCount > _remoteVideoTrackRetryMax) {
+          _remoteVideoTrackRetryTimer?.cancel();
+          _remoteVideoTrackRetryTimer = null;
+          _remoteVideoTrackRetryCount = 0;
+          print('🎥 [REMOTE TRACK] Retry timeout waiting for remote video track');
+          return;
+        }
+        _updateRemoteVideoTrack();
+      });
+      print('🎥 [REMOTE TRACK] Started retry polling for remote video track (LiveKit #919 workaround)');
+    }
+  }
+
+  /// Remote participants event handler
+  void _onRemoteParticipantsChanged() {
+    if (_room == null) {
+      print('⚠️ [PARTICIPANTS] Room is null');
+      return;
+    }
+    
+    final participants = _room!.remoteParticipants.values.toList();
+    print('👥 [PARTICIPANTS] Remote participants changed: ${participants.length}');
+    
+    // Remove listeners from participants no longer in the room
+    for (var entry in _remoteParticipantListeners.entries.toList()) {
+      if (!participants.contains(entry.key)) {
+        try {
+          entry.key.removeListener(entry.value);
+        } catch (_) {}
+        _remoteParticipantListeners.remove(entry.key);
+      }
+    }
+    
+    for (var participant in participants) {
+      print('👥 [PARTICIPANTS] - Identity: ${participant.identity}, SID: ${participant.sid}');
+      print('👥 [PARTICIPANTS] - Video tracks: ${participant.videoTrackPublications.length}');
+      print('👥 [PARTICIPANTS] - Audio tracks: ${participant.audioTrackPublications.length}');
+      
+      for (var videoPub in participant.videoTrackPublications) {
+        print('👥 [PARTICIPANTS]   Video track: subscribed=${videoPub.subscribed}, muted=${videoPub.muted}, track=${videoPub.track != null}');
+      }
+      
+      // Listen to participant so we update when track gets subscribed (fixes admin black screen)
+      if (!_remoteParticipantListeners.containsKey(participant)) {
+        void onParticipantChanged() {
+          _updateRemoteVideoTrack();
+        }
+        participant.addListener(onParticipantChanged);
+        _remoteParticipantListeners[participant] = onParticipantChanged;
+      }
+    }
+    
+    remoteParticipants.assignAll(participants);
+    _updateRemoteVideoTrack();
+    print('👥 [PARTICIPANTS] Updated remoteParticipants list: ${remoteParticipants.length}');
+  }
+
   /// Get preferred language from LanguageController if available
   String? _getPreferredLanguage() {
     try {
@@ -2251,7 +2599,7 @@ class CallClassController extends GetxController {
       return null;
     }
   }
-  
+
   /// Load call details from backend
   Future<void> _loadCallDetails(String sessionId) async {
     if (sessionId.isEmpty) {
@@ -2396,7 +2744,7 @@ class CallClassController extends GetxController {
       _isLoadingCallDetails = false;
     }
   }
-  
+
   /// Start polling for call details updates
   void _startCallDetailsPolling() {
     final sessionId = currentSessionId.value;
@@ -2434,7 +2782,7 @@ class CallClassController extends GetxController {
       },
     );
   }
-  
+
   /// Stop polling for call details updates
   void _stopCallDetailsPolling() {
     if (_callDetailsPollingTimer != null) {
@@ -2443,7 +2791,7 @@ class CallClassController extends GetxController {
       print('📋 [CALL DETAILS POLLING] Stopped call details polling');
     }
   }
-  
+
   /// Update ID Information from call details
   void _updateIdInformationFromCallDetails(CallDetailsResponse details) {
     final infoRows = <InfoRow>[];
@@ -2524,68 +2872,7 @@ class CallClassController extends GetxController {
       });
     }
   }
-  
-  /// Confirm report submission - navigate to confirmation page and end call
-  Future<void> confirmReportSubmission() async {
-    try {
-      final reportId = reportInfo.value?.id;
-      if (reportId == null || reportId.isEmpty) {
-        AppToasts.showError('Report ID not found');
-        return;
-      }
-      
-      print('✅ [REPORT CONFIRM] Confirming report submission: $reportId');
-      
-      // Fetch and show report in confirmation page
-      await _fetchAndShowReport(reportId);
-      
-      // End the call after showing confirmation page (without navigation since we're already showing confirmation page)
-      await disconnectFromRoom();
-      callStatus.value = 'ended';
-      
-      // Clear call details
-      callDetails.value = null;
-      reportInfo.value = null;
-      statementInfo.value = null;
-      
-      currentSessionId.value = '';
-      currentRoomName.value = '';
-      currentWsUrl.value = '';
-      
-      // Stop polling
-      _stopCallDetailsPolling();
-      
-      print('✅ [REPORT CONFIRM] Call ended and confirmation page shown');
-    } catch (e, stackTrace) {
-      print('❌ [REPORT CONFIRM] Error confirming report: $e');
-      print('❌ [REPORT CONFIRM] Stack trace: $stackTrace');
-      AppToasts.showError('Failed to confirm report: ${e.toString()}');
-    }
-  }
-  
-  /// Reject report submission - stay on page (API integration to be added later)
-  Future<void> rejectReportSubmission() async {
-    try {
-      final reportId = reportInfo.value?.id;
-      if (reportId == null || reportId.isEmpty) {
-        AppToasts.showError('Report ID not found');
-        return;
-      }
-      
-      print('❌ [REPORT REJECT] Rejecting report submission: $reportId');
-      
-      // TODO: Integrate API call to reject report
-      // For now, just show a message and stay on the page
-      AppToasts.showWarning('Report rejection will be processed. API integration pending.');
-      
-      // Stay on the page - no navigation
-    } catch (e, stackTrace) {
-      print('❌ [REPORT REJECT] Error rejecting report: $e');
-      print('❌ [REPORT REJECT] Stack trace: $stackTrace');
-      AppToasts.showError('Failed to reject report: ${e.toString()}');
-    }
-  }
-  
+
   /// Fetch report by ID and show in confirmation page view
   Future<void> _fetchAndShowReport(String reportId) async {
     try {
@@ -2641,7 +2928,7 @@ class CallClassController extends GetxController {
       });
     }
   }
-  
+
   /// Convert report data from API to formData format for ConfirmationPageView
   /// Only extracts necessary fields for the confirmation page
   Map<String, String> _convertReportToFormData(ReportData reportData) {
@@ -2785,7 +3072,7 @@ class CallClassController extends GetxController {
     
     return formData;
   }
-  
+
   /// Helper to get month name
   String _getMonthName(int month) {
     const months = [
@@ -2793,103 +3080,6 @@ class CallClassController extends GetxController {
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return months[month - 1];
-  }
-  
-  // Removed draft polling - now using call details endpoint which includes report and statement
-  // Old draft polling methods removed - data comes from call details every 10 seconds
-  
-  // Removed: _startDraftPolling, _stopDraftPolling, _scheduleNextPoll, _pollDraft methods
-  // These are no longer needed as we get report and statement data from call details endpoint
-
-  void confirmTerms() async {
-    // Check authentication before confirming terms
-    final isAuthenticated = await _checkAuthentication();
-    if (!isAuthenticated) {
-      return;
-    }
-    
-    // After confirming terms, request a call (Client role)
-    // The system will automatically assign an employee
-    await requestCall();
-  }
-
-  void onTakePhoto() {
-    // Placeholder for future photo capture integration
-  }
-
-  void onFlashDocuments() {
-    // Placeholder for future flash document handling
-  }
-
-  void onPaymentReceipt() {
-    // Placeholder for future payment receipt handling
-  }
-
-  void setFocusedField(
-    FocusNode? focusNode,
-    TextEditingController textController,
-  ) {
-    focusedField = focusNode;
-    focusedController = textController;
-    keyboardController
-      ..text = textController.text
-      ..selection = textController.selection;
-  }
-
-  void onKeyboardKeyPressed(String key) {
-    final controller = focusedController;
-    if (controller == null) return;
-
-    final text = controller.text;
-    final selection = controller.selection;
-
-    if (key == 'backspace') {
-      if (selection.start > 0) {
-        final newText =
-            text.substring(0, selection.start - 1) + text.substring(selection.end);
-        controller
-          ..text = newText
-          ..selection = TextSelection.collapsed(offset: selection.start - 1);
-      }
-    } else if (key == 'space') {
-      final newText =
-          '${text.substring(0, selection.start)} ${text.substring(selection.end)}';
-      controller
-        ..text = newText
-        ..selection = TextSelection.collapsed(offset: selection.start + 1);
-    } else if (key == 'left') {
-      if (selection.start > 0) {
-        controller.selection =
-            TextSelection.collapsed(offset: selection.start - 1);
-      }
-    } else if (key == 'right') {
-      if (selection.end < text.length) {
-        controller.selection =
-            TextSelection.collapsed(offset: selection.end + 1);
-      }
-    } else if (key == 'enter') {
-      final newText =
-          '${text.substring(0, selection.start)}\n${text.substring(selection.end)}';
-      controller
-        ..text = newText
-        ..selection = TextSelection.collapsed(offset: selection.start + 1);
-    } else if (key == '123') {
-      // Future enhancement: switch keyboard layout
-    } else {
-      final newText =
-          text.substring(0, selection.start) + key + text.substring(selection.end);
-      controller
-        ..text = newText
-        ..selection = TextSelection.collapsed(offset: selection.start + key.length);
-    }
-
-    keyboardController
-      ..text = controller.text
-      ..selection = controller.selection;
-  }
-
-  void clearMessage() {
-    messageController.clear();
   }
 
   /// Safely close the upload dialog without triggering GetX overlay errors

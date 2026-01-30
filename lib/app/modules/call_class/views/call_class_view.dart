@@ -72,13 +72,15 @@ class CallClassView extends GetView<CallClassController> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Middle video + actions
+                // Middle video + actions (scrollable on small screens to avoid overflow)
                 Flexible(
                   flex: 8,
                   fit: FlexFit.loose,
-                  child: Column(
-                    children: [
-                      // Video area
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Video area
                       Container(
                         decoration: BoxDecoration(
                           color: AppColors.whiteOff,
@@ -91,19 +93,21 @@ class CallClassView extends GetView<CallClassController> {
                         child: Stack(
                           children: [
                             // Main video (remote participant or placeholder)
+                            // Use remoteVideoTrack (reactive) so admin UI rebuilds when track becomes subscribed
                             AspectRatio(
                               aspectRatio: 16 / 9,
                               child: Obx(() {
-                                final remoteParticipants = controller.remoteParticipants;
-                                if (remoteParticipants.isNotEmpty) {
-                                  final remoteVideoTrack = controller.getRemoteVideoTrack(remoteParticipants.first);
-                                  if (remoteVideoTrack != null) {
-                                    return VideoTrackRenderer(
-                                      remoteVideoTrack,
-                                    );
-                                  }
+                                final track = controller.remoteVideoTrack.value;
+                                if (track != null) {
+                                  return Container(
+                                    color: Colors.black,
+                                    child: VideoTrackRenderer(
+                                      key: ValueKey(track.sid),
+                                      track,
+                                      fit: VideoViewFit.contain,
+                                    ),
+                                  );
                                 }
-                                // Placeholder when no remote video
                                 return Container(
                                   color: AppColors.black,
                                   child: Center(
@@ -333,11 +337,12 @@ class CallClassView extends GetView<CallClassController> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Progress Bar
+                      // Progress Bar (compact layout to avoid overflow on small screens)
                       _buildProgressBar(),
                     ],
                   ),
                 ),
+                  ),
                 const SizedBox(width: 24),
                 // Right info sidebar
                 Flexible(
@@ -702,7 +707,7 @@ class CallClassView extends GetView<CallClassController> {
       final isUploading = controller.isAttachmentUploading.value;
 
       return Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: AppColors.whiteOff,
           borderRadius: BorderRadius.circular(16),
@@ -715,6 +720,7 @@ class CallClassView extends GetView<CallClassController> {
           ],
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Title
@@ -727,7 +733,7 @@ class CallClassView extends GetView<CallClassController> {
                 fontFamily: 'DMSans',
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             // Progress Steps
             Row(
               children: [
@@ -811,17 +817,18 @@ class CallClassView extends GetView<CallClassController> {
         : AppColors.whiteOff;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Step Circle
+        // Step Circle (slightly smaller to avoid overflow on small screens)
         Container(
-          width: 50,
-          height: 50,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: bgColor,
             shape: BoxShape.circle,
             border: Border.all(
               color: stepColor,
-              width: 3,
+              width: 2,
             ),
           ),
           child: Stack(
@@ -829,10 +836,10 @@ class CallClassView extends GetView<CallClassController> {
             children: [
               if (isLoading)
                 SizedBox(
-                  width: 30,
-                  height: 30,
+                  width: 26,
+                  height: 26,
                   child: CircularProgressIndicator(
-                    strokeWidth: 3,
+                    strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(stepColor),
                   ),
                 )
@@ -840,13 +847,13 @@ class CallClassView extends GetView<CallClassController> {
                 Icon(
                   Icons.check,
                   color: stepColor,
-                  size: 24,
+                  size: 22,
                 )
               else
                 Text(
                   '$stepNumber',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: textColor,
                     fontFamily: 'DMSans',
@@ -855,13 +862,13 @@ class CallClassView extends GetView<CallClassController> {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         // Step Title
         Text(
           title,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
             color: textColor,
             fontFamily: 'DMSans',
