@@ -367,3 +367,55 @@ Map<String, dynamic> _$CallDetailsResponseWrapperToJson(
   'data': instance.data,
   'meta': instance.meta,
 };
+
+AttachmentUploadLinkEvent _$AttachmentUploadLinkEventFromJson(
+  Map<String, dynamic> json,
+) => AttachmentUploadLinkEvent(
+  reportId: json['reportId'] as String?,
+  url: json['url'] as String?,
+  expiresAt: json['expiresAt'] as String?,
+  attachmentType: json['attachmentType'] as String?,
+  description: json['description'] as String?,
+);
+
+Map<String, dynamic> _$AttachmentUploadLinkEventToJson(
+  AttachmentUploadLinkEvent instance,
+) => <String, dynamic>{
+  'reportId': instance.reportId,
+  'url': instance.url,
+  'expiresAt': instance.expiresAt,
+  'attachmentType': instance.attachmentType,
+  'description': instance.description,
+};
+
+AttachmentUploadedEvent _$AttachmentUploadedEventFromJson(
+  Map<String, dynamic> json,
+) => AttachmentUploadedEvent(
+  reportId: json['reportId'] as String?,
+  attachmentId: json['attachmentId'] as String?,
+  fileName: json['fileName'] as String?,
+  attachmentType: json['attachmentType'] as String?,
+);
+
+Map<String, dynamic> _$AttachmentUploadedEventToJson(
+  AttachmentUploadedEvent instance,
+) => <String, dynamic>{
+  'reportId': instance.reportId,
+  'attachmentId': instance.attachmentId,
+  'fileName': instance.fileName,
+  'attachmentType': instance.attachmentType,
+};
+
+AttachmentUploadFailedEvent _$AttachmentUploadFailedEventFromJson(
+  Map<String, dynamic> json,
+) => AttachmentUploadFailedEvent(
+  reportId: json['reportId'] as String?,
+  reason: json['reason'] as String?,
+);
+
+Map<String, dynamic> _$AttachmentUploadFailedEventToJson(
+  AttachmentUploadFailedEvent instance,
+) => <String, dynamic>{
+  'reportId': instance.reportId,
+  'reason': instance.reason,
+};

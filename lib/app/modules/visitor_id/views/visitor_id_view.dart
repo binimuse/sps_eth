@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
@@ -50,7 +49,11 @@ class VisitorIdView extends GetView<VisitorIdController> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          onPressed: () => Get.back(),
+                          onPressed: () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            }
+                          },
                           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
                           label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                         ),
@@ -106,9 +109,9 @@ class VisitorIdView extends GetView<VisitorIdController> {
             ),
           ),
           const SizedBox(height: 12),
-          // "Scan Passport" Text
+          // "Scan Passport or ID" Text
           Text(
-            'Scan Passport Document'.tr,
+            'Scan Passport or ID Document'.tr,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -117,7 +120,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Place your passport within the frame'.tr,
+            'Place your passport or ID within the frame'.tr,
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF9E9E9E),
@@ -130,7 +133,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
           
   // Scanner View Area with Animation
          Obx(() => Container(
-           height: 250,
+           height: 200,
            width: double.infinity,
            decoration: BoxDecoration(
              color: Colors.black.withOpacity(0.8),
@@ -228,196 +231,8 @@ class VisitorIdView extends GetView<VisitorIdController> {
           
           const SizedBox(height: 20),
           
-          // Scanned Document Display (shows after successful scan)
+          // Scan Button
           Obx(() {
-            if (controller.scanSuccess.value && controller.passportData.isNotEmpty) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withOpacity(0.3), width: 2),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 28),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Document Scanned Successfully',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green[800],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Display scanned document image
-                    if (controller.scannedImageBase64.value.isNotEmpty)
-                      Container(
-                        width: double.infinity,
-                        height: 200,
-                        margin: const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.withOpacity(0.3)),
-                          color: Colors.grey.withOpacity(0.1),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Builder(
-                            builder: (context) {
-                              try {
-                                final imageBytes = base64Decode(controller.scannedImageBase64.value);
-                                print('📸 Displaying image from base64: ${imageBytes.length} bytes');
-                                return Image.memory(
-                                  imageBytes,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    print('📸 Error displaying base64 image: $error');
-                                    return Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.error_outline, size: 48, color: Colors.red),
-                                          SizedBox(height: 8),
-                                          Text(
-                                            'Unable to display image',
-                                            style: TextStyle(color: Colors.red, fontSize: 12),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                );
-                              } catch (e) {
-                                print('📸 Exception decoding base64: $e');
-                                return Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        'Image format error',
-                                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-
-                    if (!controller.scannedImageBase64.value.isNotEmpty)
-                      _buildDataRow('Scanned Image', controller.scannedImageBase64.value),
-                      
-                    
-                    // Display scanned data
-                    if (controller.fullName.value.isNotEmpty)
-                      _buildDataRow('Full Name', controller.fullName.value),
-                    if (controller.passportNumber.value.isNotEmpty)
-                      _buildDataRow('ID/Passport Number', controller.passportNumber.value),
-                    if (controller.nationality.value.isNotEmpty)
-                      _buildDataRow('Nationality', controller.nationality.value),
-                    if (controller.dateOfBirth.value.isNotEmpty)
-                      _buildDataRow('Date of Birth', controller.dateOfBirth.value),
-                    if (controller.expiryDate.value.isNotEmpty)
-                      _buildDataRow('Expiry Date', controller.expiryDate.value),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Continue Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Navigate to call class
-                          Get.toNamed(
-                            Routes.CALL_CLASS,
-                            arguments: {
-                              'isVisitor': true,
-                              'autoStart': true,
-                              'passportData': Map<String, dynamic>.from(controller.passportData),
-                              'passportNumber': controller.passportNumber.value,
-                              'fullName': controller.fullName.value,
-                              'nationality': controller.nationality.value,
-                              'dateOfBirth': controller.dateOfBirth.value,
-                              'expiryDate': controller.expiryDate.value,
-                              'idPhoto': controller.scannedImageBase64.value, // Pass base64 image
-                            },
-                          );
-                        },
-                        icon: const Icon(Icons.arrow_forward, size: 22),
-                        label: Text(
-                          'Continue to Call Class',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Scan Again Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Reset and scan again
-                          controller.scanSuccess.value = false;
-                          controller.passportData.clear();
-                          controller.scanError.value = '';
-                        },
-                        icon: const Icon(Icons.refresh, size: 20),
-                        label: Text(
-                          'Scan Again',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.green,
-                          side: BorderSide(color: Colors.green.withOpacity(0.5)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          }),
-          
-          // Scan Button (hidden when scan is successful)
-          Obx(() {
-            if (controller.scanSuccess.value) {
-              return const SizedBox.shrink();
-            }
             return SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -440,7 +255,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
                 label: Text(
                   controller.isScanning.value
                       ? 'Scanning...'.tr
-                      : 'Scan Passport'.tr,
+                      : 'Scan Document'.tr,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -515,116 +330,20 @@ class VisitorIdView extends GetView<VisitorIdController> {
     );
   }
 
-  // Helper method to build data row
-  Widget _buildDataRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // Scanning animation widget
   Widget _buildScanningAnimation() {
     return Stack(
       children: [
-        // Document icon sliding through
+        // GIF Animation - centered and fills the container
         Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.0, end: 1.0),
-                duration: const Duration(milliseconds: 1500),
-                curve: Curves.easeInOut,
-                builder: (context, value, child) {
-                  return Transform.translate(
-                    offset: Offset(0, -50 + (value * 100)),
-                    child: Opacity(
-                      opacity: 1.0 - (value * 0.3),
-                      child: Icon(
-                        Icons.credit_card,
-                        size: 80,
-                        color: const Color(0xFF1976D2).withOpacity(0.8),
-                      ),
-                    ),
-                  );
-                },
-                onEnd: () {
-                  // Animation will restart automatically
-                },
-              ),
-              const SizedBox(height: 20),
-              // Animated dots
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(3, (index) {
-                  return TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    duration: Duration(milliseconds: 600 + (index * 200)),
-                    curve: Curves.easeInOut,
-                    builder: (context, value, child) {
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF1976D2).withOpacity(value),
-                        ),
-                      );
-                    },
-                    onEnd: () {
-                      // Animation will restart automatically
-                    },
-                  );
-                }),
-              ),
-            ],
+          child: Image.asset(
+            'assets/images/scanning_animation.gif',
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
           ),
         ),
-        // Scanning lines
-        Positioned.fill(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 2000),
-            curve: Curves.linear,
-            builder: (context, value, child) {
-              return CustomPaint(
-                painter: ScanningLinePainter(progress: value),
-              );
-            },
-            onEnd: () {
-              // Animation will restart automatically
-            },
-          ),
-        ),
-        // Status text
+        // Status text overlay
         Positioned(
           bottom: 20,
           left: 0,
@@ -636,6 +355,13 @@ class VisitorIdView extends GetView<VisitorIdController> {
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
+                shadows: [
+                  Shadow(
+                    color: Colors.black54,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
             ),
           ),
@@ -657,7 +383,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Insert your ID card into the scanner'.tr,
+            'Insert your passport or ID card into the scanner'.tr,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
@@ -667,7 +393,7 @@ class VisitorIdView extends GetView<VisitorIdController> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Then press "Scan Passport" button below'.tr,
+            'Then press "Scan Document" button below'.tr,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.6),
@@ -679,39 +405,5 @@ class VisitorIdView extends GetView<VisitorIdController> {
     );
   }
 
-}
-
-// Custom painter for scanning line effect
-class ScanningLinePainter extends CustomPainter {
-  final double progress;
-
-  ScanningLinePainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        colors: [
-          Colors.transparent,
-          const Color(0xFF1976D2).withOpacity(0.3),
-          const Color(0xFF1976D2).withOpacity(0.8),
-          const Color(0xFF1976D2).withOpacity(0.3),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.fill;
-
-    final yPosition = size.height * progress;
-    final rect = Rect.fromLTWH(0, yPosition - 2, size.width, 4);
-    canvas.drawRect(rect, paint);
-  }
-
-  @override
-  bool shouldRepaint(ScanningLinePainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
 }
 

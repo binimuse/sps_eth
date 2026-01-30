@@ -16,6 +16,9 @@ class DirectCallWebSocketService {
   Function(CallAcceptedEvent)? onCallAccepted;
   Function(CallRejectedEvent)? onCallRejected;
   Function(CallEndedEvent)? onCallEnded;
+  Function(AttachmentUploadLinkEvent)? onAttachmentUploadLink;
+  Function(AttachmentUploadedEvent)? onAttachmentUploaded;
+  Function(AttachmentUploadFailedEvent)? onAttachmentUploadFailed;
   Function()? onConnected;
   Function()? onDisconnected;
   Function(String)? onError;
@@ -205,6 +208,69 @@ class DirectCallWebSocketService {
         onCallEnded?.call(event);
       } catch (e) {
         print('Error parsing callEnded event: $e, data: $data');
+      }
+    });
+
+    // Listen for attachment upload link (Caller only)
+    _socket!.on('ATTACHMENT_UPLOAD_LINK', (data) {
+      print('📎 [WS SERVICE EVENT] Received ATTACHMENT_UPLOAD_LINK event');
+      print('📎 [WS SERVICE EVENT] Data: $data');
+      try {
+        Map<String, dynamic> jsonData;
+        if (data is Map<String, dynamic>) {
+          jsonData = data;
+        } else {
+          jsonData = Map<String, dynamic>.from(data as Map);
+        }
+        final event = AttachmentUploadLinkEvent.fromJson(jsonData);
+        print('📎 [WS SERVICE EVENT] Parsed ATTACHMENT_UPLOAD_LINK: reportId=${event.reportId}, url=${event.url?.substring(0, 50)}...');
+        onAttachmentUploadLink?.call(event);
+      } catch (e, stackTrace) {
+        print('❌ [WS SERVICE ERROR] Error parsing ATTACHMENT_UPLOAD_LINK event: $e');
+        print('❌ [WS SERVICE ERROR] Stack trace: $stackTrace');
+        print('❌ [WS SERVICE ERROR] Data: $data');
+      }
+    });
+
+    // Listen for attachment uploaded (Both)
+    _socket!.on('ATTACHMENT_UPLOADED', (data) {
+      print('✅ [WS SERVICE EVENT] Received ATTACHMENT_UPLOADED event');
+      print('✅ [WS SERVICE EVENT] Data: $data');
+      try {
+        Map<String, dynamic> jsonData;
+        if (data is Map<String, dynamic>) {
+          jsonData = data;
+        } else {
+          jsonData = Map<String, dynamic>.from(data as Map);
+        }
+        final event = AttachmentUploadedEvent.fromJson(jsonData);
+        print('✅ [WS SERVICE EVENT] Parsed ATTACHMENT_UPLOADED: reportId=${event.reportId}, fileName=${event.fileName}');
+        onAttachmentUploaded?.call(event);
+      } catch (e, stackTrace) {
+        print('❌ [WS SERVICE ERROR] Error parsing ATTACHMENT_UPLOADED event: $e');
+        print('❌ [WS SERVICE ERROR] Stack trace: $stackTrace');
+        print('❌ [WS SERVICE ERROR] Data: $data');
+      }
+    });
+
+    // Listen for attachment upload failed (Both)
+    _socket!.on('ATTACHMENT_UPLOAD_FAILED', (data) {
+      print('❌ [WS SERVICE EVENT] Received ATTACHMENT_UPLOAD_FAILED event');
+      print('❌ [WS SERVICE EVENT] Data: $data');
+      try {
+        Map<String, dynamic> jsonData;
+        if (data is Map<String, dynamic>) {
+          jsonData = data;
+        } else {
+          jsonData = Map<String, dynamic>.from(data as Map);
+        }
+        final event = AttachmentUploadFailedEvent.fromJson(jsonData);
+        print('❌ [WS SERVICE EVENT] Parsed ATTACHMENT_UPLOAD_FAILED: reportId=${event.reportId}, reason=${event.reason}');
+        onAttachmentUploadFailed?.call(event);
+      } catch (e, stackTrace) {
+        print('❌ [WS SERVICE ERROR] Error parsing ATTACHMENT_UPLOAD_FAILED event: $e');
+        print('❌ [WS SERVICE ERROR] Stack trace: $stackTrace');
+        print('❌ [WS SERVICE ERROR] Data: $data');
       }
     });
   }

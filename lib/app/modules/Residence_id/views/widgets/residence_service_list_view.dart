@@ -3,11 +3,10 @@ import 'package:get/get.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
+import '../../controllers/residence_id_controller.dart';
 
-import '../controllers/service_list_controller.dart';
-
-class ServiceListView extends GetView<ServiceListController> {
-  const ServiceListView({super.key});
+class ResidenceServiceListView extends GetView<ResidenceIdController> {
+  const ResidenceServiceListView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +76,7 @@ class ServiceListView extends GetView<ServiceListController> {
                                 ),
                                 SizedBox(height: 4),
                                 Text(
-                                  'Access various police services including crime reporting, traffic incident reporting, and general incident documentation through our digital platform.',
+                                  'Service List of planning and managing that promote a company\'s brand.',
                                   style: TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
                                 ),
                               ],
@@ -132,7 +131,7 @@ class ServiceListView extends GetView<ServiceListController> {
                               description: 'Report crimes promptly and help maintain public safety.',
                               image: Assets.images.crime.path,
                               onTap: () {
-                                Get.toNamed(Routes.SERVICE_DETAIL, arguments: 'Crime Report');
+                                controller.selectService('Crime Report');
                               },
                             ),
                             const SizedBox(width: 16),
@@ -141,7 +140,7 @@ class ServiceListView extends GetView<ServiceListController> {
                               description: 'Official platform for monitoring and managing traffic incidents.',
                               image: Assets.images.traffic.path,
                               onTap: () {
-                                Get.toNamed(Routes.SERVICE_DETAIL, arguments: 'Traffic Incident Report');
+                                controller.selectService('Traffic Incident Report');
                               },
                             ),
                             const SizedBox(width: 16),
@@ -150,7 +149,7 @@ class ServiceListView extends GetView<ServiceListController> {
                               description: 'Ensuring accountability through proper incident documentation.',
                               image: Assets.images.incident.path,
                               onTap: () {
-                                Get.toNamed(Routes.SERVICE_DETAIL, arguments: 'Incident Report');
+                                controller.selectService('Incident Report');
                               },
                             ),
                           ],
@@ -269,4 +268,3 @@ class _ServiceCard extends StatelessWidget {
     );
   }
 }
-

@@ -387,6 +387,68 @@ class CallClassView extends GetView<CallClassController> {
                               }
                               return const SizedBox.shrink();
                             }),
+                            // Show Residence ID user data if available
+                            Obx(() {
+                              final residenceData = controller.residenceData.value;
+                              if (residenceData.isNotEmpty) {
+                                final rows = <InfoRow>[];
+                                if (residenceData['fullName'] != null) {
+                                  rows.add(InfoRow('Name', residenceData['fullName'].toString()));
+                                }
+                                final args = Get.arguments;
+                                if (args != null && args['residenceId'] != null) {
+                                  rows.add(InfoRow('Residence ID', args['residenceId'].toString()));
+                                }
+                                if (residenceData['dob'] != null) {
+                                  rows.add(InfoRow('Date of Birth', residenceData['dob'].toString()));
+                                }
+                                if (residenceData['gender'] != null) {
+                                  rows.add(InfoRow('Gender', residenceData['gender'].toString()));
+                                }
+                                if (residenceData['nationality'] != null) {
+                                  rows.add(InfoRow('Nationality', residenceData['nationality'].toString()));
+                                }
+                                if (residenceData['phoneNo'] != null && residenceData['phoneNo'].toString().isNotEmpty) {
+                                  rows.add(InfoRow('Phone Number', residenceData['phoneNo'].toString()));
+                                }
+                                if (residenceData['currentStatus'] != null && residenceData['currentStatus'].toString().isNotEmpty) {
+                                  rows.add(InfoRow('Status', residenceData['currentStatus'].toString()));
+                                }
+                                
+                                if (rows.isNotEmpty) {
+                                  return _InfoCard(
+                                    title: 'User Information',
+                                    rows: rows,
+                                  );
+                                }
+                              }
+                              return const SizedBox.shrink();
+                            }),
+                            // Show TIN user data if available
+                            Obx(() {
+                              final tinData = controller.tinData.value;
+                              if (tinData.isNotEmpty) {
+                                final rows = <InfoRow>[];
+                                if (tinData['fullName'] != null) {
+                                  rows.add(InfoRow('Name', tinData['fullName'].toString()));
+                                }
+                                final args = Get.arguments;
+                                if (args != null && args['tinNumber'] != null) {
+                                  rows.add(InfoRow('TIN Number', args['tinNumber'].toString()));
+                                }
+                                if (tinData['phoneNumber'] != null && tinData['phoneNumber'].toString().isNotEmpty) {
+                                  rows.add(InfoRow('Phone Number', tinData['phoneNumber'].toString()));
+                                }
+                                
+                                if (rows.isNotEmpty) {
+                                  return _InfoCard(
+                                    title: 'User Information',
+                                    rows: rows,
+                                  );
+                                }
+                              }
+                              return const SizedBox.shrink();
+                            }),
                             const SizedBox(height: 12),
                             Obx(() {
                               if (controller.idInformation.isEmpty) {
@@ -1332,3 +1394,4 @@ class _StatementDetailsView extends StatelessWidget {
     );
   }
 }
+

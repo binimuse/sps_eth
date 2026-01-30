@@ -85,12 +85,15 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                             ),
                           ),
                           onPressed: () {
-                            try {
-                              Get.back(closeOverlays: false);
-                            } catch (e) {
-                              // Fallback if Get.back fails
-                              if (Get.context != null) {
-                                Navigator.of(Get.context!).pop();
+                            // Use Navigator directly to avoid GetX overlay controller issues
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            } else {
+                              // Fallback: navigate to home if can't pop
+                              try {
+                                Get.offAllNamed(Routes.HOME);
+                              } catch (e) {
+                                print('⚠️ [NAVIGATION] Error navigating back: $e');
                               }
                             }
                           },
@@ -413,96 +416,152 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                 ],
                                 
                                 if (selectedType == 'residence') ...[
-                                  TextField(
-                                    controller: controller.idController,
-                                    decoration: InputDecoration(
-                                      hintText: 'Residence ID / National ID'.tr,
-                                      hintStyle: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.grey[100],
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 14,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF1976D2),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                  Obx(() {
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller: controller.idController,
+                                          decoration: InputDecoration(
+                                            hintText: 'Residence ID / National ID'.tr,
+                                            hintStyle: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 14,
+                                            ),
+                                            filled: true,
+                                            fillColor: Colors.grey[100],
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            contentPadding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 14,
+                                            ),
+                                          ),
                                         ),
-                                        elevation: 0,
-                                      ),
-                                      onPressed: () => controller.submit(),
-                                      child: Text(
-                                        'Continue'.tr,
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
+                                        if (controller.residenceError.value.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            controller.residenceError.value,
+                                            style: const TextStyle(
+                                              color: Colors.red,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 20),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF1976D2),
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 14),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              elevation: 0,
+                                            ),
+                                            onPressed: controller.residenceNetworkStatus.value == NetworkStatus.LOADING
+                                                ? null
+                                                : () => controller.submit(),
+                                            child: controller.residenceNetworkStatus.value == NetworkStatus.LOADING
+                                                ? const SizedBox(
+                                                    height: 20,
+                                                    width: 20,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    'Continue'.tr,
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                  ),
+                                      ],
+                                    );
+                                  }),
                                 ],
                                 
                                 if (selectedType == 'tin') ...[
-                                  TextField(
-                                    controller: controller.tinController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: InputDecoration(
-                                      hintText: 'TIN Number'.tr,
-                                      hintStyle: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                      ),
-                                      filled: true,
-                                      fillColor: Colors.grey[100],
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 14,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF1976D2),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                  Obx(() {
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller: controller.tinController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            hintText: 'TIN Number'.tr,
+                                            hintStyle: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 14,
+                                            ),
+                                            filled: true,
+                                            fillColor: Colors.grey[100],
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            contentPadding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 14,
+                                            ),
+                                          ),
                                         ),
-                                        elevation: 0,
-                                      ),
-                                      onPressed: () => controller.submit(),
-                                      child: Text(
-                                        'Continue'.tr,
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
+                                        if (controller.tinError.value.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            controller.tinError.value,
+                                            style: const TextStyle(
+                                              color: Colors.red,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 20),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF1976D2),
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 14),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              elevation: 0,
+                                            ),
+                                            onPressed: controller.tinNetworkStatus.value == NetworkStatus.LOADING
+                                                ? null
+                                                : () => controller.submit(),
+                                            child: controller.tinNetworkStatus.value == NetworkStatus.LOADING
+                                                ? const SizedBox(
+                                                    height: 20,
+                                                    width: 20,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    'Continue'.tr,
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                  ),
+                                      ],
+                                    );
+                                  }),
                                 ],
                               ],
                             ),

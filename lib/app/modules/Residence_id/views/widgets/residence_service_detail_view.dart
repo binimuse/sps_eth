@@ -4,10 +4,10 @@ import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
-import '../controllers/service_detail_controller.dart';
+import '../../controllers/residence_id_controller.dart';
 
-class ServiceDetailView extends GetView<ServiceDetailController> {
-  const ServiceDetailView({super.key});
+class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
+  const ResidenceServiceDetailView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +76,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                 ),
                                 const SizedBox(height: 4),
                                 Obx(() => Text(
-                                  _getServiceDescription(controller.selectedService.value),
+                                  controller.getServiceDescription(),
                                   style: const TextStyle(color: Color(0xFF4F6B7E), fontSize: 12),
                                 )),
                               ],
@@ -134,7 +134,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                     title: 'Crime Report',
                                     description: 'Report crimes promptly and help maintain public safety.',
                                     image: Assets.images.crime.path,
-                                    onTap: () => controller.selectService('Crime Report'),
+                                    onTap: () => controller.changeSelectedService('Crime Report'),
                                     isSelected: controller.selectedService.value == 'Crime Report',
                                   )),
                                   const SizedBox(height: 16),
@@ -142,7 +142,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                     title: 'Traffic Incident Report',
                                     description: 'Official platform for monitoring and managing traffic incidents.',
                                     image: Assets.images.traffic.path,
-                                    onTap: () => controller.selectService('Traffic Incident Report'),
+                                    onTap: () => controller.changeSelectedService('Traffic Incident Report'),
                                     isSelected: controller.selectedService.value == 'Traffic Incident Report',
                                   )),
                                   const SizedBox(height: 16),
@@ -150,7 +150,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                     title: 'Incident Report',
                                     description: 'Ensuring accountability through proper incident documentation.',
                                     image: Assets.images.incident.path,
-                                    onTap: () => controller.selectService('Incident Report'),
+                                    onTap: () => controller.changeSelectedService('Incident Report'),
                                     isSelected: controller.selectedService.value == 'Incident Report',
                                   )),
                                 ],
@@ -188,31 +188,14 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                                   ),
                                   const SizedBox(height: 16),
                                   // Fill out Form and Call for Assistance cards side by side
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: _buildActionCard(
-                                          title: 'Fill out Form',
-                                          description: 'Complete the digital form to submit your report. Provide all required information and supporting documents.',
-                                          image: Assets.images.fill.path,
-                                          onTap: () {
-                                            Get.toNamed(Routes.FORM_CLASS);
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Flexible(
-                                        child: _buildActionCard(
-                                          title: 'Call for Assistance',
-                                          description: 'Connect with a police officer via video call for real-time assistance and guidance.',
-                                          image: Assets.images.callA.path,
-                                          onTap: () {
-                                         Get.toNamed(Routes.CALL_CLASS, arguments: {'isVisitor': false});
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                  ),
+                                   _buildActionCard(
+                                     title: 'Call Officer',
+                                     description: controller.getActionCardDescription(),
+                                     image: Assets.images.callA.path,
+                                     onTap: () {
+                                       controller.proceedToCallClass();
+                                     },
+                                   ),
                                 ],
                               ),
                             )),
@@ -321,10 +304,13 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
   }
 
   Widget _buildDetailCardContent() {
-    final serviceTitle = controller.selectedService.value;
-    
-    return Column(
+    return Obx(() {
+      final serviceTitle = controller.selectedService.value;
+      final requirements = controller.getServiceRequirements();
+      
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Title and subtitle
           Text(
@@ -337,7 +323,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
           ),
           const SizedBox(height: 4),
           Text(
-            _getServiceDescription(serviceTitle),
+            controller.getServiceDescription(),
             style: const TextStyle(
               color: Color(0xFF4F6B7E),
               fontSize: 12,
@@ -389,11 +375,13 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
-              children: _getServiceRequirements(serviceTitle).asMap().entries.map((entry) {
+              mainAxisSize: MainAxisSize.min,
+              children: requirements.asMap().entries.map((entry) {
                 final index = entry.key;
                 final requirement = entry.value;
-                final isLast = index == _getServiceRequirements(serviceTitle).length - 1;
+                final isLast = index == requirements.length - 1;
                 return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -431,6 +419,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
           ),
         ],
       );
+    });
   }
 
   Widget _buildActionCard({
@@ -442,6 +431,8 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
+     
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -518,51 +509,4 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
       ),
     );
   }
-
-  String _getServiceDescription(String serviceTitle) {
-    switch (serviceTitle) {
-      case 'Crime Report':
-        return 'Report criminal activities, incidents, or suspicious behavior to help maintain public safety and assist law enforcement in their investigations.';
-      case 'Traffic Incident Report':
-        return 'Report traffic accidents, violations, or road incidents to help improve road safety and traffic management in your area.';
-      case 'Incident Report':
-        return 'Document any incident, complaint, or event that requires police attention. Ensure proper documentation for official records.';
-      default:
-        return 'Access police services and submit reports through our digital platform.';
-    }
-  }
-
-  List<String> _getServiceRequirements(String serviceTitle) {
-    switch (serviceTitle) {
-      case 'Crime Report':
-        return [
-          'Valid identification document (ID card, passport, or driver\'s license)',
-          'Detailed description of the crime or incident including date, time, and location',
-          'Contact information for follow-up communication',
-          'Any supporting evidence or documents related to the incident',
-        ];
-      case 'Traffic Incident Report':
-        return [
-          'Vehicle registration documents and driver\'s license',
-          'Details of the traffic incident including date, time, and exact location',
-          'Information about involved parties and vehicles',
-          'Photos or evidence of the incident if available',
-        ];
-      case 'Incident Report':
-        return [
-          'Personal identification document',
-          'Complete description of the incident with all relevant details',
-          'Date, time, and location of the incident',
-          'Contact information and any witness details if applicable',
-        ];
-      default:
-        return [
-          'Valid identification document',
-          'Complete information about the incident',
-          'Contact details for communication',
-          'Supporting documents or evidence',
-        ];
-    }
-  }
 }
-

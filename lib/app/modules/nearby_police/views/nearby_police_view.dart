@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:sps_eth_app/app/routes/app_pages.dart';
 
 import '../controllers/nearby_police_controller.dart';
 
@@ -18,12 +19,38 @@ class NearbyPoliceView extends GetView<NearbyPoliceController> {
               if (controller.isLoading.value) {
                 return const Center(child: CircularProgressIndicator());
               }
+              if (controller.errorMessage.value.isNotEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text(
+                          controller.errorMessage.value,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16, color: Colors.red),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => controller.loadNearbyStations(),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
               return GoogleMap(
-                initialCameraPosition: controller.initialCamera,
+                initialCameraPosition: controller.cameraPosition.value,
                 onMapCreated: controller.onMapCreated,
                 markers: controller.markers,
-                myLocationButtonEnabled: false,
+                myLocationButtonEnabled: true,
                 zoomControlsEnabled: false,
+                myLocationEnabled: true,
+                mapType: MapType.normal,
               );
             }),
             // Back button
@@ -41,7 +68,19 @@ class NearbyPoliceView extends GetView<NearbyPoliceController> {
                     color: Colors.white,
                   ),
                   tooltip: 'Back',
-                  onPressed: Get.back,
+                  onPressed: () {
+                    // Use Navigator directly to avoid GetX overlay controller issues
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      // Fallback: navigate to home if can't pop
+                      try {
+                        Get.offAllNamed(Routes.HOME);
+                      } catch (e) {
+                        print('⚠️ [NAVIGATION] Error navigating back: $e');
+                      }
+                    }
+                  },
                 ),
               ),
             ),

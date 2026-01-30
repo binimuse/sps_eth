@@ -8,6 +8,7 @@ import 'package:sps_eth_app/app/modules/call_class/services/direct_call_websocke
 import 'package:sps_eth_app/app/modules/call_class/models/direct_call_model.dart';
 import 'package:sps_eth_app/app/modules/call_class/models/report_response_model.dart';
 import 'package:sps_eth_app/app/modules/call_class/views/widgets/confirmation_page_view.dart';
+import 'package:sps_eth_app/app/modules/call_class/views/widgets/attachment_upload_popup.dart';
 import 'package:sps_eth_app/app/modules/Residence_id/services/auth_service.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:sps_eth_app/app/utils/dio_util.dart';
@@ -98,6 +99,12 @@ class CallClassController extends GetxController {
   final RxInt currentCameraIndex = 0.obs;
   final RxBool hasMultipleCameras = false.obs;
   
+  // Media devices enumeration for debugging
+  final RxList<MediaDevice> availableCameras = <MediaDevice>[].obs;
+  final RxList<MediaDevice> availableMicrophones = <MediaDevice>[].obs;
+  final RxString currentCameraDeviceId = ''.obs;
+  final RxString currentMicrophoneDeviceId = ''.obs;
+  
   // Direct Call state
   final RxString callStatus = 'idle'.obs; // idle, pending, connecting, active, ended
   final Rx<String?> currentSessionId = Rx<String?>('');
@@ -139,8 +146,18 @@ class CallClassController extends GetxController {
   final RxString faydaTransactionID = ''.obs;
   final Rx<Map<String, dynamic>> faydaData = Rx<Map<String, dynamic>>(<String, dynamic>{});
   
+  // Residence ID verification data
+  final Rx<Map<String, dynamic>> residenceData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  
+  // TIN verification data
+  final Rx<Map<String, dynamic>> tinData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  
   // Passport/ID photo from scanner (base64)
   String? _scannedIdPhoto;
+  
+  // Attachment upload state
+  final Rx<AttachmentUploadLinkEvent?> currentUploadRequest = Rx<AttachmentUploadLinkEvent?>(null);
+  final RxBool isUploadDialogOpen = false.obs;
 
   @override
   void onInit() {
@@ -196,6 +213,28 @@ class CallClassController extends GetxController {
           print('  - Name: ${faydaDataMap['name']}');
           print('  - Individual ID: ${faydaDataMap['individualId']}');
           print('  - Status: ${faydaDataMap['status']}');
+        }
+        
+        // Get Residence ID data (if available)
+        if (args['residenceData'] != null && args['residenceData'] is Map) {
+          final residenceDataMap = Map<String, dynamic>.from(args['residenceData'] as Map);
+          residenceData.value = residenceDataMap;
+          print('📞 [INIT] Residence Data received:');
+          print('  - Full Name: ${residenceDataMap['fullName']}');
+          print('  - Residence ID: ${args['residenceId']}');
+          print('  - Gender: ${residenceDataMap['gender']}');
+          print('  - Nationality: ${residenceDataMap['nationality']}');
+        }
+        
+        // Get TIN data (if available)
+        if (args['tinData'] != null && args['tinData'] is Map) {
+          final tinDataMap = Map<String, dynamic>.from(args['tinData'] as Map);
+          tinData.value = tinDataMap;
+          print('📞 [INIT] TIN Data received:');
+          print('  - Full Name: ${tinDataMap['fullName']}');
+          print('  - TIN Number: ${args['tinNumber']}');
+          print('  - Type: ${tinDataMap['tpTypeDesc']}');
+          print('  - Region: ${tinDataMap['region']}');
         }
         
         // Get scanned ID photo (base64) from passport scanner (if available)
@@ -499,8 +538,70 @@ class CallClassController extends GetxController {
           callStatus.value = 'ended';
           // Clear ending call loading state when WebSocket confirms call ended
           isEndingCall.value = false;
+          // Clear upload request when call ends
+          currentUploadRequest.value = null;
           // _handleCallEnded will handle navigation based on whether report exists
           _handleCallEnded(shouldNavigate: true);
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploadLink = (event) {
+        print('📎 [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_LINK: reportId=${event.reportId}, url=${event.url?.substring(0, 50)}...');
+        print('📎 [WEBSOCKET EVENT] Description: ${event.description}');
+        print('📎 [WEBSOCKET EVENT] Attachment Type: ${event.attachmentType}');
+        print('📎 [WEBSOCKET EVENT] Expires At: ${event.expiresAt}');
+        
+        // Show upload popup
+        currentUploadRequest.value = event;
+        isUploadDialogOpen.value = true;
+        
+        // Show dialog
+        final context = Get.context;
+        if (context != null && !Get.isDialogOpen!) {
+          Get.dialog(
+            AttachmentUploadPopup(uploadLinkEvent: event),
+            barrierDismissible: true, // Allow closing by tapping outside
+          ).then((_) {
+            // Update state when dialog is closed (either manually or automatically)
+            isUploadDialogOpen.value = false;
+            // Optionally clear the upload request when manually closed
+            // currentUploadRequest.value = null; // Uncomment if you want to clear on manual close
+          });
+        }
+        
+        // Show toast notification
+        if (context != null) {
+          AppToasts.showSuccess(event.description ?? 'Please upload the requested file');
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploaded = (event) {
+        print('✅ [WEBSOCKET EVENT] ATTACHMENT_UPLOADED: reportId=${event.reportId}, fileName=${event.fileName}');
+        
+        // Close upload popup safely
+        _closeUploadDialogSafely();
+        currentUploadRequest.value = null;
+        isUploadDialogOpen.value = false;
+        
+        // Show success message
+        final context = Get.context;
+        if (context != null) {
+          _showToastSafely(() => AppToasts.showSuccess('File uploaded successfully: ${event.fileName ?? "File"}'));
+        }
+      };
+      
+      _webSocketService!.onAttachmentUploadFailed = (event) {
+        print('❌ [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_FAILED: reportId=${event.reportId}, reason=${event.reason}');
+        
+        // Close upload popup safely
+        _closeUploadDialogSafely();
+        currentUploadRequest.value = null;
+        isUploadDialogOpen.value = false;
+        
+        // Show error message
+        final context = Get.context;
+        if (context != null) {
+          _showToastSafely(() => AppToasts.showError('Upload failed: ${event.reason ?? "Unknown error"}'));
         }
       };
       
@@ -832,6 +933,7 @@ class CallClassController extends GetxController {
       String? nationality;
       String? phoneNumber;
       String? address;
+      String? idType;
       
       if (faydaDataMap.isNotEmpty && faydaTransactionID.value.isNotEmpty) {
         idNumber = faydaDataMap['individualId']?.toString();
@@ -841,6 +943,7 @@ class CallClassController extends GetxController {
         nationality = faydaDataMap['nationality']?.toString();
         phoneNumber = faydaDataMap['phoneNumber']?.toString();
         address = faydaDataMap['address']?.toString();
+        idType = 'fayda';
         
         print('📤 [REQUEST CALL] Fayda data extracted:');
         print('  - ID Number: $idNumber');
@@ -850,14 +953,81 @@ class CallClassController extends GetxController {
         print('  - Phone: $phoneNumber');
         print('  - Address: $address');
         print('  - Photo URL: ${photoUrl != null ? "${photoUrl.substring(0, 20)}..." : "null"}');
+      } else {
+        // Extract Residence ID data if available
+        final residenceDataMap = residenceData.value;
+        final args = Get.arguments;
+        if (residenceDataMap.isNotEmpty && args != null && args['residenceId'] != null) {
+          idNumber = args['residenceId']?.toString();
+          fullname = residenceDataMap['fullName']?.toString();
+          fullnameAm = residenceDataMap['fullNameAmh']?.toString();
+          nationality = residenceDataMap['nationality']?.toString();
+          phoneNumber = residenceDataMap['phoneNo']?.toString();
+          idType = 'residence';
+          
+          // Build address from residence data
+          final addressParts = <String>[];
+          if (residenceDataMap['houseNo'] != null && residenceDataMap['houseNo'].toString().isNotEmpty) {
+            addressParts.add(residenceDataMap['houseNo'].toString());
+          }
+          if (residenceDataMap['ppaCity'] != null && residenceDataMap['ppaCity'].toString().isNotEmpty) {
+            addressParts.add(residenceDataMap['ppaCity'].toString());
+          }
+          if (residenceDataMap['ppaCityAmh'] != null && residenceDataMap['ppaCityAmh'].toString().isNotEmpty) {
+            addressParts.add(residenceDataMap['ppaCityAmh'].toString());
+          }
+          if (addressParts.isNotEmpty) {
+            address = addressParts.join(', ');
+          }
+          
+          print('📤 [REQUEST CALL] Residence data extracted:');
+          print('  - ID Number: $idNumber');
+          print('  - Full Name: $fullname');
+          print('  - Full Name (Am): $fullnameAm');
+          print('  - Nationality: $nationality');
+          print('  - Phone: $phoneNumber');
+          print('  - Address: $address');
+        } else {
+          // Extract TIN data if available
+          final tinDataMap = tinData.value;
+          if (tinDataMap.isNotEmpty && args != null && args['tinNumber'] != null) {
+            idNumber = args['tinNumber']?.toString();
+            fullname = tinDataMap['fullName']?.toString();
+            fullnameAm = tinDataMap['fullNameF']?.toString();
+            phoneNumber = tinDataMap['phoneNumber']?.toString();
+            idType = 'tin';
+            
+            // Build address from TIN data
+            final addressParts = <String>[];
+            if (tinDataMap['cityName'] != null && tinDataMap['cityName'].toString().isNotEmpty) {
+              addressParts.add(tinDataMap['cityName'].toString());
+            }
+            if (tinDataMap['localityDesc'] != null && tinDataMap['localityDesc'].toString().isNotEmpty) {
+              addressParts.add(tinDataMap['localityDesc'].toString());
+            }
+            if (tinDataMap['kebeleDesc'] != null && tinDataMap['kebeleDesc'].toString().isNotEmpty) {
+              addressParts.add(tinDataMap['kebeleDesc'].toString());
+            }
+            if (addressParts.isNotEmpty) {
+              address = addressParts.join(', ');
+            }
+            
+            print('📤 [REQUEST CALL] TIN data extracted:');
+            print('  - ID Number: $idNumber');
+            print('  - Full Name: $fullname');
+            print('  - Full Name (Am): $fullnameAm');
+            print('  - Phone: $phoneNumber');
+            print('  - Address: $address');
+          }
+        }
       }
       
-      // Create request payload with isVisitor, preferredLanguage, Fayda data, scanned ID photo, and device serial
+      // Create request payload with isVisitor, preferredLanguage, ID data, scanned ID photo, and device serial
       final requestPayload = RequestCallRequest(
         isVisitor: _isVisitor,
         preferredLanguage: _preferredLanguage,
         idNumber: idNumber,
-        idType: faydaTransactionID.value.isNotEmpty ? 'fayda' : null,
+        idType: idType,
         photoUrl: photoUrl,
         fullname: fullname,
         fullnameAm: fullnameAm,
@@ -1231,6 +1401,9 @@ class CallClassController extends GetxController {
       _startConnectionTimeoutMonitor();
       
       // Add connection timeout (30 seconds)
+      // Configure audio capture options with enhanced noise cancellation
+      // These settings improve audio quality by reducing background noise,
+      // echo from speakers, and automatically adjusting microphone gain
       await _room!.connect(
         wsUrl,
         token,
@@ -1238,8 +1411,16 @@ class CallClassController extends GetxController {
           adaptiveStream: true,
           dynacast: true,
           defaultAudioCaptureOptions: AudioCaptureOptions(
+            // Echo cancellation: Prevents microphone from picking up audio from speakers
+            // This eliminates echo/feedback in video calls
             echoCancellation: true,
+            
+            // Noise suppression: Reduces background noise (traffic, music, voices, etc.)
+            // This improves audio clarity for other participants
             noiseSuppression: true,
+            
+            // Auto gain control: Automatically adjusts microphone sensitivity
+            // This ensures consistent audio levels regardless of distance from mic
             autoGainControl: true,
           ),
         ),
@@ -1486,6 +1667,90 @@ class CallClassController extends GetxController {
       hasMultipleCameras.value = false;
     }
   }
+  
+  /// Enumerate actual media devices (cameras and microphones) for debugging
+  Future<void> _enumerateMediaDevices() async {
+    try {
+      print('🎬 [MEDIA DEVICES] Enumerating media devices...');
+      
+      // Get all media devices using LiveKit's Hardware class
+      final devices = await Hardware.instance.enumerateDevices();
+      
+      print('🎬 [MEDIA DEVICES] Total devices found: ${devices.length}');
+      
+      // Filter cameras
+      final cameras = devices.where((d) => d.kind == 'videoinput').toList();
+      availableCameras.assignAll(cameras);
+      
+      print('📷 [MEDIA DEVICES] Cameras found: ${cameras.length}');
+      for (var i = 0; i < cameras.length; i++) {
+        print('📷 [MEDIA DEVICES] Camera $i:');
+        print('   - Device ID: ${cameras[i].deviceId}');
+        print('   - Label: ${cameras[i].label}');
+        print('   - Kind: ${cameras[i].kind}');
+      }
+      
+      // Filter microphones
+      final microphones = devices.where((d) => d.kind == 'audioinput').toList();
+      availableMicrophones.assignAll(microphones);
+      
+      print('🎤 [MEDIA DEVICES] Microphones found: ${microphones.length}');
+      for (var i = 0; i < microphones.length; i++) {
+        print('🎤 [MEDIA DEVICES] Microphone $i:');
+        print('   - Device ID: ${microphones[i].deviceId}');
+        print('   - Label: ${microphones[i].label}');
+        print('   - Kind: ${microphones[i].kind}');
+      }
+      
+      // Try to detect current camera device ID
+      if (_localParticipant != null) {
+        final videoTrack = _localParticipant!.videoTrackPublications
+            .where((pub) => pub.source == TrackSource.camera)
+            .map((pub) => pub.track)
+            .whereType<LocalVideoTrack>()
+            .firstOrNull;
+        
+        if (videoTrack != null) {
+          // Get device ID from track settings
+          final settings = videoTrack.mediaStreamTrack.getSettings();
+          final deviceId = settings['deviceId'];
+          final facingMode = settings['facingMode'];
+          
+          print('📷 [MEDIA DEVICES] Track settings:');
+          print('   - deviceId: $deviceId');
+          print('   - facingMode: $facingMode');
+          
+          if (deviceId != null) {
+            currentCameraDeviceId.value = deviceId.toString();
+            print('📷 [MEDIA DEVICES] Current camera device ID (from track): ${currentCameraDeviceId.value}');
+          }
+          
+          // Try to match by label if device IDs don't match
+          // Look for camera with matching facing mode or position
+          if (facingMode != null && cameras.isNotEmpty) {
+            final isFrontCamera = facingMode.toString().toLowerCase().contains('user') || 
+                                   facingMode.toString().toLowerCase().contains('front');
+            final matchingCamera = cameras.firstWhere(
+              (cam) => isFrontCamera 
+                  ? cam.label.toLowerCase().contains('front')
+                  : cam.label.toLowerCase().contains('back'),
+              orElse: () => cameras.first,
+            );
+            
+            if (matchingCamera.deviceId != currentCameraDeviceId.value) {
+              print('📷 [MEDIA DEVICES] Using label-based match: ${matchingCamera.deviceId} (${matchingCamera.label})');
+              currentCameraDeviceId.value = matchingCamera.deviceId;
+            }
+          }
+        }
+      }
+      
+      print('✅ [MEDIA DEVICES] Media device enumeration complete');
+    } catch (e, stackTrace) {
+      print('❌ [MEDIA DEVICES ERROR] Error enumerating media devices: $e');
+      print('❌ [MEDIA DEVICES ERROR] Stack trace: $stackTrace');
+    }
+  }
 
   /// Enable video
   Future<void> enableVideo() async {
@@ -1497,11 +1762,59 @@ class CallClassController extends GetxController {
           await _enumerateCameras();
         }
         
-        print('🎥 [VIDEO] Local participant exists, calling setCameraEnabled(true)...');
-        await _localParticipant!.setCameraEnabled(true);
+        print('🎥 [VIDEO] Local participant exists');
+        print('🎥 [VIDEO] Current video publications BEFORE: ${_localParticipant!.videoTrackPublications.length}');
+        
+        // Create and publish camera track manually to ensure it's sent to server
+        print('🎥 [VIDEO] Creating camera track with front camera...');
+        final cameraTrack = await LocalVideoTrack.createCameraTrack(
+          const CameraCaptureOptions(
+            cameraPosition: CameraPosition.front,
+            params: VideoParametersPresets.h720_169,
+          ),
+        );
+        print('✅ [VIDEO] Camera track created: ${cameraTrack.mediaStreamTrack.id}');
+        
+        // Explicitly publish the track to ensure it's sent to LiveKit server
+        print('🎥 [VIDEO] Publishing camera track to LiveKit server...');
+        await _localParticipant!.publishVideoTrack(cameraTrack);
+        print('✅ [VIDEO] Camera track PUBLISHED to server');
+        
+        // Small delay to let publication complete
+        await Future.delayed(const Duration(milliseconds: 800));
+        
         isVideoEnabled.value = true;
-        print('🎥 [VIDEO] Camera enabled: ${isVideoEnabled.value}');
+        
+        // Verify publication
+        final publications = _localParticipant!.videoTrackPublications
+            .where((pub) => pub.source == TrackSource.camera)
+            .toList();
+        
+        print('🎥 [VIDEO] ========== VIDEO PUBLICATION STATUS ==========');
+        print('🎥 [VIDEO] Total camera publications: ${publications.length}');
+        
+        for (var pub in publications) {
+          print('🎥 [VIDEO] Publication ${pub.sid}:');
+          print('🎥 [VIDEO]   - Source: ${pub.source}');
+          print('🎥 [VIDEO]   - Subscribed: ${pub.subscribed}');
+          print('🎥 [VIDEO]   - Muted: ${pub.muted}');
+          print('🎥 [VIDEO]   - Has track: ${pub.track != null}');
+          
+          if (pub.track != null) {
+            final track = pub.track as LocalVideoTrack;
+            print('🎥 [VIDEO]   - Track ID: ${track.mediaStreamTrack.id}');
+            print('🎥 [VIDEO]   - Track enabled: ${track.mediaStreamTrack.enabled}');
+            print('🎥 [VIDEO]   - Track label: ${track.mediaStreamTrack.label}');
+          }
+        }
+        print('🎥 [VIDEO] ================================================');
+        
         _updateLocalVideoTrack();
+        
+        // Enumerate actual media devices for debugging
+        await _enumerateMediaDevices();
+        
+        print('✅ [VIDEO] Video enabled and published successfully');
       } else {
         print('❌ [VIDEO] Local participant is null, cannot enable video');
         throw Exception('Local participant is null');
@@ -1549,6 +1862,26 @@ class CallClassController extends GetxController {
         await _localParticipant!.setMicrophoneEnabled(true);
         isAudioEnabled.value = true;
         print('🎤 [AUDIO] Microphone enabled: ${isAudioEnabled.value}');
+        
+        // Enumerate media devices if not already done
+        if (availableMicrophones.isEmpty) {
+          await _enumerateMediaDevices();
+        }
+        
+        // Try to detect current microphone device ID
+        final audioTrack = _localParticipant!.audioTrackPublications
+            .where((pub) => pub.source == TrackSource.microphone)
+            .map((pub) => pub.track)
+            .whereType<LocalAudioTrack>()
+            .firstOrNull;
+        
+        if (audioTrack != null) {
+          final deviceId = audioTrack.mediaStreamTrack.getSettings()['deviceId'];
+          if (deviceId != null) {
+            currentMicrophoneDeviceId.value = deviceId.toString();
+            print('🎤 [MEDIA DEVICES] Current microphone device ID: ${currentMicrophoneDeviceId.value}');
+          }
+        }
       } else {
         print('❌ [AUDIO] Local participant is null, cannot enable audio');
         throw Exception('Local participant is null');
@@ -1672,7 +2005,13 @@ class CallClassController extends GetxController {
     print('🎥 [LOCAL TRACK] Video track publications: ${_localParticipant!.videoTrackPublications.length}');
     
     for (var pub in _localParticipant!.videoTrackPublications) {
-      print('🎥 [LOCAL TRACK] - Publication: subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}');
+      print('🎥 [LOCAL TRACK] - Publication: sid=${pub.sid}, source=${pub.source}, subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}');
+      if (pub.track != null) {
+        final track = pub.track;
+        if (track is LocalVideoTrack) {
+          print('🎥 [LOCAL TRACK]   - Track details: sid=${track.sid}, muted=${track.muted}');
+        }
+      }
     }
     
     final videoTrack = _localParticipant!.videoTrackPublications
@@ -1682,6 +2021,9 @@ class CallClassController extends GetxController {
         .firstOrNull;
     
     print('🎥 [LOCAL TRACK] Found local video track: ${videoTrack != null}');
+    if (videoTrack != null) {
+      print('🎥 [LOCAL TRACK] Video track muted: ${videoTrack.muted}');
+    }
     
     localVideoTrack.value = videoTrack;
   }
@@ -2548,5 +2890,74 @@ class CallClassController extends GetxController {
 
   void clearMessage() {
     messageController.clear();
+  }
+
+  /// Safely close the upload dialog without triggering GetX overlay errors
+  void _closeUploadDialogSafely() {
+    // Use a delayed call to ensure the widget tree is stable
+    Future.delayed(const Duration(milliseconds: 100), () {
+      try {
+        final context = Get.context;
+        if (context != null) {
+          // Use Navigator directly to avoid GetX overlay controller issues
+          // Try rootNavigator first (for dialogs)
+          if (Navigator.of(context, rootNavigator: true).canPop()) {
+            Navigator.of(context, rootNavigator: true).pop();
+            print('✅ [UPLOAD POPUP] Dialog closed using rootNavigator');
+            return;
+          }
+          
+          // Try regular navigator
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+            print('✅ [UPLOAD POPUP] Dialog closed using Navigator');
+            return;
+          }
+          
+          print('⚠️ [UPLOAD POPUP] Cannot pop dialog - no routes to pop');
+        } else {
+          print('⚠️ [UPLOAD POPUP] No context available to close dialog');
+        }
+      } catch (e) {
+        print('⚠️ [UPLOAD POPUP] Error closing dialog: $e');
+        // Last resort: try again after a longer delay
+        Future.delayed(const Duration(milliseconds: 300), () {
+          try {
+            final context = Get.context;
+            if (context != null) {
+              if (Navigator.of(context, rootNavigator: true).canPop()) {
+                Navigator.of(context, rootNavigator: true).pop();
+              } else if (Navigator.canPop(context)) {
+                Navigator.of(context).pop();
+              }
+            }
+          } catch (e2) {
+            print('⚠️ [UPLOAD POPUP] Retry failed: $e2');
+          }
+        });
+      }
+    });
+  }
+
+  /// Safely show toast by checking if context is available and delaying if needed
+  void _showToastSafely(VoidCallback showToast) {
+    // Delay to ensure widget tree is built
+    Future.delayed(const Duration(milliseconds: 300), () {
+      try {
+        if (Get.context != null) {
+          showToast();
+        } else {
+          // If context is still not available, try again after a longer delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (Get.context != null) {
+              showToast();
+            }
+          });
+        }
+      } catch (e) {
+        print('⚠️ [UPLOAD POPUP] Error showing toast: $e');
+        // Silently fail - error message is already shown in UI
+      }
+    });
   }
 }

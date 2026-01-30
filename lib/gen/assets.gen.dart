@@ -1016,6 +1016,9 @@ class $AssetsImagesGen {
   /// File path: assets/images/fill.png
   AssetGenImage get fill => const AssetGenImage('assets/images/fill.png');
 
+  /// File path: assets/images/google.gif
+  AssetGenImage get google => const AssetGenImage('assets/images/google.gif');
+
   /// File path: assets/images/incident.png
   AssetGenImage get incident =>
       const AssetGenImage('assets/images/incident.png');
@@ -1073,6 +1076,10 @@ class $AssetsImagesGen {
   /// File path: assets/images/scanid.png
   AssetGenImage get scanid => const AssetGenImage('assets/images/scanid.png');
 
+  /// File path: assets/images/scanning_animation.gif
+  AssetGenImage get scanningAnimation =>
+      const AssetGenImage('assets/images/scanning_animation.gif');
+
   /// File path: assets/images/sps.png
   AssetGenImage get sps => const AssetGenImage('assets/images/sps.png');
 
@@ -1114,6 +1121,7 @@ class $AssetsImagesGen {
     efpLogo,
     email,
     fill,
+    google,
     incident,
     insertcard,
     law,
@@ -1131,6 +1139,7 @@ class $AssetsImagesGen {
     recent1,
     recent2,
     scanid,
+    scanningAnimation,
     sps,
     sucess,
     tigregna,
@@ -1148,12 +1157,23 @@ class $AssetsLottieGen {
   List<String> get values => [submitAnimation];
 }
 
+class $AssetsVideosGen {
+  const $AssetsVideosGen();
+
+  /// File path: assets/videos/scanning_animation.webm
+  String get scanningAnimation => 'assets/videos/scanning_animation.webm';
+
+  /// List of all assets
+  List<String> get values => [scanningAnimation];
+}
+
 class Assets {
   const Assets._();
 
   static const $AssetsIconsGen icons = $AssetsIconsGen();
   static const $AssetsImagesGen images = $AssetsImagesGen();
   static const $AssetsLottieGen lottie = $AssetsLottieGen();
+  static const $AssetsVideosGen videos = $AssetsVideosGen();
 }
 
 class AssetGenImage {
