@@ -26,10 +26,9 @@ class _NavigationHelper {
       try {
         final context = Get.context;
         if (context != null) {
-          Navigator.of(context).pushNamedAndRemoveUntil(
-            Routes.HOME,
-            (route) => false,
-          );
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil(Routes.HOME, (route) => false);
         }
       } catch (e2) {
         print('❌ [NAVIGATION] All navigation methods failed: $e2');
@@ -45,7 +44,10 @@ class CallClassView extends GetView<CallClassController> {
     // Only hide keyboard when this view is actually visible and user taps outside
     // Don't hide on every build as it interferes with other screens
 
-    final double viewportHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.vertical - 32;
+    final double viewportHeight =
+        MediaQuery.of(context).size.height -
+        MediaQuery.of(context).padding.vertical -
+        32;
     return GestureDetector(
       onTap: () {
         // Hide keyboard when tapping outside (only when this view is active)
@@ -64,636 +66,945 @@ class CallClassView extends GetView<CallClassController> {
         child: Scaffold(
           backgroundColor: AppColors.backgroundLight,
           body: Stack(
-          children: [
-            // Main content - always visible
-            SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Middle video + actions (scrollable on small screens to avoid overflow)
-                Flexible(
-                  flex: 8,
-                  fit: FlexFit.loose,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Video area
-                      Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.whiteOff,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(color: AppColors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4)),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Stack(
-                          children: [
-                            // Main video (remote participant or placeholder)
-                            // Use remoteVideoTrack (reactive) so admin UI rebuilds when track becomes subscribed
-                            AspectRatio(
-                              aspectRatio: 16 / 9,
-                              child: Obx(() {
-                                final track = controller.remoteVideoTrack.value;
-                                if (track != null) {
-                                  return Container(
-                                    color: Colors.black,
-                                    child: VideoTrackRenderer(
-                                      key: ValueKey(track.sid),
-                                      track,
-                                      fit: VideoViewFit.contain,
-                                    ),
-                                  );
-                                }
-                                return Container(
-                                  color: AppColors.black,
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.videocam_off, size: 48, color: AppColors.white70),
-                                        const SizedBox(height: 8),
-                                        Obx(() => Text(
-                                          controller.connectionStatus.value.isNotEmpty
-                                              ? controller.connectionStatus.value
-                                              : (controller.isConnected.value 
-                                                  ? 'Waiting for participant...'.tr 
-                                                  : 'Not connected'.tr),
-                                          style: TextStyle(color: AppColors.white70),
-                                        )),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ),
-                            // Back button
-                            Positioned(
-                              top: 16,
-                              left: 16,
-                              child: DecoratedBox(
+            children: [
+              // Main content - always visible
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Middle video + actions (scrollable on small screens to avoid overflow)
+                      Flexible(
+                        flex: 8,
+                        fit: FlexFit.loose,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Video area
+                              Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.black45,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(
-                                    Icons.arrow_back,
-                                    color: Colors.white,
-                                  ),
-                                  tooltip: 'Back',
-                                  onPressed: () async {
-                                    await controller.onWillPop();
-                                    _NavigationHelper.safeNavigateBack();
-                                  },
-                                ),
-                              ),
-                            ),
-                            // PIP (local video)
-                            Positioned(
-                              right: 16,
-                              bottom: 16,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Obx(() {
-                                  final localVideoTrack = controller.localVideoTrack.value;
-                                  if (localVideoTrack != null && controller.isVideoEnabled.value) {
-                                    return Container(
-                                      width: 140,
-                                      height: 100,
-                                      color: AppColors.black,
-                                      child: VideoTrackRenderer(
-                                        localVideoTrack,
-                                      ),
-                                    );
-                                  }
-                                  // Placeholder when local video is off
-                                  return Container(
-                                    width: 140,
-                                    height: 100,
-                                    color: AppColors.backgroundLight,
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.person,
-                                        size: 40,
-                                        color: AppColors.grayDark,
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ),
-                            ),
-                            // Start Call buttons - Show when call is not active and NOT auto-starting
-                            // OR show close button when auto-starting but there's an error
-                            Obx(() {
-                              final callStatus = controller.callStatus.value;
-                              final isCallActive = callStatus == 'active' || callStatus == 'connecting' || callStatus == 'pending';
-                              final isAutoStarting = controller.autoStartCall.value;
-                              final hasError = controller.callNetworkStatus.value == NetworkStatus.ERROR;
-                              
-                              // Show close button if auto-starting and there's an error
-                              if (isAutoStarting && hasError && !isCallActive) {
-                                return Positioned(
-                                  bottom: 10,
-                                  left: 0,
-                                  right: 0,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      GestureDetector(
-                                        onTap: () async {
-                                          print('🔘 [BUTTONS] Close button pressed (error state)');
-                                          await controller.onWillPop();
-                                          _NavigationHelper.safeNavigateBack();
-                                        },
-                                        child: _roundCtrl(Icons.close, color: AppColors.danger),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-                              
-                              // Hide buttons if call is active or if auto-starting (without error)
-                              if (isCallActive || (isAutoStarting && !hasError)) return const SizedBox.shrink();
-                              
-                              return Positioned(
-                                bottom: 10,
-                                left: 0,
-                                right: 0,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () async {
-                                        print('🔘 [BUTTONS] Cancel button pressed');
-                                        await controller.onWillPop();
-                                        _NavigationHelper.safeNavigateBack();
-                                      },
-                                      child: _roundCtrl(Icons.close, color: AppColors.danger),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    GestureDetector(
-                                      onTap: () {
-                                        print('🔘 [BUTTONS] Confirm / Agree button pressed');
-                                        controller.confirmTerms();
-                                      },
-                                      child: _roundCtrl(Icons.check, color: AppColors.success),
+                                  color: AppColors.whiteOff,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.black.withOpacity(0.08),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
-                              );
-                            }),
-                            // Call controls - Only show when call is active
-                            Obx(() {
-                              final isCallActive = controller.callStatus.value == 'active' || 
-                                                   controller.callStatus.value == 'connecting';
-                              if (!isCallActive) return const SizedBox.shrink();
-                              
-                              return Positioned(
-                                bottom: 10,
-                                left: 0,
-                                right: 0,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                clipBehavior: Clip.antiAlias,
+                                child: Stack(
                                   children: [
-                                    Obx(() {
-                                      final isEnding = controller.isEndingCall.value;
-                                      return GestureDetector(
-                                        onTap: isEnding ? null : () => controller.endCall(),
-                                        child: Stack(
-                                          alignment: Alignment.center,
-                                          children: [
-                                            _roundCtrl(
-                                              Icons.call_end, 
-                                              color: isEnding 
-                                                  ? AppColors.grayDark 
-                                                  : AppColors.danger,
+                                    // Main video (remote participant or placeholder)
+                                    // Use remoteVideoTrack (reactive) so admin UI rebuilds when track becomes subscribed
+                                    AspectRatio(
+                                      aspectRatio: 16 / 9,
+                                      child: Obx(() {
+                                        final track =
+                                            controller.remoteVideoTrack.value;
+                                        if (track != null) {
+                                          return Container(
+                                            color: Colors.black,
+                                            child: VideoTrackRenderer(
+                                              key: ValueKey(track.sid),
+                                              track,
+                                              fit: VideoViewFit.contain,
                                             ),
-                                            if (isEnding)
-                                              SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                                    AppColors.danger,
+                                          );
+                                        }
+                                        return Container(
+                                          color: AppColors.black,
+                                          child: Center(
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.videocam_off,
+                                                  size: 48,
+                                                  color: AppColors.white70,
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Obx(
+                                                  () => Text(
+                                                    controller
+                                                            .connectionStatus
+                                                            .value
+                                                            .isNotEmpty
+                                                        ? controller
+                                                              .connectionStatus
+                                                              .value
+                                                        : (controller
+                                                                  .isConnected
+                                                                  .value
+                                                              ? 'Waiting for participant...'
+                                                                    .tr
+                                                              : 'Not connected'
+                                                                    .tr),
+                                                    style: TextStyle(
+                                                      color: AppColors.white70,
+                                                    ),
                                                   ),
                                                 ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                    // Back button
+                                    Positioned(
+                                      top: 16,
+                                      left: 16,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black45,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.arrow_back,
+                                            color: Colors.white,
+                                          ),
+                                          tooltip: 'Back',
+                                          onPressed: () async {
+                                            await controller.onWillPop();
+                                            _NavigationHelper.safeNavigateBack();
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    // PIP (local video)
+                                    Positioned(
+                                      right: 16,
+                                      bottom: 16,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Obx(() {
+                                          final localVideoTrack =
+                                              controller.localVideoTrack.value;
+                                          if (localVideoTrack != null &&
+                                              controller.isVideoEnabled.value) {
+                                            return Container(
+                                              width: 140,
+                                              height: 100,
+                                              color: AppColors.black,
+                                              child: VideoTrackRenderer(
+                                                localVideoTrack,
                                               ),
+                                            );
+                                          }
+                                          // Placeholder when local video is off
+                                          return Container(
+                                            width: 140,
+                                            height: 100,
+                                            color: AppColors.backgroundLight,
+                                            child: Center(
+                                              child: Icon(
+                                                Icons.person,
+                                                size: 40,
+                                                color: AppColors.grayDark,
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                      ),
+                                    ),
+                                    // Start Call buttons - Show when call is not active and NOT auto-starting
+                                    // OR show close button when auto-starting but there's an error
+                                    Obx(() {
+                                      final callStatus =
+                                          controller.callStatus.value;
+                                      final isCallActive =
+                                          callStatus == 'active' ||
+                                          callStatus == 'connecting' ||
+                                          callStatus == 'pending';
+                                      final isAutoStarting =
+                                          controller.autoStartCall.value;
+                                      final hasError =
+                                          controller.callNetworkStatus.value ==
+                                          NetworkStatus.ERROR;
+
+                                      // Show close button if auto-starting and there's an error
+                                      if (isAutoStarting &&
+                                          hasError &&
+                                          !isCallActive) {
+                                        return Positioned(
+                                          bottom: 10,
+                                          left: 0,
+                                          right: 0,
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () async {
+                                                  print(
+                                                    '🔘 [BUTTONS] Close button pressed (error state)',
+                                                  );
+                                                  await controller.onWillPop();
+                                                  _NavigationHelper.safeNavigateBack();
+                                                },
+                                                child: _roundCtrl(
+                                                  Icons.close,
+                                                  color: AppColors.danger,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+
+                                      // Hide buttons if call is active or if auto-starting (without error)
+                                      if (isCallActive ||
+                                          (isAutoStarting && !hasError))
+                                        return const SizedBox.shrink();
+
+                                      return Positioned(
+                                        bottom: 10,
+                                        left: 0,
+                                        right: 0,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            GestureDetector(
+                                              onTap: () async {
+                                                print(
+                                                  '🔘 [BUTTONS] Cancel button pressed',
+                                                );
+                                                await controller.onWillPop();
+                                                _NavigationHelper.safeNavigateBack();
+                                              },
+                                              child: _roundCtrl(
+                                                Icons.close,
+                                                color: AppColors.danger,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            GestureDetector(
+                                              onTap: () {
+                                                print(
+                                                  '🔘 [BUTTONS] Confirm / Agree button pressed',
+                                                );
+                                                controller.confirmTerms();
+                                              },
+                                              child: _roundCtrl(
+                                                Icons.check,
+                                                color: AppColors.success,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       );
                                     }),
-                                    const SizedBox(width: 12),
-                                    GestureDetector(
-                                      onTap: () => controller.toggleVideo(),
-                                      child: _roundCtrl(
-                                        controller.isVideoEnabled.value 
-                                            ? Icons.videocam 
-                                            : Icons.videocam_off,
-                                        color: controller.isVideoEnabled.value 
-                                            ? null 
-                                            : AppColors.grayDark,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    GestureDetector(
-                                      onTap: () => controller.toggleAudio(),
-                                      child: _roundCtrl(
-                                        controller.isAudioEnabled.value 
-                                            ? Icons.mic 
-                                            : Icons.mic_off,
-                                        color: controller.isAudioEnabled.value 
-                                            ? null 
-                                            : AppColors.grayDark,
-                                      ),
-                                    ),
-                                    // Show camera selector only if multiple cameras are available
+                                    // Call controls - Only show when call is active
                                     Obx(() {
-                                      if (controller.hasMultipleCameras.value) {
-                                        return Row(
+                                      final isCallActive =
+                                          controller.callStatus.value ==
+                                              'active' ||
+                                          controller.callStatus.value ==
+                                              'connecting';
+                                      if (!isCallActive)
+                                        return const SizedBox.shrink();
+
+                                      return Positioned(
+                                        bottom: 10,
+                                        left: 0,
+                                        right: 0,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
+                                            Obx(() {
+                                              final isEnding =
+                                                  controller.isEndingCall.value;
+                                              return GestureDetector(
+                                                onTap: isEnding
+                                                    ? null
+                                                    : () =>
+                                                          controller.endCall(),
+                                                child: Stack(
+                                                  alignment: Alignment.center,
+                                                  children: [
+                                                    _roundCtrl(
+                                                      Icons.call_end,
+                                                      color: isEnding
+                                                          ? AppColors.grayDark
+                                                          : AppColors.danger,
+                                                    ),
+                                                    if (isEnding)
+                                                      SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          valueColor:
+                                                              AlwaysStoppedAnimation<
+                                                                Color
+                                                              >(
+                                                                AppColors
+                                                                    .danger,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              );
+                                            }),
                                             const SizedBox(width: 12),
                                             GestureDetector(
-                                              onTap: () => controller.switchCamera(),
+                                              onTap: () =>
+                                                  controller.toggleVideo(),
                                               child: _roundCtrl(
-                                                Icons.cameraswitch,
-                                                color: AppColors.primary,
+                                                controller.isVideoEnabled.value
+                                                    ? Icons.videocam
+                                                    : Icons.videocam_off,
+                                                color:
+                                                    controller
+                                                        .isVideoEnabled
+                                                        .value
+                                                    ? null
+                                                    : AppColors.grayDark,
                                               ),
                                             ),
+                                            const SizedBox(width: 12),
+                                            GestureDetector(
+                                              onTap: () =>
+                                                  controller.toggleAudio(),
+                                              child: _roundCtrl(
+                                                controller.isAudioEnabled.value
+                                                    ? Icons.mic
+                                                    : Icons.mic_off,
+                                                color:
+                                                    controller
+                                                        .isAudioEnabled
+                                                        .value
+                                                    ? null
+                                                    : AppColors.grayDark,
+                                              ),
+                                            ),
+                                            // Camera switch — show when 2+ cameras and video on
+                                            Obx(() {
+                                              final canSwitch =
+                                                  controller
+                                                      .hasMultipleCameras
+                                                      .value &&
+                                                  controller
+                                                      .isVideoEnabled
+                                                      .value &&
+                                                  !controller
+                                                      .isSwitchingCamera
+                                                      .value &&
+                                                  !controller
+                                                      .isSwitchingCodec
+                                                      .value;
+                                              final nextId = controller
+                                                  .getNextCameraDeviceId();
+                                              if (!controller
+                                                      .hasMultipleCameras
+                                                      .value ||
+                                                  nextId == null) {
+                                                return const SizedBox.shrink();
+                                              }
+                                              return Padding(
+                                                padding: const EdgeInsets.only(
+                                                  left: 12,
+                                                ),
+                                                child: GestureDetector(
+                                                  onTap: canSwitch
+                                                      ? () => controller
+                                                            .switchCamera(
+                                                              nextId,
+                                                            )
+                                                      : null,
+                                                  child: Opacity(
+                                                    opacity: canSwitch
+                                                        ? 1
+                                                        : 0.5,
+                                                    child: Stack(
+                                                      alignment:
+                                                          Alignment.center,
+                                                      children: [
+                                                        _roundCtrl(
+                                                          Icons.cameraswitch,
+                                                          color:
+                                                              AppColors.primary,
+                                                        ),
+                                                        if (controller
+                                                            .isSwitchingCamera
+                                                            .value)
+                                                          SizedBox(
+                                                            width: 24,
+                                                            height: 24,
+                                                            child: CircularProgressIndicator(
+                                                              strokeWidth: 2,
+                                                              valueColor:
+                                                                  AlwaysStoppedAnimation<
+                                                                    Color
+                                                                  >(
+                                                                    AppColors
+                                                                        .primary
+                                                                        .withOpacity(
+                                                                          0.8,
+                                                                        ),
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            }),
+                                            // Codec switcher
+                                            const SizedBox(width: 12),
+                                            Obx(() {
+                                              final isSwitching =
+                                                  controller
+                                                      .isSwitchingCodec
+                                                      .value ||
+                                                  controller
+                                                      .isSwitchingCamera
+                                                      .value;
+                                              final enabled =
+                                                  !isSwitching &&
+                                                  controller
+                                                      .isVideoEnabled
+                                                      .value;
+                                              return PopupMenuButton<String>(
+                                                enabled: enabled,
+                                                tooltip: 'Video codec',
+                                                icon: Opacity(
+                                                  opacity: enabled ? 1 : 0.5,
+                                                  child: Container(
+                                                    width: 48,
+                                                    height: 48,
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.primary
+                                                          .withOpacity(0.1),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.video_settings,
+                                                      color: AppColors.primary,
+                                                      size: 24,
+                                                    ),
+                                                  ),
+                                                ),
+                                                onSelected: (String codec) =>
+                                                    controller.switchCodec(
+                                                      codec,
+                                                    ),
+                                                itemBuilder:
+                                                    (BuildContext context) => [
+                                                      _codecItem(
+                                                        controller,
+                                                        'H264',
+                                                      ),
+                                                      _codecItem(
+                                                        controller,
+                                                        'VP8',
+                                                      ),
+                                                      _codecItem(
+                                                        controller,
+                                                        'VP9',
+                                                      ),
+                                                    ],
+                                              );
+                                            }),
                                           ],
-                                        );
-                                      }
-                                      return const SizedBox.shrink();
+                                        ),
+                                      );
                                     }),
                                   ],
                                 ),
-                              );
-                            }),
-                          ],
+                              ),
+                              const SizedBox(height: 16),
+                              // Progress Bar (compact layout to avoid overflow on small screens)
+                              _buildProgressBar(),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      // Progress Bar (compact layout to avoid overflow on small screens)
-                      _buildProgressBar(),
+                      const SizedBox(width: 24),
+                      // Right info sidebar
+                      Flexible(
+                        flex: 4,
+                        fit: FlexFit.loose,
+                        child: SingleChildScrollView(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: viewportHeight,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Column(
+                                children: [
+                                  // Show Fayda user data if available
+                                  Obx(() {
+                                    final faydaData =
+                                        controller.faydaData.value;
+                                    if (faydaData.isNotEmpty) {
+                                      final rows = <InfoRow>[];
+                                      if (faydaData['name'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Name',
+                                            faydaData['name'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (faydaData['individualId'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'FAN/FIN Number',
+                                            faydaData['individualId']
+                                                .toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (faydaData['dateOfBirth'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Date of Birth',
+                                            faydaData['dateOfBirth'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (faydaData['gender'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Gender',
+                                            faydaData['gender'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (faydaData['nationality'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Nationality',
+                                            faydaData['nationality'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (faydaData['phoneNumber'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Phone Number',
+                                            faydaData['phoneNumber'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (faydaData['status'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Status',
+                                            faydaData['status'].toString(),
+                                          ),
+                                        );
+                                      }
+
+                                      if (rows.isNotEmpty) {
+                                        return _InfoCard(
+                                          title: 'User Information',
+                                          rows: rows,
+                                        );
+                                      }
+                                    }
+                                    return const SizedBox.shrink();
+                                  }),
+                                  // Show Residence ID user data if available
+                                  Obx(() {
+                                    final residenceData =
+                                        controller.residenceData.value;
+                                    if (residenceData.isNotEmpty) {
+                                      final rows = <InfoRow>[];
+                                      if (residenceData['fullName'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Name',
+                                            residenceData['fullName']
+                                                .toString(),
+                                          ),
+                                        );
+                                      }
+                                      final args = Get.arguments;
+                                      if (args != null &&
+                                          args['residenceId'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Residence ID',
+                                            args['residenceId'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (residenceData['dob'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Date of Birth',
+                                            residenceData['dob'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (residenceData['gender'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Gender',
+                                            residenceData['gender'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (residenceData['nationality'] !=
+                                          null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Nationality',
+                                            residenceData['nationality']
+                                                .toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (residenceData['phoneNo'] != null &&
+                                          residenceData['phoneNo']
+                                              .toString()
+                                              .isNotEmpty) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Phone Number',
+                                            residenceData['phoneNo'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (residenceData['currentStatus'] !=
+                                              null &&
+                                          residenceData['currentStatus']
+                                              .toString()
+                                              .isNotEmpty) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Status',
+                                            residenceData['currentStatus']
+                                                .toString(),
+                                          ),
+                                        );
+                                      }
+
+                                      if (rows.isNotEmpty) {
+                                        return _InfoCard(
+                                          title: 'User Information',
+                                          rows: rows,
+                                        );
+                                      }
+                                    }
+                                    return const SizedBox.shrink();
+                                  }),
+                                  // Show TIN user data if available
+                                  Obx(() {
+                                    final tinData = controller.tinData.value;
+                                    if (tinData.isNotEmpty) {
+                                      final rows = <InfoRow>[];
+                                      if (tinData['fullName'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Name',
+                                            tinData['fullName'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      final args = Get.arguments;
+                                      if (args != null &&
+                                          args['tinNumber'] != null) {
+                                        rows.add(
+                                          InfoRow(
+                                            'TIN Number',
+                                            args['tinNumber'].toString(),
+                                          ),
+                                        );
+                                      }
+                                      if (tinData['phoneNumber'] != null &&
+                                          tinData['phoneNumber']
+                                              .toString()
+                                              .isNotEmpty) {
+                                        rows.add(
+                                          InfoRow(
+                                            'Phone Number',
+                                            tinData['phoneNumber'].toString(),
+                                          ),
+                                        );
+                                      }
+
+                                      if (rows.isNotEmpty) {
+                                        return _InfoCard(
+                                          title: 'User Information',
+                                          rows: rows,
+                                        );
+                                      }
+                                    }
+                                    return const SizedBox.shrink();
+                                  }),
+                                  const SizedBox(height: 12),
+                                  Obx(() {
+                                    if (controller.idInformation.isEmpty) {
+                                      return Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.whiteOff,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Report Info',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              'No information available yet',
+                                              style: TextStyle(
+                                                color: AppColors.grayDark,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+
+                                    return _InfoCard(
+                                      title: 'Report Info',
+                                      rows: controller.idInformation.toList(),
+                                    );
+                                  }),
+                                  const SizedBox(height: 12),
+
+                                  Obx(() {
+                                    if (controller
+                                        .supportingDocuments
+                                        .isEmpty) {
+                                      return Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.whiteOff,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Supporting Document',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.primary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              'No documents available',
+                                              style: TextStyle(
+                                                color: AppColors.grayDark,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+
+                                    return _DocumentsCard(
+                                      documents: controller.supportingDocuments
+                                          .toList(),
+                                    );
+                                  }),
+                                  const SizedBox(height: 12),
+                                  // Statement Details View - Show during active calls
+                                  Obx(() {
+                                    final isCallActive =
+                                        controller.callStatus.value ==
+                                            'active' ||
+                                        controller.callStatus.value ==
+                                            'connecting';
+                                    if (!isCallActive) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return _StatementDetailsView(
+                                      controller: controller,
+                                    );
+                                  }),
+                                  const SizedBox(height: 8),
+                                  _TermsAndActions(controller: controller),
+                                  const Spacer(), // Push buttons to top if needed
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                  ),
-                const SizedBox(width: 24),
-                // Right info sidebar
-                Flexible(
-                  flex: 4,
-                  fit: FlexFit.loose,
-                  child: SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: viewportHeight,
-                      ),
-                      child: IntrinsicHeight(
+              ),
+              // Blurred loading overlay - shown during anonymous login
+              Obx(() {
+                if (!controller.isAnonymousLoginLoading.value) {
+                  return const SizedBox.shrink();
+                }
+
+                return Positioned.fill(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                    child: Container(
+                      color: AppColors.black.withOpacity(0.3),
+                      child: Center(
                         child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Show Fayda user data if available
-                            Obx(() {
-                              final faydaData = controller.faydaData.value;
-                              if (faydaData.isNotEmpty) {
-                                final rows = <InfoRow>[];
-                                if (faydaData['name'] != null) {
-                                  rows.add(InfoRow('Name', faydaData['name'].toString()));
-                                }
-                                if (faydaData['individualId'] != null) {
-                                  rows.add(InfoRow('FAN/FIN Number', faydaData['individualId'].toString()));
-                                }
-                                if (faydaData['dateOfBirth'] != null) {
-                                  rows.add(InfoRow('Date of Birth', faydaData['dateOfBirth'].toString()));
-                                }
-                                if (faydaData['gender'] != null) {
-                                  rows.add(InfoRow('Gender', faydaData['gender'].toString()));
-                                }
-                                if (faydaData['nationality'] != null) {
-                                  rows.add(InfoRow('Nationality', faydaData['nationality'].toString()));
-                                }
-                                if (faydaData['phoneNumber'] != null) {
-                                  rows.add(InfoRow('Phone Number', faydaData['phoneNumber'].toString()));
-                                }
-                                if (faydaData['status'] != null) {
-                                  rows.add(InfoRow('Status', faydaData['status'].toString()));
-                                }
-                                
-                                if (rows.isNotEmpty) {
-                                  return _InfoCard(
-                                    title: 'User Information',
-                                    rows: rows,
-                                  );
-                                }
-                              }
-                              return const SizedBox.shrink();
-                            }),
-                            // Show Residence ID user data if available
-                            Obx(() {
-                              final residenceData = controller.residenceData.value;
-                              if (residenceData.isNotEmpty) {
-                                final rows = <InfoRow>[];
-                                if (residenceData['fullName'] != null) {
-                                  rows.add(InfoRow('Name', residenceData['fullName'].toString()));
-                                }
-                                final args = Get.arguments;
-                                if (args != null && args['residenceId'] != null) {
-                                  rows.add(InfoRow('Residence ID', args['residenceId'].toString()));
-                                }
-                                if (residenceData['dob'] != null) {
-                                  rows.add(InfoRow('Date of Birth', residenceData['dob'].toString()));
-                                }
-                                if (residenceData['gender'] != null) {
-                                  rows.add(InfoRow('Gender', residenceData['gender'].toString()));
-                                }
-                                if (residenceData['nationality'] != null) {
-                                  rows.add(InfoRow('Nationality', residenceData['nationality'].toString()));
-                                }
-                                if (residenceData['phoneNo'] != null && residenceData['phoneNo'].toString().isNotEmpty) {
-                                  rows.add(InfoRow('Phone Number', residenceData['phoneNo'].toString()));
-                                }
-                                if (residenceData['currentStatus'] != null && residenceData['currentStatus'].toString().isNotEmpty) {
-                                  rows.add(InfoRow('Status', residenceData['currentStatus'].toString()));
-                                }
-                                
-                                if (rows.isNotEmpty) {
-                                  return _InfoCard(
-                                    title: 'User Information',
-                                    rows: rows,
-                                  );
-                                }
-                              }
-                              return const SizedBox.shrink();
-                            }),
-                            // Show TIN user data if available
-                            Obx(() {
-                              final tinData = controller.tinData.value;
-                              if (tinData.isNotEmpty) {
-                                final rows = <InfoRow>[];
-                                if (tinData['fullName'] != null) {
-                                  rows.add(InfoRow('Name', tinData['fullName'].toString()));
-                                }
-                                final args = Get.arguments;
-                                if (args != null && args['tinNumber'] != null) {
-                                  rows.add(InfoRow('TIN Number', args['tinNumber'].toString()));
-                                }
-                                if (tinData['phoneNumber'] != null && tinData['phoneNumber'].toString().isNotEmpty) {
-                                  rows.add(InfoRow('Phone Number', tinData['phoneNumber'].toString()));
-                                }
-                                
-                                if (rows.isNotEmpty) {
-                                  return _InfoCard(
-                                    title: 'User Information',
-                                    rows: rows,
-                                  );
-                                }
-                              }
-                              return const SizedBox.shrink();
-                            }),
-                            const SizedBox(height: 12),
-                            Obx(() {
-                              if (controller.idInformation.isEmpty) {
-                                return Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.whiteOff,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Report Info',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'No information available yet',
-                                        style: TextStyle(
-                                          color: AppColors.grayDark,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-                              
-                              return _InfoCard(
-                                title: 'Report Info',
-                                rows: controller.idInformation.toList(),
-                              );
-                            }),
-                            const SizedBox(height: 12),
-                         
-                            Obx(() {
-                              if (controller.supportingDocuments.isEmpty) {
-                                return Container(
-                                  width: double.infinity,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.whiteOff,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Supporting Document',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'No documents available',
-                                        style: TextStyle(
-                                          color: AppColors.grayDark,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-                              
-                              return _DocumentsCard(
-                                documents: controller.supportingDocuments.toList(),
-                              );
-                            }),
-                            const SizedBox(height: 12),
-                            // Statement Details View - Show during active calls
-                            Obx(() {
-                              final isCallActive = controller.callStatus.value == 'active' || 
-                                                   controller.callStatus.value == 'connecting';
-                              if (!isCallActive) {
-                                return const SizedBox.shrink();
-                              }
-                              return _StatementDetailsView(controller: controller);
-                            }),
+                            PulsingLogoLoader(
+                              logoPath: Assets.images.efpLogo.path,
+                              logoSize: 160.0,
+                              waveColor: AppColors.primary,
+                              logoBackgroundColor: AppColors.whiteOff,
+                              logoBorderColor: AppColors.primary,
+                              waveCount: 3,
+                              baseRadius: 100.0,
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              'Authenticating...'.tr,
+                              style: TextStyle(
+                                color: AppColors.whiteOff,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             const SizedBox(height: 8),
-                            _TermsAndActions(controller: controller),
-                            const Spacer(), // Push buttons to top if needed
+                            Text(
+                              'Please wait while we set up your connection'.tr,
+                              style: TextStyle(
+                                color: AppColors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-            ),
-            // Blurred loading overlay - shown during anonymous login
-            Obx(() {
-              if (!controller.isAnonymousLoginLoading.value) {
-                return const SizedBox.shrink();
-              }
-              
-              return Positioned.fill(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                  child: Container(
-                    color: AppColors.black.withOpacity(0.3),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          PulsingLogoLoader(
-                            logoPath: Assets.images.efpLogo.path,
-                            logoSize: 160.0,
-                            waveColor: AppColors.primary,
-                            logoBackgroundColor: AppColors.whiteOff,
-                            logoBorderColor: AppColors.primary,
-                            waveCount: 3,
-                            baseRadius: 100.0,
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'Authenticating...'.tr,
-                            style: TextStyle(
-                              color: AppColors.whiteOff,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                );
+              }),
+              // Full-page loading overlay - shown during call connecting/pending
+              Obx(() {
+                final callStatus = controller.callStatus.value;
+                final isConnecting =
+                    callStatus == 'connecting' || callStatus == 'pending';
+
+                if (!isConnecting) {
+                  return const SizedBox.shrink();
+                }
+
+                return Positioned.fill(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                    child: Container(
+                      color: AppColors.black.withOpacity(0.3),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            PulsingLogoLoader(
+                              logoPath: Assets.images.efpLogo.path,
+                              logoSize: 160.0,
+                              waveColor: AppColors.primary,
+                              logoBackgroundColor: AppColors.whiteOff,
+                              logoBorderColor: AppColors.primary,
+                              waveCount: 3,
+                              baseRadius: 100.0,
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Please wait while we set up your connection'.tr,
-                            style: TextStyle(
-                              color: AppColors.white70,
-                              fontSize: 14,
+                            const SizedBox(height: 24),
+                            Text(
+                              callStatus == 'connecting'
+                                  ? 'Connecting...'.tr
+                                  : 'Waiting for agent...'.tr,
+                              style: TextStyle(
+                                color: AppColors.whiteOff,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-            // Full-page loading overlay - shown during call connecting/pending
-            Obx(() {
-              final callStatus = controller.callStatus.value;
-              final isConnecting = callStatus == 'connecting' || callStatus == 'pending';
-              
-              if (!isConnecting) {
-                return const SizedBox.shrink();
-              }
-              
-              return Positioned.fill(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                  child: Container(
-                    color: AppColors.black.withOpacity(0.3),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          PulsingLogoLoader(
-                            logoPath: Assets.images.efpLogo.path,
-                            logoSize: 160.0,
-                            waveColor: AppColors.primary,
-                            logoBackgroundColor: AppColors.whiteOff,
-                            logoBorderColor: AppColors.primary,
-                            waveCount: 3,
-                            baseRadius: 100.0,
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            callStatus == 'connecting' ? 'Connecting...'.tr : 'Waiting for agent...'.tr,
-                            style: TextStyle(
-                              color: AppColors.whiteOff,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                            const SizedBox(height: 8),
+                            Text(
+                              'Please wait while we connect your call'.tr,
+                              style: TextStyle(
+                                color: AppColors.white70,
+                                fontSize: 14,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Please wait while we connect your call'.tr,
-                            style: TextStyle(
-                              color: AppColors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-            // Offline indicator - shown at the top when offline
-            Obx(() {
-              final isOnline = controller.connectivityUtil.isOnline.value;
-              if (isOnline) {
-                return const SizedBox.shrink();
-              }
-              
-              return Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    color: AppColors.danger,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.wifi_off,
-                          color: AppColors.whiteOff,
-                          size: 20,
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'No Internet Connection'.tr,
-                          style: TextStyle(
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              // Offline indicator - shown at the top when offline
+              Obx(() {
+                final isOnline = controller.connectivityUtil.isOnline.value;
+                if (isOnline) {
+                  return const SizedBox.shrink();
+                }
+
+                return Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      color: AppColors.danger,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.wifi_off,
                             color: AppColors.whiteOff,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            size: 20,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Text(
+                            'No Internet Connection'.tr,
+                            style: TextStyle(
+                              color: AppColors.whiteOff,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
-          ],
-        ),
+                );
+              }),
+            ],
+          ),
         ),
       ),
     );
@@ -754,8 +1065,8 @@ class CallClassView extends GetView<CallClassController> {
                     height: 3,
                     margin: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
-                      color: currentStep >= 2 
-                          ? AppColors.success 
+                      color: currentStep >= 2
+                          ? AppColors.success
                           : AppColors.grayLighter,
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -778,8 +1089,8 @@ class CallClassView extends GetView<CallClassController> {
                     height: 3,
                     margin: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
-                      color: currentStep >= 3 
-                          ? AppColors.success 
+                      color: currentStep >= 3
+                          ? AppColors.success
                           : AppColors.grayLighter,
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -812,9 +1123,7 @@ class CallClassView extends GetView<CallClassController> {
   }) {
     final stepColor = isActive ? AppColors.success : AppColors.grayLighter;
     final textColor = isActive ? AppColors.successDark : AppColors.grayDefault;
-    final bgColor = isActive 
-        ? AppColors.successLight 
-        : AppColors.whiteOff;
+    final bgColor = isActive ? AppColors.successLight : AppColors.whiteOff;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -826,10 +1135,7 @@ class CallClassView extends GetView<CallClassController> {
           decoration: BoxDecoration(
             color: bgColor,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: stepColor,
-              width: 2,
-            ),
+            border: Border.all(color: stepColor, width: 2),
           ),
           child: Stack(
             alignment: Alignment.center,
@@ -844,11 +1150,7 @@ class CallClassView extends GetView<CallClassController> {
                   ),
                 )
               else if (isActive)
-                Icon(
-                  Icons.check,
-                  color: stepColor,
-                  size: 22,
-                )
+                Icon(Icons.check, color: stepColor, size: 22)
               else
                 Text(
                   '$stepNumber',
@@ -880,6 +1182,21 @@ class CallClassView extends GetView<CallClassController> {
   }
 }
 
+PopupMenuItem<String> _codecItem(CallClassController controller, String codec) {
+  final isSelected = controller.currentVideoCodec.value == codec;
+  return PopupMenuItem<String>(
+    value: codec,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isSelected) Icon(Icons.check, color: AppColors.primary, size: 20),
+        if (isSelected) const SizedBox(width: 8),
+        Text(codec),
+      ],
+    ),
+  );
+}
+
 Widget _roundCtrl(IconData icon, {Color? color}) {
   return Container(
     width: 44,
@@ -892,7 +1209,6 @@ Widget _roundCtrl(IconData icon, {Color? color}) {
     child: Icon(icon, color: color ?? AppColors.white70),
   );
 }
-
 
 class _InfoCard extends StatelessWidget {
   final String title;
@@ -911,17 +1227,25 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
+          Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
           const SizedBox(height: 12),
-          ...rows.map((r) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(r.label, )),
-                    Text(r.value, ),
-                  ],
-                ),
-              )),
+          ...rows.map(
+            (r) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(child: Text(r.label)),
+                  Text(r.value),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -945,21 +1269,30 @@ class _DocumentsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Supporting Document',style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
+          Text(
+            'Supporting Document',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
           const SizedBox(height: 12),
-          ...documents.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(item.label, )),
-                    Row(children: [
+          ...documents.map(
+            (item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(child: Text(item.label)),
+                  Row(
+                    children: [
                       _docChip(item.fileName),
                       const SizedBox(width: 6),
-                      
-                    ])
-                  ],
-                ),
-              )),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -972,7 +1305,7 @@ class _DocumentsCard extends StatelessWidget {
         color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(fileName, ),
+      child: Text(fileName),
     );
   }
 }
@@ -998,7 +1331,13 @@ class _TermsAndActions extends StatelessWidget {
             children: [
               Icon(Icons.check_box, color: AppColors.grayDark),
               const SizedBox(width: 8),
-              Text('Terms and Condition'.tr,style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary), ),
+              Text(
+                'Terms and Condition'.tr,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -1014,11 +1353,15 @@ class _TermsAndActions extends StatelessWidget {
             final isAutoStarting = controller.autoStartCall.value;
             print('🔘 [BUTTONS] Current call status: $callStatus');
             print('🔘 [BUTTONS] Auto-starting: $isAutoStarting');
-            final isCallActive = callStatus == 'active' || callStatus == 'connecting' || callStatus == 'pending';
+            final isCallActive =
+                callStatus == 'active' ||
+                callStatus == 'connecting' ||
+                callStatus == 'pending';
             print('🔘 [BUTTONS] Is call active: $isCallActive');
-            
+
             // Show error message with close button if auto-starting and there's an error
-            if (isAutoStarting && controller.callNetworkStatus.value == NetworkStatus.ERROR) {
+            if (isAutoStarting &&
+                controller.callNetworkStatus.value == NetworkStatus.ERROR) {
               return Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -1043,20 +1386,24 @@ class _TermsAndActions extends StatelessWidget {
                     Text(
                       'Failed to connect. Please try again later.'.tr,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.grayDark,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: AppColors.grayDark, fontSize: 12),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.danger,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: () async {
-                        print('🔘 [BUTTONS] Close button pressed (error in terms card)');
+                        print(
+                          '🔘 [BUTTONS] Close button pressed (error in terms card)',
+                        );
                         await controller.onWillPop();
                         _NavigationHelper.safeNavigateBack();
                       },
@@ -1072,7 +1419,7 @@ class _TermsAndActions extends StatelessWidget {
                 ),
               );
             }
-            
+
             // Show loading if auto-starting without error AND call is not yet active
             if (isAutoStarting && !isCallActive) {
               return Container(
@@ -1097,7 +1444,7 @@ class _TermsAndActions extends StatelessWidget {
                 ),
               );
             }
-            
+
             if (callStatus == 'ended') {
               // Show "Go Back" button when call is ended
               print('🔘 [BUTTONS] Showing Go Back button (call ended)');
@@ -1105,7 +1452,9 @@ class _TermsAndActions extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   minimumSize: const Size(double.infinity, 0),
                 ),
                 onPressed: () async {
@@ -1122,7 +1471,7 @@ class _TermsAndActions extends StatelessWidget {
                 ),
               );
             }
-            
+
             // No buttons shown when call is not active (user already used slide button to get here)
             return const SizedBox.shrink();
           }),
@@ -1143,7 +1492,7 @@ class _StatementDetailsView extends StatelessWidget {
     return Obx(() {
       final statement = controller.statementInfo.value;
       final report = controller.reportInfo.value;
-      
+
       // Show message if no statement yet
       if (statement == null && report == null) {
         return Container(
@@ -1175,7 +1524,7 @@ class _StatementDetailsView extends StatelessWidget {
           ),
         );
       }
-      
+
       return Container(
         decoration: BoxDecoration(
           color: AppColors.whiteOff,
@@ -1212,7 +1561,8 @@ class _StatementDetailsView extends StatelessWidget {
                               color: AppColors.primary,
                             ),
                           ),
-                          if (report.reportType!.nameAmharic != null && report.reportType!.nameAmharic!.isNotEmpty) ...[
+                          if (report.reportType!.nameAmharic != null &&
+                              report.reportType!.nameAmharic!.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             Text(
                               report.reportType!.nameAmharic!,
@@ -1231,7 +1581,8 @@ class _StatementDetailsView extends StatelessWidget {
                               color: AppColors.primary,
                             ),
                           ),
-                        if (report?.caseNumber != null && report!.caseNumber!.isNotEmpty) ...[
+                        if (report?.caseNumber != null &&
+                            report!.caseNumber!.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
                             'Case: ${report.caseNumber}',
@@ -1265,20 +1616,29 @@ class _StatementDetailsView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _buildInfoRow('Full Name', statement!.person!.fullName ?? 'N/A'),
+                    _buildInfoRow(
+                      'Full Name',
+                      statement!.person!.fullName ?? 'N/A',
+                    ),
                     if (statement.person!.age != null)
                       _buildInfoRow('Age', '${statement.person!.age}'),
                     if (statement.person!.sex != null)
                       _buildInfoRow('Gender', statement.person!.sex!),
-                    if (statement.person!.phoneMobile != null && statement.person!.phoneMobile!.isNotEmpty)
+                    if (statement.person!.phoneMobile != null &&
+                        statement.person!.phoneMobile!.isNotEmpty)
                       _buildInfoRow('Phone', statement.person!.phoneMobile!),
-                    if (statement.person!.nationality != null && statement.person!.nationality!.isNotEmpty)
-                      _buildInfoRow('Nationality', statement.person!.nationality!),
+                    if (statement.person!.nationality != null &&
+                        statement.person!.nationality!.isNotEmpty)
+                      _buildInfoRow(
+                        'Nationality',
+                        statement.person!.nationality!,
+                      ),
                     const SizedBox(height: 16),
                   ],
-                  
+
                   // Statement Details
-                  if (statement?.statement != null && statement!.statement!.isNotEmpty) ...[
+                  if (statement?.statement != null &&
+                      statement!.statement!.isNotEmpty) ...[
                     Text(
                       'Statement',
                       style: TextStyle(
@@ -1294,7 +1654,10 @@ class _StatementDetailsView extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: AppColors.backgroundLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.grayLight, width: 1),
+                        border: Border.all(
+                          color: AppColors.grayLight,
+                          width: 1,
+                        ),
                       ),
                       child: Text(
                         statement.statement!,
@@ -1307,7 +1670,7 @@ class _StatementDetailsView extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  
+
                   // Statement Metadata
                   if (statement != null) ...[
                     Text(
@@ -1319,18 +1682,26 @@ class _StatementDetailsView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    if (statement.statementTakerName != null && statement.statementTakerName!.isNotEmpty)
-                      _buildInfoRow('Statement Taker', statement.statementTakerName!),
+                    if (statement.statementTakerName != null &&
+                        statement.statementTakerName!.isNotEmpty)
+                      _buildInfoRow(
+                        'Statement Taker',
+                        statement.statementTakerName!,
+                      ),
                     if (statement.applicantType != null)
                       _buildInfoRow('Applicant Type', statement.applicantType!),
                     if (statement.statementDate != null)
-                      _buildInfoRow('Statement Date', '${statement.statementDate!.day}/${statement.statementDate!.month}/${statement.statementDate!.year}'),
-                    if (statement.statementTime != null && statement.statementTime!.isNotEmpty)
+                      _buildInfoRow(
+                        'Statement Date',
+                        '${statement.statementDate!.day}/${statement.statementDate!.month}/${statement.statementDate!.year}',
+                      ),
+                    if (statement.statementTime != null &&
+                        statement.statementTime!.isNotEmpty)
                       _buildInfoRow('Statement Time', statement.statementTime!),
                     if (statement.status != null)
                       _buildInfoRow('Status', statement.status!),
                   ],
-                  
+
                   // Report Submission Status (no buttons, just show status)
                   if (report?.submitted == true) ...[
                     const SizedBox(height: 16),
@@ -1343,7 +1714,11 @@ class _StatementDetailsView extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                          Icon(
+                            Icons.check_circle,
+                            color: AppColors.success,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -1367,7 +1742,7 @@ class _StatementDetailsView extends StatelessWidget {
       );
     });
   }
-  
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1401,4 +1776,3 @@ class _StatementDetailsView extends StatelessWidget {
     );
   }
 }
-

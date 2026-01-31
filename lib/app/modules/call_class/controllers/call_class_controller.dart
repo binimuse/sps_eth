@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart' hide ConnectionState;
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:get/get.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -25,13 +27,10 @@ import 'package:sps_eth_app/app/modules/language/controllers/language_controller
 import 'package:sps_eth_app/app/modules/language/views/language_view.dart';
 
 class ChatMessage {
-  ChatMessage({
-    required this.text,
-    required this.isFromOP,
-    required this.time,
-  });
+  ChatMessage({required this.text, required this.isFromOP, required this.time});
 
-  final bool isFromOP; // true if from OP (Officer/Operator), false if from other party
+  final bool
+  isFromOP; // true if from OP (Officer/Operator), false if from other party
   final String text;
   final String time;
 }
@@ -44,10 +43,7 @@ class InfoRow {
 }
 
 class DocumentItem {
-  const DocumentItem({
-    required this.label,
-    required this.fileName,
-  });
+  const DocumentItem({required this.label, required this.fileName});
 
   final String fileName;
   final String label;
@@ -58,7 +54,8 @@ class CallClassController extends GetxController {
   final RxBool autoStartCall = false.obs;
 
   // Camera selection
-  final RxList<CameraPosition> availableCameraPositions = <CameraPosition>[].obs;
+  final RxList<CameraPosition> availableCameraPositions =
+      <CameraPosition>[].obs;
 
   // Media devices enumeration for debugging
   final RxList<MediaDevice> availableCameras = <MediaDevice>[].obs;
@@ -69,7 +66,8 @@ class CallClassController extends GetxController {
 
   final Rx<NetworkStatus> callNetworkStatus = NetworkStatus.IDLE.obs;
   // Direct Call state
-  final RxString callStatus = 'idle'.obs; // idle, pending, connecting, active, ended
+  final RxString callStatus =
+      'idle'.obs; // idle, pending, connecting, active, ended
 
   final RxString connectionStatus = 'Disconnected'.obs;
   // Connectivity monitoring
@@ -79,16 +77,20 @@ class CallClassController extends GetxController {
   final RxInt currentCameraIndex = 0.obs;
   final RxString currentMicrophoneDeviceId = ''.obs;
   // Progress tracking for call process
-  final RxInt currentProgressStep = 0.obs; // 0: not started, 1: connecting, 2: report initiated, 3: attachment upload
+  final RxInt currentProgressStep = 0
+      .obs; // 0: not started, 1: connecting, 2: report initiated, 3: attachment upload
 
   final Rx<String?> currentRoomName = Rx<String?>('');
   final Rx<String?> currentSessionId = Rx<String?>('');
   // Attachment upload state
-  final Rx<AttachmentUploadLinkEvent?> currentUploadRequest = Rx<AttachmentUploadLinkEvent?>(null);
+  final Rx<AttachmentUploadLinkEvent?> currentUploadRequest =
+      Rx<AttachmentUploadLinkEvent?>(null);
 
   final Rx<String?> currentWsUrl = Rx<String?>('');
   final RxString discussionDate = 'June 12, 2024'.obs;
-  final Rx<Map<String, dynamic>> faydaData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  final Rx<Map<String, dynamic>> faydaData = Rx<Map<String, dynamic>>(
+    <String, dynamic>{},
+  );
   // Fayda ID verification data
   final RxString faydaTransactionID = ''.obs;
 
@@ -103,6 +105,12 @@ class CallClassController extends GetxController {
   final RxBool isAttachmentUploading = false.obs;
   final RxBool isAudioEnabled = true.obs;
   final RxBool isConnected = false.obs;
+
+  // Codec switching state
+  final RxString currentVideoCodec =
+      'VP9'.obs; // Default codec: 'VP9'; also 'H264', 'VP8'
+  final RxBool isSwitchingCodec = false.obs;
+  final RxBool isSwitchingCamera = false.obs;
   final RxBool isConnectingToOfficer = false.obs;
   final RxBool isEndingCall = false.obs; // Loading state for ending call
   final RxBool isReportInitiated = false.obs;
@@ -115,7 +123,9 @@ class CallClassController extends GetxController {
   // For employee side
   final RxList<PendingCall> pendingCalls = <PendingCall>[].obs;
 
-  final RxList<RemoteParticipant> remoteParticipants = <RemoteParticipant>[].obs;
+  final RxList<RemoteParticipant> remoteParticipants =
+      <RemoteParticipant>[].obs;
+
   /// Reactive remote video track so admin UI rebuilds when track becomes subscribed (fixes black screen)
   final Rx<VideoTrack?> remoteVideoTrack = Rx<VideoTrack?>(null);
 
@@ -123,7 +133,9 @@ class CallClassController extends GetxController {
   final Rx<ReportInfo?> reportInfo = Rx<ReportInfo?>(null);
 
   // Residence ID verification data
-  final Rx<Map<String, dynamic>> residenceData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  final Rx<Map<String, dynamic>> residenceData = Rx<Map<String, dynamic>>(
+    <String, dynamic>{},
+  );
 
   final selectedLanguage = 'English'.obs;
   final Rx<StatementInfo?> statementInfo = Rx<StatementInfo?>(null);
@@ -133,10 +145,15 @@ class CallClassController extends GetxController {
           .obs;
 
   // TIN verification data
-  final Rx<Map<String, dynamic>> tinData = Rx<Map<String, dynamic>>(<String, dynamic>{});
+  final Rx<Map<String, dynamic>> tinData = Rx<Map<String, dynamic>>(
+    <String, dynamic>{},
+  );
 
-  static const int _callDetailsPollInterval = 3; // seconds (reduced for faster updates)
-  static const Duration _remoteVideoTrackRetryInterval = Duration(milliseconds: 200);
+  static const int _callDetailsPollInterval =
+      3; // seconds (reduced for faster updates)
+  static const Duration _remoteVideoTrackRetryInterval = Duration(
+    milliseconds: 200,
+  );
   static const int _remoteVideoTrackRetryMax = 20; // 200ms * 20 = 4s
 
   // Call details polling
@@ -156,8 +173,10 @@ class CallClassController extends GetxController {
 
   LocalParticipant? _localParticipant;
   String? _preferredLanguage; // Will be set if language was selected
-  final Map<RemoteParticipant, void Function()> _remoteParticipantListeners = {};
+  final Map<RemoteParticipant, void Function()> _remoteParticipantListeners =
+      {};
   int _remoteVideoTrackRetryCount = 0;
+
   /// Workaround for LiveKit Flutter #919: on Android, publication.track can be null after subscribe.
   /// We retry _updateRemoteVideoTrack periodically until track appears or timeout.
   Timer? _remoteVideoTrackRetryTimer;
@@ -206,14 +225,18 @@ class CallClassController extends GetxController {
     try {
       // Initialize connectivity monitoring
       connectivityUtil.initialize();
-      
+
       // Listen to connectivity changes to auto-retry when internet comes back
       ever(connectivityUtil.isOnline, (bool isOnline) {
         if (isOnline) {
-          print('🌐 [CONNECTIVITY] Internet restored, checking if retry is needed...');
+          print(
+            '🌐 [CONNECTIVITY] Internet restored, checking if retry is needed...',
+          );
           // If WebSocket is not connected, try to reconnect
           if (_webSocketService != null && !_webSocketService!.isConnected) {
-            print('🔄 [CONNECTIVITY] WebSocket disconnected, attempting to reconnect...');
+            print(
+              '🔄 [CONNECTIVITY] WebSocket disconnected, attempting to reconnect...',
+            );
             _connectWebSocket().catchError((e) {
               print('❌ [CONNECTIVITY] Failed to reconnect WebSocket: $e');
             });
@@ -222,7 +245,7 @@ class CallClassController extends GetxController {
           print('🌐 [CONNECTIVITY] Internet disconnected');
         }
       });
-      
+
       // Read arguments to determine call source and get preferred language
       final args = Get.arguments;
       if (args != null && args is Map) {
@@ -231,34 +254,38 @@ class CallClassController extends GetxController {
           autoStartCall.value = true;
           print('📞 [AUTO START] Auto-start call requested from home swipe');
         }
-        
+
         // Get isVisitor flag (default to false if not provided)
         _isVisitor = args['isVisitor'] == true;
         print('📞 [INIT] isVisitor: $_isVisitor');
-        
+
         // Get transactionID from Fayda verification (if available)
         if (args['transactionID'] != null) {
           faydaTransactionID.value = args['transactionID'].toString();
           print('📞 [INIT] Fayda Transaction ID: ${faydaTransactionID.value}');
-          
+
           // Auto-start call when coming from Fayda verification
           autoStartCall.value = true;
           print('📞 [INIT] Auto-starting call for Fayda verification');
         }
-        
+
         // Get Fayda data (if available)
         if (args['faydaData'] != null && args['faydaData'] is Map) {
-          final faydaDataMap = Map<String, dynamic>.from(args['faydaData'] as Map);
+          final faydaDataMap = Map<String, dynamic>.from(
+            args['faydaData'] as Map,
+          );
           faydaData.value = faydaDataMap;
           print('📞 [INIT] Fayda Data received:');
           print('  - Name: ${faydaDataMap['name']}');
           print('  - Individual ID: ${faydaDataMap['individualId']}');
           print('  - Status: ${faydaDataMap['status']}');
         }
-        
+
         // Get Residence ID data (if available)
         if (args['residenceData'] != null && args['residenceData'] is Map) {
-          final residenceDataMap = Map<String, dynamic>.from(args['residenceData'] as Map);
+          final residenceDataMap = Map<String, dynamic>.from(
+            args['residenceData'] as Map,
+          );
           residenceData.value = residenceDataMap;
           print('📞 [INIT] Residence Data received:');
           print('  - Full Name: ${residenceDataMap['fullName']}');
@@ -266,7 +293,7 @@ class CallClassController extends GetxController {
           print('  - Gender: ${residenceDataMap['gender']}');
           print('  - Nationality: ${residenceDataMap['nationality']}');
         }
-        
+
         // Get TIN data (if available)
         if (args['tinData'] != null && args['tinData'] is Map) {
           final tinDataMap = Map<String, dynamic>.from(args['tinData'] as Map);
@@ -277,15 +304,17 @@ class CallClassController extends GetxController {
           print('  - Type: ${tinDataMap['tpTypeDesc']}');
           print('  - Region: ${tinDataMap['region']}');
         }
-        
+
         // Get scanned ID photo (base64) from passport scanner (if available)
         if (args['idPhoto'] != null && args['idPhoto'].toString().isNotEmpty) {
           _scannedIdPhoto = args['idPhoto'].toString();
-          print('📞 [INIT] Scanned ID Photo received: ${_scannedIdPhoto!.length} characters (base64)');
+          print(
+            '📞 [INIT] Scanned ID Photo received: ${_scannedIdPhoto!.length} characters (base64)',
+          );
         } else {
           print('📞 [INIT] No scanned ID photo provided');
         }
-        
+
         // Get preferred language from LanguageController if available
         _preferredLanguage = _getPreferredLanguage();
         if (_preferredLanguage != null) {
@@ -297,9 +326,11 @@ class CallClassController extends GetxController {
         // No arguments, default values
         _isVisitor = false;
         _preferredLanguage = _getPreferredLanguage();
-        print('📞 [INIT] No arguments provided, using defaults - isVisitor: $_isVisitor');
+        print(
+          '📞 [INIT] No arguments provided, using defaults - isVisitor: $_isVisitor',
+        );
       }
-      
+
       _loadInitialData();
     } catch (e, stackTrace) {
       print('❌ [INIT ERROR] Error in onInit: $e');
@@ -316,7 +347,9 @@ class CallClassController extends GetxController {
     _checkAuthBeforeAccess().catchError((error, stackTrace) {
       print('❌ [INIT ERROR] Error in onReady: $error');
       print('❌ [INIT ERROR] Stack trace: $stackTrace');
-      AppToasts.showError('Failed to initialize call class: ${error.toString()}');
+      AppToasts.showError(
+        'Failed to initialize call class: ${error.toString()}',
+      );
     });
   }
 
@@ -347,16 +380,16 @@ class CallClassController extends GetxController {
   /// This is the new Direct Call flow
   Future<void> requestCall() async {
     print('📞 [REQUEST CALL] Starting call request...');
-    
+
     // Check authentication first
     final isAuthenticated = await _checkAuthentication();
     if (!isAuthenticated) {
       print('❌ [REQUEST CALL] Authentication check failed');
       return;
     }
-    
+
     print('✅ [REQUEST CALL] Authentication passed');
-    
+
     try {
       callNetworkStatus.value = NetworkStatus.LOADING;
       callStatus.value = 'pending';
@@ -366,26 +399,30 @@ class CallClassController extends GetxController {
       print('📞 [REQUEST CALL] Requesting camera permission...');
       final cameraStatus = await Permission.camera.request();
       print('📞 [REQUEST CALL] Camera permission: ${cameraStatus.toString()}');
-      
+
       print('📞 [REQUEST CALL] Requesting microphone permission...');
       final microphoneStatus = await Permission.microphone.request();
-      print('📞 [REQUEST CALL] Microphone permission: ${microphoneStatus.toString()}');
+      print(
+        '📞 [REQUEST CALL] Microphone permission: ${microphoneStatus.toString()}',
+      );
 
       if (!cameraStatus.isGranted || !microphoneStatus.isGranted) {
         callNetworkStatus.value = NetworkStatus.ERROR;
         callStatus.value = 'idle';
-        print('❌ [REQUEST CALL] Permissions denied - Camera: ${cameraStatus.isGranted}, Microphone: ${microphoneStatus.isGranted}');
+        print(
+          '❌ [REQUEST CALL] Permissions denied - Camera: ${cameraStatus.isGranted}, Microphone: ${microphoneStatus.isGranted}',
+        );
         AppToasts.showError('Camera and microphone permissions are required');
         return;
       }
 
       print('✅ [REQUEST CALL] Permissions granted');
       print('📞 [REQUEST CALL] Calling Direct Call API...');
-      
+
       // Get device serial number
       final deviceSerial = await DeviceIdUtil.getDeviceSerialNumber();
       print('📱 [REQUEST CALL] Device Serial Number: $deviceSerial');
-      
+
       // Extract Fayda data if available
       final faydaDataMap = faydaData.value;
       String? idNumber;
@@ -396,7 +433,7 @@ class CallClassController extends GetxController {
       String? phoneNumber;
       String? address;
       String? idType;
-      
+
       if (faydaDataMap.isNotEmpty && faydaTransactionID.value.isNotEmpty) {
         idNumber = faydaDataMap['individualId']?.toString();
         photoUrl = faydaDataMap['photo']?.toString();
@@ -406,7 +443,7 @@ class CallClassController extends GetxController {
         phoneNumber = faydaDataMap['phoneNumber']?.toString();
         address = faydaDataMap['address']?.toString();
         idType = 'fayda';
-        
+
         print('📤 [REQUEST CALL] Fayda data extracted:');
         print('  - ID Number: $idNumber');
         print('  - Full Name: $fullname');
@@ -414,34 +451,41 @@ class CallClassController extends GetxController {
         print('  - Nationality: $nationality');
         print('  - Phone: $phoneNumber');
         print('  - Address: $address');
-        print('  - Photo URL: ${photoUrl != null ? "${photoUrl.substring(0, 20)}..." : "null"}');
+        print(
+          '  - Photo URL: ${photoUrl != null ? "${photoUrl.substring(0, 20)}..." : "null"}',
+        );
       } else {
         // Extract Residence ID data if available
         final residenceDataMap = residenceData.value;
         final args = Get.arguments;
-        if (residenceDataMap.isNotEmpty && args != null && args['residenceId'] != null) {
+        if (residenceDataMap.isNotEmpty &&
+            args != null &&
+            args['residenceId'] != null) {
           idNumber = args['residenceId']?.toString();
           fullname = residenceDataMap['fullName']?.toString();
           fullnameAm = residenceDataMap['fullNameAmh']?.toString();
           nationality = residenceDataMap['nationality']?.toString();
           phoneNumber = residenceDataMap['phoneNo']?.toString();
           idType = 'residence';
-          
+
           // Build address from residence data
           final addressParts = <String>[];
-          if (residenceDataMap['houseNo'] != null && residenceDataMap['houseNo'].toString().isNotEmpty) {
+          if (residenceDataMap['houseNo'] != null &&
+              residenceDataMap['houseNo'].toString().isNotEmpty) {
             addressParts.add(residenceDataMap['houseNo'].toString());
           }
-          if (residenceDataMap['ppaCity'] != null && residenceDataMap['ppaCity'].toString().isNotEmpty) {
+          if (residenceDataMap['ppaCity'] != null &&
+              residenceDataMap['ppaCity'].toString().isNotEmpty) {
             addressParts.add(residenceDataMap['ppaCity'].toString());
           }
-          if (residenceDataMap['ppaCityAmh'] != null && residenceDataMap['ppaCityAmh'].toString().isNotEmpty) {
+          if (residenceDataMap['ppaCityAmh'] != null &&
+              residenceDataMap['ppaCityAmh'].toString().isNotEmpty) {
             addressParts.add(residenceDataMap['ppaCityAmh'].toString());
           }
           if (addressParts.isNotEmpty) {
             address = addressParts.join(', ');
           }
-          
+
           print('📤 [REQUEST CALL] Residence data extracted:');
           print('  - ID Number: $idNumber');
           print('  - Full Name: $fullname');
@@ -452,28 +496,33 @@ class CallClassController extends GetxController {
         } else {
           // Extract TIN data if available
           final tinDataMap = tinData.value;
-          if (tinDataMap.isNotEmpty && args != null && args['tinNumber'] != null) {
+          if (tinDataMap.isNotEmpty &&
+              args != null &&
+              args['tinNumber'] != null) {
             idNumber = args['tinNumber']?.toString();
             fullname = tinDataMap['fullName']?.toString();
             fullnameAm = tinDataMap['fullNameF']?.toString();
             phoneNumber = tinDataMap['phoneNumber']?.toString();
             idType = 'tin';
-            
+
             // Build address from TIN data
             final addressParts = <String>[];
-            if (tinDataMap['cityName'] != null && tinDataMap['cityName'].toString().isNotEmpty) {
+            if (tinDataMap['cityName'] != null &&
+                tinDataMap['cityName'].toString().isNotEmpty) {
               addressParts.add(tinDataMap['cityName'].toString());
             }
-            if (tinDataMap['localityDesc'] != null && tinDataMap['localityDesc'].toString().isNotEmpty) {
+            if (tinDataMap['localityDesc'] != null &&
+                tinDataMap['localityDesc'].toString().isNotEmpty) {
               addressParts.add(tinDataMap['localityDesc'].toString());
             }
-            if (tinDataMap['kebeleDesc'] != null && tinDataMap['kebeleDesc'].toString().isNotEmpty) {
+            if (tinDataMap['kebeleDesc'] != null &&
+                tinDataMap['kebeleDesc'].toString().isNotEmpty) {
               addressParts.add(tinDataMap['kebeleDesc'].toString());
             }
             if (addressParts.isNotEmpty) {
               address = addressParts.join(', ');
             }
-            
+
             print('📤 [REQUEST CALL] TIN data extracted:');
             print('  - ID Number: $idNumber');
             print('  - Full Name: $fullname');
@@ -483,7 +532,7 @@ class CallClassController extends GetxController {
           }
         }
       }
-      
+
       // Create request payload with isVisitor, preferredLanguage, ID data, scanned ID photo, and device serial
       final requestPayload = RequestCallRequest(
         isVisitor: _isVisitor,
@@ -499,13 +548,13 @@ class CallClassController extends GetxController {
         idPhoto: _scannedIdPhoto, // Add scanned ID photo (base64)
         deviceSerialNumber: deviceSerial, // Add device serial number
       );
-      
+
       // Print request payload details
       final accessToken = await AuthUtil().getAccessToken();
       final baseUrl = 'https://sps-api-test.aii.et/api/v1';
       final endpoint = '/direct-call/request';
       final fullUrl = '$baseUrl$endpoint';
-      
+
       print('📤 [REQUEST CALL] ========== REQUEST PAYLOAD ==========');
       print('📤 [REQUEST CALL] Method: POST');
       print('📤 [REQUEST CALL] URL: $fullUrl');
@@ -519,75 +568,105 @@ class CallClassController extends GetxController {
       print('📤 [REQUEST CALL] Body:');
       print('📤 [REQUEST CALL] {');
       print('📤 [REQUEST CALL]   "isVisitor": ${requestPayload.isVisitor}');
-      print('📤 [REQUEST CALL]   "preferredLanguage": ${requestPayload.preferredLanguage != null ? "\"${requestPayload.preferredLanguage}\"" : "null"}');
+      print(
+        '📤 [REQUEST CALL]   "preferredLanguage": ${requestPayload.preferredLanguage != null ? "\"${requestPayload.preferredLanguage}\"" : "null"}',
+      );
       if (requestPayload.idNumber != null) {
         print('📤 [REQUEST CALL]   "idNumber": "${requestPayload.idNumber}"');
         print('📤 [REQUEST CALL]   "idType": "${requestPayload.idType}"');
         print('📤 [REQUEST CALL]   "fullname": "${requestPayload.fullname}"');
         if (requestPayload.fullnameAm != null) {
-          print('📤 [REQUEST CALL]   "fullnameAm": "${requestPayload.fullnameAm}"');
+          print(
+            '📤 [REQUEST CALL]   "fullnameAm": "${requestPayload.fullnameAm}"',
+          );
         }
         if (requestPayload.nationality != null) {
-          print('📤 [REQUEST CALL]   "nationality": "${requestPayload.nationality}"');
+          print(
+            '📤 [REQUEST CALL]   "nationality": "${requestPayload.nationality}"',
+          );
         }
         if (requestPayload.phoneNumber != null) {
-          print('📤 [REQUEST CALL]   "phoneNumber": "${requestPayload.phoneNumber}"');
+          print(
+            '📤 [REQUEST CALL]   "phoneNumber": "${requestPayload.phoneNumber}"',
+          );
         }
         if (requestPayload.address != null) {
           print('📤 [REQUEST CALL]   "address": "${requestPayload.address}"');
         }
         if (requestPayload.photoUrl != null) {
-          print('📤 [REQUEST CALL]   "photoUrl": "${requestPayload.photoUrl!.substring(0, requestPayload.photoUrl!.length > 50 ? 50 : requestPayload.photoUrl!.length)}..."');
+          print(
+            '📤 [REQUEST CALL]   "photoUrl": "${requestPayload.photoUrl!.substring(0, requestPayload.photoUrl!.length > 50 ? 50 : requestPayload.photoUrl!.length)}..."',
+          );
         }
       }
-      if (requestPayload.idPhoto != null && requestPayload.idPhoto!.isNotEmpty) {
-        print('📤 [REQUEST CALL]   "idPhoto": "<base64 image ${requestPayload.idPhoto!.length} chars>"');
+      if (requestPayload.idPhoto != null &&
+          requestPayload.idPhoto!.isNotEmpty) {
+        print(
+          '📤 [REQUEST CALL]   "idPhoto": "<base64 image ${requestPayload.idPhoto!.length} chars>"',
+        );
       }
-      if (requestPayload.deviceSerialNumber != null && requestPayload.deviceSerialNumber!.isNotEmpty) {
-        print('📤 [REQUEST CALL]   "deviceSerialNumber": "${requestPayload.deviceSerialNumber}"');
+      if (requestPayload.deviceSerialNumber != null &&
+          requestPayload.deviceSerialNumber!.isNotEmpty) {
+        print(
+          '📤 [REQUEST CALL]   "deviceSerialNumber": "${requestPayload.deviceSerialNumber}"',
+        );
       }
       print('📤 [REQUEST CALL] }');
       print('📤 [REQUEST CALL] ======================================');
-      
+
       // Request call via Direct Call API
-      final responseWrapper = await _directCallService.requestCall(requestPayload);
-      
+      final responseWrapper = await _directCallService.requestCall(
+        requestPayload,
+      );
+
       // Extract data from wrapper
       if (responseWrapper.success != true || responseWrapper.data == null) {
         callNetworkStatus.value = NetworkStatus.ERROR;
         callStatus.value = 'idle';
-        print('❌ [REQUEST CALL] API response indicates failure or missing data');
+        print(
+          '❌ [REQUEST CALL] API response indicates failure or missing data',
+        );
         print('  - success: ${responseWrapper.success}');
         print('  - data: ${responseWrapper.data}');
         AppToasts.showError('Failed to request call');
         return;
       }
-      
+
       final response = responseWrapper.data!;
-      
+
       print('📥 [REQUEST CALL] ========== RESPONSE PAYLOAD ==========');
       print('📥 [REQUEST CALL] Status: Success');
       print('📥 [REQUEST CALL] Response Body:');
       print('📥 [REQUEST CALL] {');
       print('📥 [REQUEST CALL]   "success": ${responseWrapper.success}');
       print('📥 [REQUEST CALL]   "data": {');
-      print('📥 [REQUEST CALL]     "token": "${response.token != null ? "${response.token!.substring(0, 20)}..." : "null"}"');
-      print('📥 [REQUEST CALL]     "roomName": "${response.roomName ?? "null"}"');
-      print('📥 [REQUEST CALL]     "sessionId": "${response.sessionId ?? "null"}"');
+      print(
+        '📥 [REQUEST CALL]     "token": "${response.token != null ? "${response.token!.substring(0, 20)}..." : "null"}"',
+      );
+      print(
+        '📥 [REQUEST CALL]     "roomName": "${response.roomName ?? "null"}"',
+      );
+      print(
+        '📥 [REQUEST CALL]     "sessionId": "${response.sessionId ?? "null"}"',
+      );
       print('📥 [REQUEST CALL]     "wsUrl": "${response.wsUrl ?? "null"}"');
       print('📥 [REQUEST CALL]   }');
       if (responseWrapper.meta != null) {
         print('📥 [REQUEST CALL]   "meta": {');
-        print('📥 [REQUEST CALL]     "timestamp": "${responseWrapper.meta!.timestamp ?? "null"}"');
-        print('📥 [REQUEST CALL]     "requestId": "${responseWrapper.meta!.requestId ?? "null"}"');
+        print(
+          '📥 [REQUEST CALL]     "timestamp": "${responseWrapper.meta!.timestamp ?? "null"}"',
+        );
+        print(
+          '📥 [REQUEST CALL]     "requestId": "${responseWrapper.meta!.requestId ?? "null"}"',
+        );
         print('📥 [REQUEST CALL]   }');
       }
       print('📥 [REQUEST CALL] }');
       print('📥 [REQUEST CALL] ======================================');
 
-      if (response.token == null || 
-          response.roomName == null || 
-          response.sessionId == null || 
+      if (response.token == null ||
+          response.roomName == null ||
+          response.sessionId == null ||
           response.wsUrl == null) {
         callNetworkStatus.value = NetworkStatus.ERROR;
         callStatus.value = 'idle';
@@ -623,34 +702,47 @@ class CallClassController extends GetxController {
       print('❌ [REQUEST CALL] Response: ${e.response?.data}');
       print('❌ [REQUEST CALL] Error: ${e.error}');
       print('❌ [REQUEST CALL] Message: ${e.message}');
-      
+
       callNetworkStatus.value = NetworkStatus.ERROR;
       callStatus.value = 'idle';
-      
+
       String errorMessage = 'Failed to request call';
-      
+
       // Handle network/connection errors
       if (e.type == dio.DioExceptionType.connectionTimeout ||
           e.type == dio.DioExceptionType.receiveTimeout ||
           e.type == dio.DioExceptionType.sendTimeout) {
-        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection and try again.';
       } else if (e.type == dio.DioExceptionType.connectionError ||
-                 e.error?.toString().toLowerCase().contains('connection closed') == true ||
-                 e.error?.toString().toLowerCase().contains('connection refused') == true ||
-                 e.error?.toString().toLowerCase().contains('failed host lookup') == true ||
-                 e.error?.toString().toLowerCase().contains('no address associated') == true ||
-                 e.error?.toString().toLowerCase().contains('network is unreachable') == true ||
-                 e.message?.toLowerCase().contains('connection closed') == true ||
-                 e.message?.toLowerCase().contains('failed host lookup') == true) {
+          e.error?.toString().toLowerCase().contains('connection closed') ==
+              true ||
+          e.error?.toString().toLowerCase().contains('connection refused') ==
+              true ||
+          e.error?.toString().toLowerCase().contains('failed host lookup') ==
+              true ||
+          e.error?.toString().toLowerCase().contains('no address associated') ==
+              true ||
+          e.error?.toString().toLowerCase().contains(
+                'network is unreachable',
+              ) ==
+              true ||
+          e.message?.toLowerCase().contains('connection closed') == true ||
+          e.message?.toLowerCase().contains('failed host lookup') == true) {
         // Check if it's an internet connectivity issue
         if (!connectivityUtil.isOnline.value) {
-          print('🌐 [REQUEST CALL] Internet disconnected, waiting for connection to restore...');
+          print(
+            '🌐 [REQUEST CALL] Internet disconnected, waiting for connection to restore...',
+          );
           // Wait for internet and retry
           await _waitForInternetAndRetryCall();
           return; // Exit early, retry will happen in _waitForInternetAndRetryCall
         }
-        errorMessage = 'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
-        print('⚠️ [REQUEST CALL] This appears to be a backend/network issue. The server closed the connection unexpectedly.');
+        errorMessage =
+            'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
+        print(
+          '⚠️ [REQUEST CALL] This appears to be a backend/network issue. The server closed the connection unexpectedly.',
+        );
       } else if (e.response?.statusCode == 403) {
         // Parse error message from response
         try {
@@ -658,15 +750,18 @@ class CallClassController extends GetxController {
           if (responseData is Map<String, dynamic>) {
             final error = responseData['error'];
             if (error is Map && error.containsKey('message')) {
-              errorMessage = error['message'] ?? 'Access forbidden. This action requires USER role.';
+              errorMessage =
+                  error['message'] ??
+                  'Access forbidden. This action requires USER role.';
             } else {
-              errorMessage = 'Access forbidden. This action requires USER role.';
+              errorMessage =
+                  'Access forbidden. This action requires USER role.';
             }
           }
         } catch (_) {
           errorMessage = 'Access forbidden. This action requires USER role.';
         }
-        
+
         // Get user role for debugging
         final userInfo = await AuthUtil().getUserData();
         if (userInfo.isNotEmpty && userInfo.containsKey('role')) {
@@ -685,14 +780,14 @@ class CallClassController extends GetxController {
             final error = responseData['error'];
             if (error is Map && error.containsKey('message')) {
               final errorMsg = error['message']?.toString().toLowerCase() ?? '';
-              if (errorMsg.contains('no connected call center agents') || 
+              if (errorMsg.contains('no connected call center agents') ||
                   errorMsg.contains('no agents available')) {
                 isNoAgentsError = true;
               }
             }
           }
         } catch (_) {}
-        
+
         if (isNoAgentsError) {
           // Show line busy dialog instead of snackbar
           final context = Get.context;
@@ -726,10 +821,10 @@ class CallClassController extends GetxController {
           }
         } catch (_) {}
       }
-      
+
       print('❌ [REQUEST CALL] Error message: $errorMessage');
       print('❌ [REQUEST CALL] Error type: ${e.type}');
-      
+
       // Show user-friendly error message (only if not already shown via dialog)
       if (errorMessage.isNotEmpty) {
         AppToasts.showError(errorMessage);
@@ -739,7 +834,9 @@ class CallClassController extends GetxController {
       print('❌ [REQUEST CALL] Stack trace: $stackTrace');
       callNetworkStatus.value = NetworkStatus.ERROR;
       callStatus.value = 'idle';
-      AppToasts.showError('An unexpected error occurred while requesting the call. Please try again.');
+      AppToasts.showError(
+        'An unexpected error occurred while requesting the call. Please try again.',
+      );
     }
   }
 
@@ -750,7 +847,7 @@ class CallClassController extends GetxController {
     if (!isAuthenticated) {
       return;
     }
-    
+
     try {
       callNetworkStatus.value = NetworkStatus.LOADING;
 
@@ -773,12 +870,12 @@ class CallClassController extends GetxController {
         AppToasts.showError('Failed to accept call');
         return;
       }
-      
+
       final response = responseWrapper.data!;
 
-      if (response.token == null || 
-          response.roomName == null || 
-          response.sessionId == null || 
+      if (response.token == null ||
+          response.roomName == null ||
+          response.sessionId == null ||
           response.wsUrl == null) {
         callNetworkStatus.value = NetworkStatus.ERROR;
         AppToasts.showError('Failed to accept call');
@@ -817,10 +914,10 @@ class CallClassController extends GetxController {
     if (!isAuthenticated) {
       return;
     }
-    
+
     try {
       await _directCallService.rejectCall(sessionId);
-      
+
       // Remove from pending calls
       pendingCalls.removeWhere((call) => call.id == sessionId);
       incomingCall.value = null;
@@ -837,7 +934,7 @@ class CallClassController extends GetxController {
         // Stop and cleanup tracks before disconnecting
         if (_localParticipant != null) {
           print('🔌 [DISCONNECT] Cleaning up local tracks...');
-          
+
           // Get and stop local video track
           try {
             final videoTrackPub = _localParticipant!.videoTrackPublications
@@ -845,7 +942,7 @@ class CallClassController extends GetxController {
                 .map((pub) => pub.track)
                 .whereType<LocalVideoTrack>()
                 .firstOrNull;
-            
+
             if (videoTrackPub != null) {
               print('🔌 [DISCONNECT] Stopping local video track...');
               await videoTrackPub.stop();
@@ -854,7 +951,7 @@ class CallClassController extends GetxController {
           } catch (e) {
             print('⚠️ [DISCONNECT] Error stopping video track: $e');
           }
-          
+
           // Get and stop local audio track
           try {
             final audioTrackPub = _localParticipant!.audioTrackPublications
@@ -862,7 +959,7 @@ class CallClassController extends GetxController {
                 .map((pub) => pub.track)
                 .whereType<LocalAudioTrack>()
                 .firstOrNull;
-            
+
             if (audioTrackPub != null) {
               print('🔌 [DISCONNECT] Stopping local audio track...');
               await audioTrackPub.stop();
@@ -872,7 +969,7 @@ class CallClassController extends GetxController {
             print('⚠️ [DISCONNECT] Error stopping audio track: $e');
           }
         }
-        
+
         print('🔌 [DISCONNECT] Room exists, calling disconnect()...');
         await _room!.disconnect();
         print('🔌 [DISCONNECT] Room disconnected');
@@ -916,122 +1013,174 @@ class CallClassController extends GetxController {
   /// On kiosks with two front cameras, we prefer the second front camera by deviceId
   /// (typically the user-facing one; the first may be document/scanner).
   Future<void> enableVideo() async {
-    print('🎥 [VIDEO] ========== ENABLE VIDEO (admin sees this stream) ==========');
+    print(
+      '🎥 [VIDEO] ========== ENABLE VIDEO (admin sees this stream) ==========',
+    );
     try {
       if (_localParticipant != null) {
         // Enumerate cameras first if not already done
         if (availableCameraPositions.isEmpty) {
           await _enumerateCameras();
         }
-        
+
         // Enumerate actual devices BEFORE creating track for kiosk debug (multiple front cameras)
-        print('🎥 [VIDEO] Enumerating cameras before creating track (kiosk debug)...');
+        print(
+          '🎥 [VIDEO] Enumerating cameras before creating track (kiosk debug)...',
+        );
         List<MediaDevice> allCameras = [];
         try {
           final devices = await Hardware.instance.enumerateDevices();
           allCameras = devices.where((d) => d.kind == 'videoinput').toList();
-          print('🎥 [VIDEO] ========== CAMERA ENUMERATION (KIOSK DEBUG) ==========');
+          print(
+            '🎥 [VIDEO] ========== CAMERA ENUMERATION (KIOSK DEBUG) ==========',
+          );
           print('🎥 [VIDEO] Total videoinput devices: ${allCameras.length}');
           for (var i = 0; i < allCameras.length; i++) {
             final c = allCameras[i];
             final labelLower = c.label.toLowerCase();
-            final isFront = labelLower.contains('front') || labelLower.contains('user') || labelLower.contains('face');
-            print('🎥 [VIDEO] Camera[$i] deviceId=${c.deviceId} label="${c.label}" kind=${c.kind} isFrontLike=$isFront');
+            final isFront =
+                labelLower.contains('front') ||
+                labelLower.contains('user') ||
+                labelLower.contains('face');
+            print(
+              '🎥 [VIDEO] Camera[$i] deviceId=${c.deviceId} label="${c.label}" kind=${c.kind} isFrontLike=$isFront',
+            );
           }
           final frontCameras = allCameras.where((c) {
             final l = c.label.toLowerCase();
-            return l.contains('front') || l.contains('user') || l.contains('face');
+            return l.contains('front') ||
+                l.contains('user') ||
+                l.contains('face');
           }).toList();
           if (frontCameras.isEmpty) {
-            print('🎥 [VIDEO] No cameras with front/user/face in label; using CameraPosition.front (SDK default)');
+            print(
+              '🎥 [VIDEO] No cameras with front/user/face in label; using CameraPosition.front (SDK default)',
+            );
           } else {
-            print('🎥 [VIDEO] Front-like cameras count: ${frontCameras.length}');
+            print(
+              '🎥 [VIDEO] Front-like cameras count: ${frontCameras.length}',
+            );
             for (var i = 0; i < frontCameras.length; i++) {
-              print('🎥 [VIDEO]   Front[$i]: deviceId=${frontCameras[i].deviceId} label="${frontCameras[i].label}"');
+              print(
+                '🎥 [VIDEO]   Front[$i]: deviceId=${frontCameras[i].deviceId} label="${frontCameras[i].label}"',
+              );
             }
           }
-          print('🎥 [VIDEO] =========================================================');
+          print(
+            '🎥 [VIDEO] =========================================================',
+          );
         } catch (e) {
           print('⚠️ [VIDEO] Could not enumerate devices before track: $e');
         }
-        
+
         print('🎥 [VIDEO] Local participant exists');
-        print('🎥 [VIDEO] Current video publications BEFORE: ${_localParticipant!.videoTrackPublications.length}');
-        
+        print(
+          '🎥 [VIDEO] Current video publications BEFORE: ${_localParticipant!.videoTrackPublications.length}',
+        );
+
         // On kiosks with 2+ front cameras, prefer second front camera by deviceId (usually user-facing)
         String? preferredDeviceId;
         if (allCameras.isNotEmpty) {
           final frontLike = allCameras.where((c) {
             final l = c.label.toLowerCase();
-            return l.contains('front') || l.contains('user') || l.contains('face');
+            return l.contains('front') ||
+                l.contains('user') ||
+                l.contains('face');
           }).toList();
           if (frontLike.length >= 2) {
             preferredDeviceId = frontLike[1].deviceId;
-            print('🎥 [VIDEO] KIOSK: 2+ front cameras detected, using SECOND front camera by deviceId: $preferredDeviceId (label: "${frontLike[1].label}")');
+            print(
+              '🎥 [VIDEO] KIOSK: 2+ front cameras detected, using SECOND front camera by deviceId: $preferredDeviceId (label: "${frontLike[1].label}")',
+            );
           } else if (frontLike.length == 1) {
             preferredDeviceId = frontLike[0].deviceId;
-            print('🎥 [VIDEO] Single front camera, using deviceId: $preferredDeviceId');
+            print(
+              '🎥 [VIDEO] Single front camera, using deviceId: $preferredDeviceId',
+            );
           }
         }
-        
+
         // Create and publish camera track (with optional deviceId for kiosk)
         final captureOptions = CameraCaptureOptions(
           cameraPosition: CameraPosition.front,
           deviceId: preferredDeviceId,
           params: VideoParametersPresets.h720_169,
         );
-        print('🎥 [VIDEO] Creating camera track: position=front deviceId=${preferredDeviceId ?? "null (SDK default)"}');
-        final cameraTrack = await LocalVideoTrack.createCameraTrack(captureOptions);
-        print('✅ [VIDEO] Camera track created: trackId=${cameraTrack.mediaStreamTrack.id}');
-        
+        print(
+          '🎥 [VIDEO] Creating camera track: position=front deviceId=${preferredDeviceId ?? "null (SDK default)"}',
+        );
+        final cameraTrack = await LocalVideoTrack.createCameraTrack(
+          captureOptions,
+        );
+        print(
+          '✅ [VIDEO] Camera track created: trackId=${cameraTrack.mediaStreamTrack.id}',
+        );
+
         // Log which camera the track is actually using (getSettings)
         try {
           final settings = cameraTrack.mediaStreamTrack.getSettings();
           final actualDeviceId = settings['deviceId']?.toString();
           final facingMode = settings['facingMode']?.toString();
           final trackLabel = cameraTrack.mediaStreamTrack.label;
-          print('🎥 [VIDEO] ========== ACTIVE CAMERA FOR STREAM (what admin sees) ==========');
+          print(
+            '🎥 [VIDEO] ========== ACTIVE CAMERA FOR STREAM (what admin sees) ==========',
+          );
           print('🎥 [VIDEO] deviceId: $actualDeviceId');
           print('🎥 [VIDEO] label: $trackLabel');
           print('🎥 [VIDEO] facingMode: $facingMode');
-          print('🎥 [VIDEO] =================================================================');
+          print(
+            '🎥 [VIDEO] =================================================================',
+          );
           if (actualDeviceId != null) {
             currentCameraDeviceId.value = actualDeviceId;
           }
         } catch (e) {
           print('⚠️ [VIDEO] Could not read track getSettings(): $e');
         }
-        
+
         // Explicitly publish the track to ensure it's sent to LiveKit server
+        // Use current codec (defaults to H.264)
         print('🎥 [VIDEO] Publishing camera track to LiveKit server...');
-        await _localParticipant!.publishVideoTrack(cameraTrack);
-        print('✅ [VIDEO] Camera track PUBLISHED to server');
-        
+        print('🎥 [VIDEO] Using codec: ${currentVideoCodec.value}');
+        await _localParticipant!.publishVideoTrack(
+          cameraTrack,
+          publishOptions: VideoPublishOptions(
+            videoCodec: currentVideoCodec.value, // Use current codec setting
+          ),
+        );
+        print(
+          '✅ [VIDEO] Camera track PUBLISHED to server with ${currentVideoCodec.value} codec',
+        );
+
         // Small delay to let publication complete
         await Future.delayed(const Duration(milliseconds: 800));
-        
+
         isVideoEnabled.value = true;
-        
+
         // Verify publication
         final publications = _localParticipant!.videoTrackPublications
             .where((pub) => pub.source == TrackSource.camera)
             .toList();
-        
+
         print('🎥 [VIDEO] ========== VIDEO PUBLICATION STATUS ==========');
         print('🎥 [VIDEO] Total camera publications: ${publications.length}');
-        
+
         for (var pub in publications) {
           print('🎥 [VIDEO] Publication ${pub.sid}:');
           print('🎥 [VIDEO]   - Source: ${pub.source}');
           print('🎥 [VIDEO]   - Subscribed: ${pub.subscribed}');
           print('🎥 [VIDEO]   - Muted: ${pub.muted}');
           print('🎥 [VIDEO]   - Has track: ${pub.track != null}');
-          
+
           if (pub.track != null) {
             final track = pub.track as LocalVideoTrack;
             print('🎥 [VIDEO]   - Track ID: ${track.mediaStreamTrack.id}');
-            print('🎥 [VIDEO]   - Track enabled: ${track.mediaStreamTrack.enabled}');
-            print('🎥 [VIDEO]   - Track label: ${track.mediaStreamTrack.label}');
+            print(
+              '🎥 [VIDEO]   - Track enabled: ${track.mediaStreamTrack.enabled}',
+            );
+            print(
+              '🎥 [VIDEO]   - Track label: ${track.mediaStreamTrack.label}',
+            );
             try {
               final s = track.mediaStreamTrack.getSettings();
               print('🎥 [VIDEO]   - Track deviceId (stream): ${s['deviceId']}');
@@ -1040,12 +1189,12 @@ class CallClassController extends GetxController {
           }
         }
         print('🎥 [VIDEO] ================================================');
-        
+
         _updateLocalVideoTrack();
-        
+
         // Enumerate actual media devices for debugging
         await _enumerateMediaDevices();
-        
+
         print('✅ [VIDEO] Video enabled and published successfully');
       } else {
         print('❌ [VIDEO] Local participant is null, cannot enable video');
@@ -1056,8 +1205,11 @@ class CallClassController extends GetxController {
       print('❌ [VIDEO ERROR] Stack trace: $stackTrace');
       isVideoEnabled.value = false;
       // Only show error if it's a permission issue, not connection issues
-      if (e.toString().contains('permission') || e.toString().contains('Permission')) {
-        AppToasts.showError('Camera permission denied. Please grant permission and try again.');
+      if (e.toString().contains('permission') ||
+          e.toString().contains('Permission')) {
+        AppToasts.showError(
+          'Camera permission denied. Please grant permission and try again.',
+        );
       }
       rethrow;
     }
@@ -1090,28 +1242,33 @@ class CallClassController extends GetxController {
     print('🎤 [AUDIO] Enabling audio...');
     try {
       if (_localParticipant != null) {
-        print('🎤 [AUDIO] Local participant exists, calling setMicrophoneEnabled(true)...');
+        print(
+          '🎤 [AUDIO] Local participant exists, calling setMicrophoneEnabled(true)...',
+        );
         await _localParticipant!.setMicrophoneEnabled(true);
         isAudioEnabled.value = true;
         print('🎤 [AUDIO] Microphone enabled: ${isAudioEnabled.value}');
-        
+
         // Enumerate media devices if not already done
         if (availableMicrophones.isEmpty) {
           await _enumerateMediaDevices();
         }
-        
+
         // Try to detect current microphone device ID
         final audioTrack = _localParticipant!.audioTrackPublications
             .where((pub) => pub.source == TrackSource.microphone)
             .map((pub) => pub.track)
             .whereType<LocalAudioTrack>()
             .firstOrNull;
-        
+
         if (audioTrack != null) {
-          final deviceId = audioTrack.mediaStreamTrack.getSettings()['deviceId'];
+          final deviceId = audioTrack.mediaStreamTrack
+              .getSettings()['deviceId'];
           if (deviceId != null) {
             currentMicrophoneDeviceId.value = deviceId.toString();
-            print('🎤 [MEDIA DEVICES] Current microphone device ID: ${currentMicrophoneDeviceId.value}');
+            print(
+              '🎤 [MEDIA DEVICES] Current microphone device ID: ${currentMicrophoneDeviceId.value}',
+            );
           }
         }
       } else {
@@ -1123,8 +1280,11 @@ class CallClassController extends GetxController {
       print('❌ [AUDIO ERROR] Stack trace: $stackTrace');
       isAudioEnabled.value = false;
       // Only show error if it's a permission issue, not connection issues
-      if (e.toString().contains('permission') || e.toString().contains('Permission')) {
-        AppToasts.showError('Microphone permission denied. Please grant permission and try again.');
+      if (e.toString().contains('permission') ||
+          e.toString().contains('Permission')) {
+        AppToasts.showError(
+          'Microphone permission denied. Please grant permission and try again.',
+        );
       }
       rethrow;
     }
@@ -1142,115 +1302,250 @@ class CallClassController extends GetxController {
     }
   }
 
-  /// Switch to next available camera
-  Future<void> switchCamera() async {
+  /// Check if device is ZC-3588A tablet (uses lower quality preset for compatibility)
+  Future<bool> _isZC3588ATablet() async {
     try {
-      if (!hasMultipleCameras.value || availableCameraPositions.isEmpty) {
-        print('📷 [CAMERA] No multiple cameras available, skipping switch');
-        return;
-      }
-      
-      if (_localParticipant == null) {
-        print('❌ [CAMERA] Local participant is null, cannot switch camera');
-        return;
-      }
-      
-      // Get current camera track
-      final cameraTrack = _localParticipant!.videoTrackPublications
-          .where((pub) => pub.source == TrackSource.camera)
-          .map((pub) => pub.track)
-          .whereType<LocalVideoTrack>()
-          .firstOrNull;
-      
-      if (cameraTrack == null) {
-        print('❌ [CAMERA] No camera track found, cannot switch');
-        return;
-      }
-      
-      // Calculate next camera index
-      currentCameraIndex.value = (currentCameraIndex.value + 1) % availableCameraPositions.length;
-      final nextPosition = availableCameraPositions[currentCameraIndex.value];
-      
-      print('📷 [CAMERA] Switching to camera ${currentCameraIndex.value}: $nextPosition');
-      
-      // Switch camera by using setCameraPosition on the track
-      try {
-        // Try to set camera position directly on the track
-        await cameraTrack.setCameraPosition(nextPosition);
-        print('✅ [CAMERA] Camera switched successfully to $nextPosition');
-        _updateLocalVideoTrack();
-      } catch (e) {
-        print('❌ [CAMERA ERROR] Error using setCameraPosition: $e');
-        // Fallback: Disable and re-enable with new position (and deviceId for kiosk 2 front cameras)
-        try {
-          await _localParticipant!.setCameraEnabled(false);
-          await Future.delayed(const Duration(milliseconds: 200));
-          
-          // On kiosk with 2 front cameras: use deviceId so we actually switch to the other front camera
-          String? deviceIdForPosition;
-          if (availableCameras.isNotEmpty && (nextPosition == CameraPosition.front)) {
-            final frontLike = availableCameras
-                .where((c) => c.label.toLowerCase().contains('front') ||
-                    c.label.toLowerCase().contains('user') ||
-                    c.label.toLowerCase().contains('face'))
-                .toList();
-            if (frontLike.length >= 2) {
-              final idx = currentCameraIndex.value % frontLike.length;
-              deviceIdForPosition = frontLike[idx].deviceId;
-              print('📷 [CAMERA] Fallback: using front camera[$idx] deviceId=$deviceIdForPosition label="${frontLike[idx].label}"');
-            }
-          }
-          
-          final newOptions = CameraCaptureOptions(
-            cameraPosition: nextPosition,
-            deviceId: deviceIdForPosition,
+      if (Platform.isAndroid) {
+        final deviceInfo = DeviceInfoPlugin();
+        final androidInfo = await deviceInfo.androidInfo;
+        final model = androidInfo.model.toUpperCase();
+        print('📱 [DEVICE] Device model: $model');
+        // Check if it's ZC-3588A tablet
+        if (model.contains('ZC-3588A') || model.contains('ZC3588A')) {
+          print(
+            '📱 [DEVICE] ZC-3588A tablet detected - will use lower quality preset',
           );
-          
-          final newTrack = await LocalVideoTrack.createCameraTrack(newOptions);
-          
-          final oldTrackPub = _localParticipant!.videoTrackPublications
-              .where((pub) => pub.source == TrackSource.camera)
-              .firstOrNull;
-          
-          if (oldTrackPub != null && oldTrackPub.track != null) {
-            final oldTrack = oldTrackPub.track;
-            if (oldTrack is LocalVideoTrack) {
-              await oldTrack.stop();
-            }
-          }
-          
-          await _localParticipant!.publishVideoTrack(newTrack);
-          print('✅ [CAMERA] Camera switched using createCameraTrack (deviceId=${deviceIdForPosition ?? "null"})');
-          
-          await Future.delayed(const Duration(milliseconds: 200));
-          _updateLocalVideoTrack();
-        } catch (e2) {
-          print('❌ [CAMERA ERROR] All camera switch methods failed: $e2');
+          return true;
         }
       }
+      return false;
+    } catch (e) {
+      print('⚠️ [DEVICE] Error detecting device model: $e');
+      return false;
+    }
+  }
+
+  /// Get video publish options helper (matches web client pattern)
+  VideoPublishOptions _getVideoPublishOptions(String codec) {
+    return VideoPublishOptions(
+      videoCodec: codec,
+      // Simulcast disabled for simplicity (can be enabled if needed)
+      simulcast: false,
+    );
+  }
+
+  /// Camera position from device label (back/night/ir/rear → back, else front).
+  static CameraPosition _positionFromLabel(String label) {
+    final l = label.toLowerCase();
+    if (l.contains('back') ||
+        l.contains('night') ||
+        l.contains('ir') ||
+        l.contains('rear') ||
+        l.contains('environment')) {
+      return CameraPosition.back;
+    }
+    return CameraPosition.front;
+  }
+
+  /// Switch camera using unpublish → stop → create new → publish pattern
+  Future<void> switchCamera(String deviceId) async {
+    if (_localParticipant == null ||
+        isSwitchingCamera.value ||
+        isSwitchingCodec.value)
+      return;
+    if (deviceId == currentCameraDeviceId.value) return;
+
+    final oldTrack = _localParticipant!.videoTrackPublications
+        .where((pub) => pub.source == TrackSource.camera && pub.track != null)
+        .map((pub) => pub.track)
+        .whereType<LocalVideoTrack>()
+        .firstOrNull;
+
+    if (oldTrack == null) return;
+
+    isSwitchingCamera.value = true;
+    try {
+      // Refresh camera list so we have the latest devices and labels
+      await _enumerateMediaDevices();
+
+      await _localParticipant!.setCameraEnabled(false);
+      await Future.delayed(const Duration(milliseconds: 250));
+
+      await oldTrack.stop();
+
+      final isZC3588A = await _isZC3588ATablet();
+      final videoParams = isZC3588A
+          ? VideoParametersPresets.h360_169
+          : VideoParametersPresets.h720_169;
+
+      final device = availableCameras
+          .where((c) => c.deviceId == deviceId)
+          .firstOrNull;
+      final position = device != null
+          ? _positionFromLabel(device.label)
+          : CameraPosition.front;
+
+      final captureOptions = CameraCaptureOptions(
+        cameraPosition: position,
+        deviceId: deviceId,
+        params: videoParams,
+      );
+
+      final newTrack = await LocalVideoTrack.createCameraTrack(captureOptions);
+
+      await _localParticipant!.publishVideoTrack(
+        newTrack,
+        publishOptions: _getVideoPublishOptions(currentVideoCodec.value),
+      );
+
+      currentCameraDeviceId.value = deviceId;
+      _updateLocalVideoTrack();
     } catch (e, stackTrace) {
-      print('❌ [CAMERA ERROR] Error switching camera: $e');
-      print('❌ [CAMERA ERROR] Stack trace: $stackTrace');
+      print('❌ [CAMERA] Switch failed: $e');
+      print('❌ [CAMERA] $stackTrace');
+    } finally {
+      isSwitchingCamera.value = false;
+    }
+  }
+
+  /// Get next camera deviceId for cycling through ALL cameras (so normal ↔ night/back works).
+  String? getNextCameraDeviceId() {
+    final cameras = availableCameras;
+    if (cameras.isEmpty) return null;
+    if (cameras.length == 1) return cameras.first.deviceId;
+
+    final currentId = currentCameraDeviceId.value;
+    final idx = cameras.indexWhere((c) => c.deviceId == currentId);
+    final nextIdx = (idx < 0 ? 0 : idx + 1) % cameras.length;
+    return cameras[nextIdx].deviceId;
+  }
+
+  /// Switch codec using unpublish → stop → create new → publish pattern (matches web client)
+  Future<void> switchCodec(String newCodec) async {
+    try {
+      // Guard: Room and current video track must exist, not already switching, and new codec must be different
+      if (_localParticipant == null ||
+          localVideoTrack.value == null ||
+          isSwitchingCodec.value ||
+          isSwitchingCamera.value ||
+          newCodec == currentVideoCodec.value) {
+        print(
+          '🎬 [CODEC] Switch codec skipped: room=${_localParticipant != null}, track=${localVideoTrack.value != null}, switching=${isSwitchingCodec.value}, sameCodec=${newCodec == currentVideoCodec.value}',
+        );
+        return;
+      }
+
+      // Get current camera deviceId so the new track uses the same camera
+      String? deviceId = currentCameraDeviceId.value;
+      if (deviceId.isEmpty) {
+        // Try to get deviceId from current track
+        try {
+          final currentTrack = localVideoTrack.value as LocalVideoTrack?;
+          if (currentTrack != null) {
+            final settings = currentTrack.mediaStreamTrack.getSettings();
+            deviceId = settings['deviceId']?.toString();
+          }
+        } catch (e) {
+          print('⚠️ [CODEC] Could not get deviceId from current track: $e');
+        }
+      }
+
+      if (deviceId == null || deviceId.isEmpty) {
+        print('❌ [CODEC] Cannot switch codec: deviceId not available');
+        return;
+      }
+
+      isSwitchingCodec.value = true;
+      print(
+        '🎬 [CODEC] Switching codec from ${currentVideoCodec.value} to $newCodec',
+      );
+
+      try {
+        final oldTrack = localVideoTrack.value as LocalVideoTrack?;
+        if (oldTrack == null) {
+          print('❌ [CODEC] No current video track found');
+          return;
+        }
+
+        // Step 1: Unpublish old track by disabling camera (this unpublishes the track)
+        print('🎬 [CODEC] Unpublishing old track...');
+        await _localParticipant!.setCameraEnabled(false);
+        await Future.delayed(const Duration(milliseconds: 200));
+
+        // Step 2: Stop old track
+        print('🎬 [CODEC] Stopping old track...');
+        await oldTrack.stop();
+
+        // Step 3: Create new track from the same camera (same deviceId)
+        print(
+          '🎬 [CODEC] Creating new track from same camera (deviceId: $deviceId)',
+        );
+        final isZC3588A = await _isZC3588ATablet();
+        final videoParams = isZC3588A
+            ? VideoParametersPresets.h360_169
+            : VideoParametersPresets.h720_169;
+
+        final captureOptions = CameraCaptureOptions(
+          cameraPosition: CameraPosition.front,
+          deviceId: deviceId,
+          params: videoParams,
+        );
+        final newTrack = await LocalVideoTrack.createCameraTrack(
+          captureOptions,
+        );
+
+        // Step 4: Publish new track with new codec (this is the only place the codec changes)
+        print('🎬 [CODEC] Publishing new track with codec: $newCodec');
+        await _localParticipant!.publishVideoTrack(
+          newTrack,
+          publishOptions: _getVideoPublishOptions(newCodec),
+        );
+
+        // Step 5: Update state
+        final oldCodec = currentVideoCodec.value;
+        currentVideoCodec.value = newCodec;
+        _updateLocalVideoTrack();
+
+        print(
+          '✅ [CODEC] Codec switched successfully from $oldCodec to $newCodec',
+        );
+      } catch (e, stackTrace) {
+        print('❌ [CODEC ERROR] Error switching codec: $e');
+        print('❌ [CODEC ERROR] Stack trace: $stackTrace');
+        rethrow;
+      } finally {
+        isSwitchingCodec.value = false;
+      }
+    } catch (e, stackTrace) {
+      print('❌ [CODEC ERROR] Error in switchCodec: $e');
+      print('❌ [CODEC ERROR] Stack trace: $stackTrace');
+      isSwitchingCodec.value = false;
     }
   }
 
   /// Get remote video track for a participant
   VideoTrack? getRemoteVideoTrack(RemoteParticipant participant) {
-    print('🎥 [REMOTE TRACK] Getting remote video track for participant: ${participant.identity}');
-    print('🎥 [REMOTE TRACK] Video publications: ${participant.videoTrackPublications.length}');
-    
+    print(
+      '🎥 [REMOTE TRACK] Getting remote video track for participant: ${participant.identity}',
+    );
+    print(
+      '🎥 [REMOTE TRACK] Video publications: ${participant.videoTrackPublications.length}',
+    );
+
     for (var pub in participant.videoTrackPublications) {
-      print('🎥 [REMOTE TRACK] - Publication: subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}');
+      print(
+        '🎥 [REMOTE TRACK] - Publication: subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}',
+      );
     }
-    
+
     final videoTrack = participant.videoTrackPublications
         .where((pub) => pub.subscribed)
         .map((pub) => pub.track)
         .whereType<RemoteVideoTrack>()
         .firstOrNull;
-    
+
     print('🎥 [REMOTE TRACK] Found remote video track: ${videoTrack != null}');
-    
+
     return videoTrack;
   }
 
@@ -1259,17 +1554,15 @@ class CallClassController extends GetxController {
     if (text.isEmpty) return;
 
     final now = DateTime.now();
-    final hour = now.hour == 0 ? 12 : now.hour > 12 ? now.hour - 12 : now.hour;
+    final hour = now.hour == 0
+        ? 12
+        : now.hour > 12
+        ? now.hour - 12
+        : now.hour;
     final timeString =
         '$hour:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
 
-    messages.add(
-      ChatMessage(
-        text: text,
-        isFromOP: true,
-        time: timeString,
-      ),
-    );
+    messages.add(ChatMessage(text: text, isFromOP: true, time: timeString));
 
     messageController.clear();
   }
@@ -1283,10 +1576,12 @@ class CallClassController extends GetxController {
   Future<void> endCall() async {
     // Prevent multiple simultaneous end calls
     if (isEndingCall.value) {
-      print('⚠️ [END CALL] Call ending already in progress, ignoring duplicate request');
+      print(
+        '⚠️ [END CALL] Call ending already in progress, ignoring duplicate request',
+      );
       return;
     }
-    
+
     final sessionId = currentSessionId.value;
     if (sessionId == null || sessionId.isEmpty) {
       await disconnectFromRoom();
@@ -1308,28 +1603,28 @@ class CallClassController extends GetxController {
       if (e is dio.DioException) {
         final statusCode = e.response?.statusCode;
         final responseData = e.response?.data;
-        
+
         if (statusCode == 400) {
           // Check if error message mentions PENDING status
           final errorMessage = responseData?.toString() ?? '';
-          if (errorMessage.contains('PENDING') || 
+          if (errorMessage.contains('PENDING') ||
               errorMessage.contains('not active') ||
               errorMessage.contains('Call session is not active')) {
             isPendingCallError = true;
           }
         }
       }
-      
+
       // Even if API call fails, disconnect from LiveKit and handle call ended
       // Don't clear loading state yet - wait for WebSocket or navigation
       await _handleCallEnded(shouldNavigate: true);
-      
+
       // Only show error if it's not a PENDING call error (which is expected)
       if (!isPendingCallError) {
         AppToasts.showError('Error ending call. Please try again.');
       }
       // For pending calls, just clean up silently
-      
+
       // If navigation happens immediately (no report), clear loading state
       // Otherwise it will be cleared when WebSocket receives callEnded event
       Future.delayed(const Duration(milliseconds: 1000), () {
@@ -1348,28 +1643,28 @@ class CallClassController extends GetxController {
         AppToasts.showError('Report ID not found');
         return;
       }
-      
+
       print('✅ [REPORT CONFIRM] Confirming report submission: $reportId');
-      
+
       // Fetch and show report in confirmation page
       await _fetchAndShowReport(reportId);
-      
+
       // End the call after showing confirmation page (without navigation since we're already showing confirmation page)
       await disconnectFromRoom();
       callStatus.value = 'ended';
-      
+
       // Clear call details
       callDetails.value = null;
       reportInfo.value = null;
       statementInfo.value = null;
-      
+
       currentSessionId.value = '';
       currentRoomName.value = '';
       currentWsUrl.value = '';
-      
+
       // Stop polling
       _stopCallDetailsPolling();
-      
+
       print('✅ [REPORT CONFIRM] Call ended and confirmation page shown');
     } catch (e, stackTrace) {
       print('❌ [REPORT CONFIRM] Error confirming report: $e');
@@ -1386,13 +1681,15 @@ class CallClassController extends GetxController {
         AppToasts.showError('Report ID not found');
         return;
       }
-      
+
       print('❌ [REPORT REJECT] Rejecting report submission: $reportId');
-      
+
       // TODO: Integrate API call to reject report
       // For now, just show a message and stay on the page
-      AppToasts.showWarning('Report rejection will be processed. API integration pending.');
-      
+      AppToasts.showWarning(
+        'Report rejection will be processed. API integration pending.',
+      );
+
       // Stay on the page - no navigation
     } catch (e, stackTrace) {
       print('❌ [REPORT REJECT] Error rejecting report: $e');
@@ -1403,7 +1700,7 @@ class CallClassController extends GetxController {
 
   // Removed draft polling - now using call details endpoint which includes report and statement
   // Old draft polling methods removed - data comes from call details every 10 seconds
-  
+
   // Removed: _startDraftPolling, _stopDraftPolling, _scheduleNextPoll, _pollDraft methods
   // These are no longer needed as we get report and statement data from call details endpoint
 
@@ -1413,7 +1710,7 @@ class CallClassController extends GetxController {
     if (!isAuthenticated) {
       return;
     }
-    
+
     // After confirming terms, request a call (Client role)
     // The system will automatically assign an employee
     await requestCall();
@@ -1452,7 +1749,8 @@ class CallClassController extends GetxController {
     if (key == 'backspace') {
       if (selection.start > 0) {
         final newText =
-            text.substring(0, selection.start - 1) + text.substring(selection.end);
+            text.substring(0, selection.start - 1) +
+            text.substring(selection.end);
         controller
           ..text = newText
           ..selection = TextSelection.collapsed(offset: selection.start - 1);
@@ -1465,13 +1763,15 @@ class CallClassController extends GetxController {
         ..selection = TextSelection.collapsed(offset: selection.start + 1);
     } else if (key == 'left') {
       if (selection.start > 0) {
-        controller.selection =
-            TextSelection.collapsed(offset: selection.start - 1);
+        controller.selection = TextSelection.collapsed(
+          offset: selection.start - 1,
+        );
       }
     } else if (key == 'right') {
       if (selection.end < text.length) {
-        controller.selection =
-            TextSelection.collapsed(offset: selection.end + 1);
+        controller.selection = TextSelection.collapsed(
+          offset: selection.end + 1,
+        );
       }
     } else if (key == 'enter') {
       final newText =
@@ -1483,10 +1783,14 @@ class CallClassController extends GetxController {
       // Future enhancement: switch keyboard layout
     } else {
       final newText =
-          text.substring(0, selection.start) + key + text.substring(selection.end);
+          text.substring(0, selection.start) +
+          key +
+          text.substring(selection.end);
       controller
         ..text = newText
-        ..selection = TextSelection.collapsed(offset: selection.start + key.length);
+        ..selection = TextSelection.collapsed(
+          offset: selection.start + key.length,
+        );
     }
 
     keyboardController
@@ -1503,11 +1807,11 @@ class CallClassController extends GetxController {
   Future<void> _checkAuthBeforeAccess() async {
     try {
       print('🔐 [AUTH CHECK] Starting authentication check...');
-      
+
       // First check if user is already authenticated
       final isAuthenticated = await AuthUtil().isFullyAuthenticated();
       print('🔐 [AUTH CHECK] isFullyAuthenticated: $isAuthenticated');
-      
+
       if (isAuthenticated) {
         // Check if token is not expired
         final token = await AuthUtil().getAccessToken();
@@ -1516,7 +1820,7 @@ class CallClassController extends GetxController {
           print('✅ [AUTH CHECK] Token is valid, connecting WebSocket...');
           // User is authenticated, connect WebSocket
           await _checkAuthAndConnectWebSocket();
-          
+
           // If auto-start is requested, automatically start the call
           if (autoStartCall.value) {
             print('📞 [AUTO START] Auto-starting call after authentication...');
@@ -1533,16 +1837,19 @@ class CallClassController extends GetxController {
           return;
         }
       }
-      
+
       // User is not authenticated or token is expired, perform anonymous login
-      print('🔐 [ANONYMOUS LOGIN] User not authenticated, performing anonymous login...');
+      print(
+        '🔐 [ANONYMOUS LOGIN] User not authenticated, performing anonymous login...',
+      );
       await _performAnonymousLogin();
-      
     } catch (e, stackTrace) {
       print('❌ [AUTH CHECK] Fatal error in _checkAuthBeforeAccess: $e');
       print('❌ [AUTH CHECK] Stack trace: $stackTrace');
       isAnonymousLoginLoading.value = false;
-      AppToasts.showError('Failed to initialize authentication: ${e.toString()}');
+      AppToasts.showError(
+        'Failed to initialize authentication: ${e.toString()}',
+      );
       rethrow;
     }
   }
@@ -1551,62 +1858,66 @@ class CallClassController extends GetxController {
   Future<void> _performAnonymousLogin() async {
     try {
       isAnonymousLoginLoading.value = true;
-      
+
       // Get device ID from utility (for now returns common static ID)
       final deviceId = await DeviceIdUtil.getDeviceId();
-      print('🔐 [ANONYMOUS LOGIN] Starting anonymous login with device ID: $deviceId');
-      
+      print(
+        '🔐 [ANONYMOUS LOGIN] Starting anonymous login with device ID: $deviceId',
+      );
+
       // Create Dio instance without access token (since we don't have one yet)
       final dio = DioUtil().getDio(useAccessToken: false);
       final authService = AuthService(dio);
-      
+
       // Call anonymous login API
-      final response = await authService.anonymousLogin({
-        'deviceId': deviceId,
-      });
-      
+      final response = await authService.anonymousLogin({'deviceId': deviceId});
+
       print('🔐 [ANONYMOUS LOGIN] API response received');
       print('  - success: ${response.success}');
-      print('  - accessToken: ${response.data?.accessToken != null ? "${response.data!.accessToken!.substring(0, 20)}..." : "null"}');
+      print(
+        '  - accessToken: ${response.data?.accessToken != null ? "${response.data!.accessToken!.substring(0, 20)}..." : "null"}',
+      );
       print('  - user: ${response.data?.user != null ? "exists" : "null"}');
-      
+
       if (response.success != true || response.data == null) {
         throw Exception('Anonymous login failed: Invalid response from server');
       }
-      
+
       final loginData = response.data!;
-      
+
       if (loginData.accessToken == null || loginData.accessToken!.isEmpty) {
         throw Exception('Anonymous login failed: Access token is missing');
       }
-      
+
       if (loginData.user == null) {
         throw Exception('Anonymous login failed: User data is missing');
       }
-      
+
       // Convert user to Map for storage
       final userMap = loginData.user!.toJson();
-      
+
       // Save tokens and user info
       print('💾 [ANONYMOUS LOGIN] Saving tokens and user data...');
       await AuthUtil().saveTokenAndUserInfo(
         accessToken: loginData.accessToken!,
-        refreshToken: loginData.refreshToken ?? '', // Anonymous login might not provide refresh token
+        refreshToken:
+            loginData.refreshToken ??
+            '', // Anonymous login might not provide refresh token
         user: userMap,
       );
-      
+
       // Verify token was saved
       final savedToken = await AuthUtil().getAccessToken();
       if (savedToken == null || savedToken != loginData.accessToken) {
         throw Exception('Failed to save authentication token');
       }
-      
+
       print('✅ [ANONYMOUS LOGIN] Anonymous login successful');
       print('✅ [ANONYMOUS LOGIN] Token saved, connecting WebSocket...');
-      
+
       // Connect WebSocket
       await _checkAuthAndConnectWebSocket();
-      
+
       // If auto-start is requested, automatically start the call
       if (autoStartCall.value) {
         print('📞 [AUTO START] Auto-starting call after anonymous login...');
@@ -1626,30 +1937,36 @@ class CallClassController extends GetxController {
       print('❌ [ANONYMOUS LOGIN] Response: ${e.response?.data}');
       print('❌ [ANONYMOUS LOGIN] Error: ${e.error}');
       print('❌ [ANONYMOUS LOGIN] Message: ${e.message}');
-      
+
       String errorMessage = 'Failed to authenticate. Please try again.';
-      
+
       // Detect network connectivity errors
       if (e.type == dio.DioExceptionType.connectionTimeout ||
           e.type == dio.DioExceptionType.receiveTimeout ||
           e.type == dio.DioExceptionType.sendTimeout) {
-        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection and try again.';
       } else if (e.type == dio.DioExceptionType.connectionError) {
         // Check for specific network unreachable errors
         final errorString = e.error?.toString().toLowerCase() ?? '';
         final messageString = e.message?.toLowerCase() ?? '';
-        
+
         if (errorString.contains('network is unreachable') ||
             errorString.contains('connection failed') ||
             errorString.contains('socketexception') ||
             messageString.contains('network is unreachable') ||
             messageString.contains('connection failed')) {
-          errorMessage = 'No internet connection. Please check your network settings and try again.';
-          print('⚠️ [ANONYMOUS LOGIN] Network connectivity issue detected - device cannot reach the server');
+          errorMessage =
+              'No internet connection. Please check your network settings and try again.';
+          print(
+            '⚠️ [ANONYMOUS LOGIN] Network connectivity issue detected - device cannot reach the server',
+          );
         } else {
-          errorMessage = 'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
+          errorMessage =
+              'Connection error. The server may be temporarily unavailable. Please try again in a moment.';
         }
-      } else if (e.response?.statusCode == 400 || e.response?.statusCode == 500) {
+      } else if (e.response?.statusCode == 400 ||
+          e.response?.statusCode == 500) {
         // Backend validation errors
         try {
           final responseData = e.response?.data;
@@ -1663,14 +1980,16 @@ class CallClassController extends GetxController {
           }
         } catch (_) {}
       }
-      
+
       // Show user-friendly error message
       AppToasts.showError(errorMessage);
       rethrow;
     } catch (e, stackTrace) {
       print('❌ [ANONYMOUS LOGIN] Exception: $e');
       print('❌ [ANONYMOUS LOGIN] Stack trace: $stackTrace');
-      AppToasts.showError('An unexpected error occurred during authentication. Please try again.');
+      AppToasts.showError(
+        'An unexpected error occurred during authentication. Please try again.',
+      );
       rethrow;
     } finally {
       isAnonymousLoginLoading.value = false;
@@ -1680,28 +1999,36 @@ class CallClassController extends GetxController {
   /// Check authentication and connect WebSocket if authenticated
   Future<void> _checkAuthAndConnectWebSocket() async {
     try {
-      print('🔌 [WEBSOCKET] Checking authentication for WebSocket connection...');
+      print(
+        '🔌 [WEBSOCKET] Checking authentication for WebSocket connection...',
+      );
       final isAuthenticated = await AuthUtil().isFullyAuthenticated();
       print('🔌 [WEBSOCKET] isAuthenticated: $isAuthenticated');
-      
+
       if (isAuthenticated) {
         // Also check if token is not expired
         final token = await AuthUtil().getAccessToken();
         print('🔌 [WEBSOCKET] Token exists: ${token != null}');
-        
+
         if (token != null && !JwtUtil.isTokenExpired(token)) {
           print('✅ [WEBSOCKET] Token valid, connecting WebSocket...');
           await _connectWebSocket();
         } else {
-          print('❌ [WEBSOCKET] Token expired or null, performing anonymous login...');
+          print(
+            '❌ [WEBSOCKET] Token expired or null, performing anonymous login...',
+          );
           if (token != null) {
-            print('🔌 [WEBSOCKET] Token expired: ${JwtUtil.isTokenExpired(token)}');
+            print(
+              '🔌 [WEBSOCKET] Token expired: ${JwtUtil.isTokenExpired(token)}',
+            );
           }
           // Perform anonymous login instead of showing login dialog
           await _performAnonymousLogin();
         }
       } else {
-        print('❌ [WEBSOCKET] User not authenticated, WebSocket connection skipped');
+        print(
+          '❌ [WEBSOCKET] User not authenticated, WebSocket connection skipped',
+        );
       }
     } catch (e, stackTrace) {
       print('❌ [WEBSOCKET] Error in _checkAuthAndConnectWebSocket: $e');
@@ -1717,20 +2044,28 @@ class CallClassController extends GetxController {
     try {
       _webSocketService = DirectCallWebSocketService();
       print('🔌 [WEBSOCKET] WebSocket service created');
-      
+
       // Set up event handlers
       _webSocketService!.onIncomingCall = (event) {
-        print('📞 [WEBSOCKET EVENT] incomingCall: sessionId=${event.sessionId}, roomName=${event.roomName}, callerId=${event.callerId}');
+        print(
+          '📞 [WEBSOCKET EVENT] incomingCall: sessionId=${event.sessionId}, roomName=${event.roomName}, callerId=${event.callerId}',
+        );
         incomingCall.value = event;
         // Optionally refresh pending calls
         _loadPendingCalls();
       };
-      
+
       _webSocketService!.onCallAccepted = (event) {
-        print('✅ [WEBSOCKET EVENT] callAccepted: sessionId=${event.sessionId}, roomName=${event.roomName}');
-        print('📊 [WEBSOCKET EVENT] Current sessionId: ${currentSessionId.value}');
+        print(
+          '✅ [WEBSOCKET EVENT] callAccepted: sessionId=${event.sessionId}, roomName=${event.roomName}',
+        );
+        print(
+          '📊 [WEBSOCKET EVENT] Current sessionId: ${currentSessionId.value}',
+        );
         if (event.sessionId == currentSessionId.value) {
-          print('✅ [WEBSOCKET EVENT] Session IDs match, updating call status to active');
+          print(
+            '✅ [WEBSOCKET EVENT] Session IDs match, updating call status to active',
+          );
           callStatus.value = 'active';
           connectionStatus.value = 'Connected';
           // Start polling for call details when call is accepted (this includes report and statement)
@@ -1738,21 +2073,27 @@ class CallClassController extends GetxController {
             _startCallDetailsPolling();
           }
         } else {
-          print('⚠️ [WEBSOCKET EVENT] Session IDs do not match! Event: ${event.sessionId}, Current: ${currentSessionId.value}');
+          print(
+            '⚠️ [WEBSOCKET EVENT] Session IDs do not match! Event: ${event.sessionId}, Current: ${currentSessionId.value}',
+          );
         }
       };
-      
+
       _webSocketService!.onCallRejected = (event) {
-        print('❌ [WEBSOCKET EVENT] callRejected: sessionId=${event.sessionId}, message=${event.message}');
+        print(
+          '❌ [WEBSOCKET EVENT] callRejected: sessionId=${event.sessionId}, message=${event.message}',
+        );
         if (event.sessionId == currentSessionId.value) {
           callStatus.value = 'ended';
           _handleCallEnded(shouldNavigate: false);
           AppToasts.showError(event.message ?? 'Call rejected');
         }
       };
-      
+
       _webSocketService!.onCallEnded = (event) {
-        print('🔚 [WEBSOCKET EVENT] callEnded: sessionId=${event.sessionId}, duration=${event.duration}, message=${event.message}');
+        print(
+          '🔚 [WEBSOCKET EVENT] callEnded: sessionId=${event.sessionId}, duration=${event.duration}, message=${event.message}',
+        );
         if (event.sessionId == currentSessionId.value) {
           callStatus.value = 'ended';
           // Clear ending call loading state when WebSocket confirms call ended
@@ -1763,17 +2104,19 @@ class CallClassController extends GetxController {
           _handleCallEnded(shouldNavigate: true);
         }
       };
-      
+
       _webSocketService!.onAttachmentUploadLink = (event) {
-        print('📎 [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_LINK: reportId=${event.reportId}, url=${event.url?.substring(0, 50)}...');
+        print(
+          '📎 [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_LINK: reportId=${event.reportId}, url=${event.url?.substring(0, 50)}...',
+        );
         print('📎 [WEBSOCKET EVENT] Description: ${event.description}');
         print('📎 [WEBSOCKET EVENT] Attachment Type: ${event.attachmentType}');
         print('📎 [WEBSOCKET EVENT] Expires At: ${event.expiresAt}');
-        
+
         // Show upload popup
         currentUploadRequest.value = event;
         isUploadDialogOpen.value = true;
-        
+
         // Show dialog
         final context = Get.context;
         if (context != null && !Get.isDialogOpen!) {
@@ -1787,73 +2130,93 @@ class CallClassController extends GetxController {
             // currentUploadRequest.value = null; // Uncomment if you want to clear on manual close
           });
         }
-        
+
         // Show toast notification
         if (context != null) {
-          AppToasts.showSuccess(event.description ?? 'Please upload the requested file');
+          AppToasts.showSuccess(
+            event.description ?? 'Please upload the requested file',
+          );
         }
       };
-      
+
       _webSocketService!.onAttachmentUploaded = (event) {
-        print('✅ [WEBSOCKET EVENT] ATTACHMENT_UPLOADED: reportId=${event.reportId}, fileName=${event.fileName}');
-        
+        print(
+          '✅ [WEBSOCKET EVENT] ATTACHMENT_UPLOADED: reportId=${event.reportId}, fileName=${event.fileName}',
+        );
+
         // Close upload popup safely
         _closeUploadDialogSafely();
         currentUploadRequest.value = null;
         isUploadDialogOpen.value = false;
-        
+
         // Show success message
         final context = Get.context;
         if (context != null) {
-          _showToastSafely(() => AppToasts.showSuccess('File uploaded successfully: ${event.fileName ?? "File"}'));
+          _showToastSafely(
+            () => AppToasts.showSuccess(
+              'File uploaded successfully: ${event.fileName ?? "File"}',
+            ),
+          );
         }
       };
-      
+
       _webSocketService!.onAttachmentUploadFailed = (event) {
-        print('❌ [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_FAILED: reportId=${event.reportId}, reason=${event.reason}');
-        
+        print(
+          '❌ [WEBSOCKET EVENT] ATTACHMENT_UPLOAD_FAILED: reportId=${event.reportId}, reason=${event.reason}',
+        );
+
         // Close upload popup safely
         _closeUploadDialogSafely();
         currentUploadRequest.value = null;
         isUploadDialogOpen.value = false;
-        
+
         // Show error message
         final context = Get.context;
         if (context != null) {
-          _showToastSafely(() => AppToasts.showError('Upload failed: ${event.reason ?? "Unknown error"}'));
+          _showToastSafely(
+            () => AppToasts.showError(
+              'Upload failed: ${event.reason ?? "Unknown error"}',
+            ),
+          );
         }
       };
-      
+
       _webSocketService!.onConnected = () {
         print('✅ [WEBSOCKET] Direct Call WebSocket connected successfully');
         print('🔌 [WEBSOCKET] Socket ID: ${_webSocketService?.socketId}');
       };
-      
+
       _webSocketService!.onDisconnected = () {
         print('❌ [WEBSOCKET] Direct Call WebSocket disconnected');
       };
-      
+
       _webSocketService!.onError = (error) {
         print('❌ [WEBSOCKET ERROR] Error: $error');
-        
+
         // Check if it's a network/internet error
         final errorString = error.toString().toLowerCase();
-        final isNetworkError = errorString.contains('socketexception') ||
+        final isNetworkError =
+            errorString.contains('socketexception') ||
             errorString.contains('failed host lookup') ||
             errorString.contains('no address associated') ||
             errorString.contains('network is unreachable') ||
             errorString.contains('connection failed');
-        
+
         if (isNetworkError && !connectivityUtil.isOnline.value) {
-          print('🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...');
+          print(
+            '🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...',
+          );
           // Wait for internet and retry connection
           _waitForInternetAndRetryWebSocket();
           return;
         }
-        
+
         // Don't show error toast for auth errors, perform anonymous login instead
-        if (errorString.contains('auth') || errorString.contains('unauthorized')) {
-          print('🔐 [WEBSOCKET ERROR] Auth error detected, performing anonymous login');
+        if (errorString.contains('auth') ||
+            errorString.contains('unauthorized')) {
+          print(
+            '🔐 [WEBSOCKET ERROR] Auth error detected, performing anonymous login',
+          );
           // Perform anonymous login
           _performAnonymousLogin().catchError((authError) {
             print('❌ [WEBSOCKET ERROR] Anonymous login failed: $authError');
@@ -1862,33 +2225,38 @@ class CallClassController extends GetxController {
         // Only show critical WebSocket errors that affect functionality
         // Non-critical errors are logged but not shown to user
       };
-      
+
       // Connect
       print('🔌 [WEBSOCKET] Calling connect()...');
       await _webSocketService!.connect();
-      print('🔌 [WEBSOCKET] connect() completed, isConnected: ${_webSocketService?.isConnected}');
+      print(
+        '🔌 [WEBSOCKET] connect() completed, isConnected: ${_webSocketService?.isConnected}',
+      );
     } catch (e, stackTrace) {
       print('❌ [WEBSOCKET ERROR] Exception connecting WebSocket: $e');
       print('❌ [WEBSOCKET ERROR] Stack trace: $stackTrace');
       final errorMessage = e.toString();
-      
+
       // Check if it's a network/internet error
       final errorString = errorMessage.toLowerCase();
-      final isNetworkError = errorString.contains('socketexception') ||
+      final isNetworkError =
+          errorString.contains('socketexception') ||
           errorString.contains('failed host lookup') ||
           errorString.contains('no address associated') ||
           errorString.contains('network is unreachable') ||
           errorString.contains('connection failed');
-      
+
       if (isNetworkError && !connectivityUtil.isOnline.value) {
-        print('🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...');
+        print(
+          '🌐 [WEBSOCKET ERROR] Network error detected, waiting for internet to come back...',
+        );
         // Wait for internet and retry connection
         await _waitForInternetAndRetryWebSocket();
         return;
       }
-      
+
       AppToasts.showError('WebSocket connection failed: $errorMessage');
-      if (errorString.contains('auth') || 
+      if (errorString.contains('auth') ||
           errorString.contains('token') ||
           errorString.contains('unauthorized')) {
         // Try anonymous login
@@ -1909,21 +2277,27 @@ class CallClassController extends GetxController {
       final internetRestored = await connectivityUtil.waitForInternet(
         timeout: const Duration(seconds: 60),
       );
-      
+
       if (internetRestored) {
-        print('✅ [WEBSOCKET RETRY] Internet restored, retrying WebSocket connection...');
+        print(
+          '✅ [WEBSOCKET RETRY] Internet restored, retrying WebSocket connection...',
+        );
         // Small delay to ensure connection is stable
         await Future.delayed(const Duration(seconds: 2));
         // Retry WebSocket connection
         await _connectWebSocket();
       } else {
         print('⏰ [WEBSOCKET RETRY] Timeout waiting for internet, giving up');
-        AppToasts.showError('No internet connection. Please check your network and try again.');
+        AppToasts.showError(
+          'No internet connection. Please check your network and try again.',
+        );
       }
     } catch (e, stackTrace) {
       print('❌ [WEBSOCKET RETRY] Error waiting for internet: $e');
       print('❌ [WEBSOCKET RETRY] Stack trace: $stackTrace');
-      AppToasts.showError('Failed to reconnect. Please check your internet connection.');
+      AppToasts.showError(
+        'Failed to reconnect. Please check your internet connection.',
+      );
     }
   }
 
@@ -1934,9 +2308,11 @@ class CallClassController extends GetxController {
       final internetRestored = await connectivityUtil.waitForInternet(
         timeout: const Duration(seconds: 60),
       );
-      
+
       if (internetRestored) {
-        print('✅ [REQUEST CALL RETRY] Internet restored, retrying call request...');
+        print(
+          '✅ [REQUEST CALL RETRY] Internet restored, retrying call request...',
+        );
         // Small delay to ensure connection is stable
         await Future.delayed(const Duration(seconds: 2));
         // Retry call request
@@ -1945,14 +2321,18 @@ class CallClassController extends GetxController {
         print('⏰ [REQUEST CALL RETRY] Timeout waiting for internet, giving up');
         callNetworkStatus.value = NetworkStatus.ERROR;
         callStatus.value = 'idle';
-        AppToasts.showError('No internet connection. Please check your network and try again.');
+        AppToasts.showError(
+          'No internet connection. Please check your network and try again.',
+        );
       }
     } catch (e, stackTrace) {
       print('❌ [REQUEST CALL RETRY] Error waiting for internet: $e');
       print('❌ [REQUEST CALL RETRY] Stack trace: $stackTrace');
       callNetworkStatus.value = NetworkStatus.ERROR;
       callStatus.value = 'idle';
-      AppToasts.showError('Failed to reconnect. Please check your internet connection.');
+      AppToasts.showError(
+        'Failed to reconnect. Please check your internet connection.',
+      );
     }
   }
 
@@ -1970,7 +2350,7 @@ class CallClassController extends GetxController {
         return false;
       }
     }
-    
+
     // Check if token is expired
     final token = await AuthUtil().getAccessToken();
     if (token == null || JwtUtil.isTokenExpired(token)) {
@@ -1983,7 +2363,7 @@ class CallClassController extends GetxController {
         return false;
       }
     }
-    
+
     return true;
   }
 
@@ -1994,14 +2374,14 @@ class CallClassController extends GetxController {
     if (!isAuthenticated) {
       return;
     }
-    
+
     try {
       final calls = await _directCallService.getPendingCalls();
       pendingCalls.assignAll(calls);
     } catch (e) {
       print('Error loading pending calls: $e');
       // If it's an auth error, perform anonymous login
-      if (e.toString().toLowerCase().contains('401') || 
+      if (e.toString().toLowerCase().contains('401') ||
           e.toString().toLowerCase().contains('unauthorized')) {
         try {
           await _performAnonymousLogin();
@@ -2071,7 +2451,7 @@ class CallClassController extends GetxController {
     print('🎥 [LIVEKIT] wsUrl: $wsUrl');
     print('🎥 [LIVEKIT] roomName: $roomName');
     print('🎥 [LIVEKIT] token: ${token.substring(0, 20)}...');
-    
+
     try {
       // Create room
       print('🎥 [LIVEKIT] Creating Room instance...');
@@ -2090,42 +2470,46 @@ class CallClassController extends GetxController {
       print('🎥 [LIVEKIT] Calling room.connect()...');
       connectionStatus.value = 'Connecting...';
       callStatus.value = 'connecting';
-      
+
       // Start connection timeout monitor
       _startConnectionTimeoutMonitor();
-      
+
       // Add connection timeout (30 seconds)
       // Configure audio capture options with enhanced noise cancellation
       // These settings improve audio quality by reducing background noise,
       // echo from speakers, and automatically adjusting microphone gain
-      await _room!.connect(
-        wsUrl,
-        token,
-        roomOptions: const RoomOptions(
-          adaptiveStream: true,
-          dynacast: true,
-          defaultAudioCaptureOptions: AudioCaptureOptions(
-            // Echo cancellation: Prevents microphone from picking up audio from speakers
-            // This eliminates echo/feedback in video calls
-            echoCancellation: true,
-            
-            // Noise suppression: Reduces background noise (traffic, music, voices, etc.)
-            // This improves audio clarity for other participants
-            noiseSuppression: true,
-            
-            // Auto gain control: Automatically adjusts microphone sensitivity
-            // This ensures consistent audio levels regardless of distance from mic
-            autoGainControl: true,
-          ),
-        ),
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          print('❌ [LIVEKIT] Connection timeout after 30 seconds');
-          throw TimeoutException('Connection timeout: Failed to connect to video call server within 30 seconds. Please check your internet connection and try again.');
-        },
-      );
-      
+      await _room!
+          .connect(
+            wsUrl,
+            token,
+            roomOptions: const RoomOptions(
+              adaptiveStream: true,
+              dynacast: true,
+              defaultAudioCaptureOptions: AudioCaptureOptions(
+                // Echo cancellation: Prevents microphone from picking up audio from speakers
+                // This eliminates echo/feedback in video calls
+                echoCancellation: true,
+
+                // Noise suppression: Reduces background noise (traffic, music, voices, etc.)
+                // This improves audio clarity for other participants
+                noiseSuppression: true,
+
+                // Auto gain control: Automatically adjusts microphone sensitivity
+                // This ensures consistent audio levels regardless of distance from mic
+                autoGainControl: true,
+              ),
+            ),
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              print('❌ [LIVEKIT] Connection timeout after 30 seconds');
+              throw TimeoutException(
+                'Connection timeout: Failed to connect to video call server within 30 seconds. Please check your internet connection and try again.',
+              );
+            },
+          );
+
       print('🎥 [LIVEKIT] room.connect() completed');
 
       // Wait a bit for connection state to stabilize
@@ -2133,28 +2517,38 @@ class CallClassController extends GetxController {
 
       // Check if connection actually succeeded
       if (_room!.connectionState != ConnectionState.connected) {
-        print('❌ [LIVEKIT] Connection state is not connected: ${_room!.connectionState}');
-        throw Exception('Connection failed: Room state is ${_room!.connectionState}');
+        print(
+          '❌ [LIVEKIT] Connection state is not connected: ${_room!.connectionState}',
+        );
+        throw Exception(
+          'Connection failed: Room state is ${_room!.connectionState}',
+        );
       }
 
       _localParticipant = _room!.localParticipant;
-      print('🎥 [LIVEKIT] Local participant: ${_localParticipant != null ? "exists" : "null"}');
-      
+      print(
+        '🎥 [LIVEKIT] Local participant: ${_localParticipant != null ? "exists" : "null"}',
+      );
+
       if (_localParticipant == null) {
         print('❌ [LIVEKIT] Local participant is null after connection');
         throw Exception('Connection failed: Local participant is null');
       }
-      
-      print('🎥 [LIVEKIT] Local participant identity: ${_localParticipant!.identity}');
+
+      print(
+        '🎥 [LIVEKIT] Local participant identity: ${_localParticipant!.identity}',
+      );
       print('🎥 [LIVEKIT] Local participant sid: ${_localParticipant!.sid}');
 
       isConnected.value = true;
       connectionStatus.value = 'Connected';
       callStatus.value = 'active';
-      
-      print('🎥 [LIVEKIT] Connection state updated - isConnected: ${isConnected.value}');
+
+      print(
+        '🎥 [LIVEKIT] Connection state updated - isConnected: ${isConnected.value}',
+      );
       print('🎥 [LIVEKIT] Room connection state: ${_room!.connectionState}');
-      
+
       // Start polling for call details when call becomes active (this includes report and statement)
       final sessionId = currentSessionId.value;
       if (sessionId != null && sessionId.isNotEmpty) {
@@ -2162,7 +2556,9 @@ class CallClassController extends GetxController {
       }
 
       // Enable camera and microphone (this stream is what admin/officer sees)
-      print('🎥 [LIVEKIT] Enabling video (kiosk: use second front camera if 2 front cameras)...');
+      print(
+        '🎥 [LIVEKIT] Enabling video (kiosk: use second front camera if 2 front cameras)...',
+      );
       try {
         await enableVideo();
         print('🎥 [LIVEKIT] Video enabled: ${isVideoEnabled.value}');
@@ -2170,7 +2566,7 @@ class CallClassController extends GetxController {
         print('⚠️ [LIVEKIT] Warning: Failed to enable video: $e');
         // Error toast already shown in enableVideo()
       }
-      
+
       print('🎥 [LIVEKIT] Enabling audio...');
       try {
         await enableAudio();
@@ -2183,12 +2579,16 @@ class CallClassController extends GetxController {
       // Get local video track
       print('🎥 [LIVEKIT] Updating local video track...');
       _updateLocalVideoTrack();
-      print('🎥 [LIVEKIT] Local video track: ${localVideoTrack.value != null ? "exists" : "null"}');
-      
+      print(
+        '🎥 [LIVEKIT] Local video track: ${localVideoTrack.value != null ? "exists" : "null"}',
+      );
+
       // Log room participants
-      print('🎥 [LIVEKIT] Remote participants count: ${_room!.remoteParticipants.length}');
+      print(
+        '🎥 [LIVEKIT] Remote participants count: ${_room!.remoteParticipants.length}',
+      );
       print('🎥 [LIVEKIT] ========== LiveKit Connection Complete ==========');
-      
+
       // Cancel timeout monitor since connection succeeded
       _connectionTimeoutTimer?.cancel();
       _connectionTimeoutTimer = null;
@@ -2200,7 +2600,9 @@ class CallClassController extends GetxController {
       isConnected.value = false;
       callStatus.value = 'idle';
       callNetworkStatus.value = NetworkStatus.ERROR;
-      AppToasts.showError('Failed to connect to video call server. This may be due to slow internet connection or server issues.');
+      AppToasts.showError(
+        'Failed to connect to video call server. This may be due to slow internet connection or server issues.',
+      );
       await _handleCallEnded(shouldNavigate: false);
     } catch (e, stackTrace) {
       print('❌ [LIVEKIT ERROR] Exception connecting to LiveKit: $e');
@@ -2208,19 +2610,25 @@ class CallClassController extends GetxController {
       connectionStatus.value = 'Connection failed';
       isConnected.value = false;
       callStatus.value = 'idle';
-      
+
       // Show user-friendly error message
       String errorMessage = 'Failed to connect to video call';
       if (e.toString().contains('timeout')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('network') || e.toString().contains('socket')) {
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
+      } else if (e.toString().contains('network') ||
+          e.toString().contains('socket')) {
         errorMessage = 'Network error. Please check your internet connection.';
-      } else if (e.toString().contains('permission') || e.toString().contains('camera') || e.toString().contains('microphone')) {
-        errorMessage = 'Camera or microphone permission error. Please grant permissions and try again.';
-      } else if (e.toString().contains('token') || e.toString().contains('auth')) {
+      } else if (e.toString().contains('permission') ||
+          e.toString().contains('camera') ||
+          e.toString().contains('microphone')) {
+        errorMessage =
+            'Camera or microphone permission error. Please grant permissions and try again.';
+      } else if (e.toString().contains('token') ||
+          e.toString().contains('auth')) {
         errorMessage = 'Authentication error. Please try logging in again.';
       }
-      
+
       AppToasts.showError(errorMessage);
       _connectionTimeoutTimer?.cancel();
       _connectionTimeoutTimer = null;
@@ -2232,13 +2640,18 @@ class CallClassController extends GetxController {
   /// This will show an error if connection is stuck in "connecting" state for too long
   void _startConnectionTimeoutMonitor() {
     _connectionTimeoutTimer?.cancel();
-    
+
     _connectionTimeoutTimer = Timer(const Duration(seconds: 35), () {
       // Check if still connecting after timeout
-      if (callStatus.value == 'connecting' && 
-          (connectionStatus.value == 'Connecting...' || connectionStatus.value == 'Reconnecting...')) {
-        print('❌ [CONNECTION TIMEOUT] Connection stuck in connecting state for 35 seconds');
-        AppToasts.showError('Connection is taking too long. Please check your internet and try again.');
+      if (callStatus.value == 'connecting' &&
+          (connectionStatus.value == 'Connecting...' ||
+              connectionStatus.value == 'Reconnecting...')) {
+        print(
+          '❌ [CONNECTION TIMEOUT] Connection stuck in connecting state for 35 seconds',
+        );
+        AppToasts.showError(
+          'Connection is taking too long. Please check your internet and try again.',
+        );
         callNetworkStatus.value = NetworkStatus.ERROR;
         callStatus.value = 'idle';
         connectionStatus.value = 'Connection timeout';
@@ -2253,34 +2666,36 @@ class CallClassController extends GetxController {
   Future<void> _enumerateCameras() async {
     try {
       print('📷 [CAMERA] Enumerating available cameras...');
-      
+
       // Test which camera positions are available
       final positions = <CameraPosition>[];
-      
+
       // Add front camera (may have multiple front cameras on some devices)
       positions.add(CameraPosition.front);
-      
+
       // Try to add back camera if available
       // Note: On devices with only front cameras, back might not be available
       // but we'll add it anyway and handle errors gracefully
       positions.add(CameraPosition.back);
-      
+
       // For devices with multiple front cameras (like smart police station machines),
       // we'll add front position again to allow cycling through front cameras
       // The actual device switching will be handled in switchCamera()
       positions.add(CameraPosition.front); // Second front camera option
-      
+
       availableCameraPositions.assignAll(positions);
       hasMultipleCameras.value = positions.length > 1;
       currentCameraIndex.value = 0;
-      
+
       print('📷 [CAMERA] Available camera positions: ${positions.length}');
       for (var i = 0; i < positions.length; i++) {
         print('📷 [CAMERA] Position $i: ${positions[i]}');
       }
-      
+
       if (hasMultipleCameras.value) {
-        print('📷 [CAMERA] Multiple cameras detected, camera switching enabled');
+        print(
+          '📷 [CAMERA] Multiple cameras detected, camera switching enabled',
+        );
       }
     } catch (e, stackTrace) {
       print('❌ [CAMERA ERROR] Error enumerating cameras: $e');
@@ -2295,16 +2710,17 @@ class CallClassController extends GetxController {
   Future<void> _enumerateMediaDevices() async {
     try {
       print('🎬 [MEDIA DEVICES] Enumerating media devices...');
-      
+
       // Get all media devices using LiveKit's Hardware class
       final devices = await Hardware.instance.enumerateDevices();
-      
+
       print('🎬 [MEDIA DEVICES] Total devices found: ${devices.length}');
-      
+
       // Filter cameras
       final cameras = devices.where((d) => d.kind == 'videoinput').toList();
       availableCameras.assignAll(cameras);
-      
+      hasMultipleCameras.value = cameras.length > 1;
+
       print('📷 [MEDIA DEVICES] Cameras found: ${cameras.length}');
       for (var i = 0; i < cameras.length; i++) {
         print('📷 [MEDIA DEVICES] Camera $i:');
@@ -2312,11 +2728,11 @@ class CallClassController extends GetxController {
         print('   - Label: ${cameras[i].label}');
         print('   - Kind: ${cameras[i].kind}');
       }
-      
+
       // Filter microphones
       final microphones = devices.where((d) => d.kind == 'audioinput').toList();
       availableMicrophones.assignAll(microphones);
-      
+
       print('🎤 [MEDIA DEVICES] Microphones found: ${microphones.length}');
       for (var i = 0; i < microphones.length; i++) {
         print('🎤 [MEDIA DEVICES] Microphone $i:');
@@ -2324,7 +2740,7 @@ class CallClassController extends GetxController {
         print('   - Label: ${microphones[i].label}');
         print('   - Kind: ${microphones[i].kind}');
       }
-      
+
       // Try to detect current camera device ID
       if (_localParticipant != null) {
         final videoTrack = _localParticipant!.videoTrackPublications
@@ -2332,42 +2748,47 @@ class CallClassController extends GetxController {
             .map((pub) => pub.track)
             .whereType<LocalVideoTrack>()
             .firstOrNull;
-        
+
         if (videoTrack != null) {
           // Get device ID from track settings
           final settings = videoTrack.mediaStreamTrack.getSettings();
           final deviceId = settings['deviceId'];
           final facingMode = settings['facingMode'];
-          
+
           print('📷 [MEDIA DEVICES] Track settings:');
           print('   - deviceId: $deviceId');
           print('   - facingMode: $facingMode');
-          
+
           if (deviceId != null) {
             currentCameraDeviceId.value = deviceId.toString();
-            print('📷 [MEDIA DEVICES] Current camera device ID (from track): ${currentCameraDeviceId.value}');
+            print(
+              '📷 [MEDIA DEVICES] Current camera device ID (from track): ${currentCameraDeviceId.value}',
+            );
           }
-          
+
           // Try to match by label if device IDs don't match
           // Look for camera with matching facing mode or position
           if (facingMode != null && cameras.isNotEmpty) {
-            final isFrontCamera = facingMode.toString().toLowerCase().contains('user') || 
-                                   facingMode.toString().toLowerCase().contains('front');
+            final isFrontCamera =
+                facingMode.toString().toLowerCase().contains('user') ||
+                facingMode.toString().toLowerCase().contains('front');
             final matchingCamera = cameras.firstWhere(
-              (cam) => isFrontCamera 
+              (cam) => isFrontCamera
                   ? cam.label.toLowerCase().contains('front')
                   : cam.label.toLowerCase().contains('back'),
               orElse: () => cameras.first,
             );
-            
+
             if (matchingCamera.deviceId != currentCameraDeviceId.value) {
-              print('📷 [MEDIA DEVICES] Using label-based match: ${matchingCamera.deviceId} (${matchingCamera.label})');
+              print(
+                '📷 [MEDIA DEVICES] Using label-based match: ${matchingCamera.deviceId} (${matchingCamera.label})',
+              );
               currentCameraDeviceId.value = matchingCamera.deviceId;
             }
           }
         }
       }
-      
+
       print('✅ [MEDIA DEVICES] Media device enumeration complete');
     } catch (e, stackTrace) {
       print('❌ [MEDIA DEVICES ERROR] Error enumerating media devices: $e');
@@ -2375,38 +2796,20 @@ class CallClassController extends GetxController {
     }
   }
 
-  /// Update local video track
+  /// Update local video track (local participant: use source == camera, not subscribed)
   void _updateLocalVideoTrack() {
     if (_localParticipant == null) {
-      print('⚠️ [LOCAL TRACK] Local participant is null');
       localVideoTrack.value = null;
       return;
     }
-    
-    print('🎥 [LOCAL TRACK] Updating local video track...');
-    print('🎥 [LOCAL TRACK] Video track publications: ${_localParticipant!.videoTrackPublications.length}');
-    
-    for (var pub in _localParticipant!.videoTrackPublications) {
-      print('🎥 [LOCAL TRACK] - Publication: sid=${pub.sid}, source=${pub.source}, subscribed=${pub.subscribed}, muted=${pub.muted}, track=${pub.track != null}');
-      if (pub.track != null) {
-        final track = pub.track;
-        if (track is LocalVideoTrack) {
-          print('🎥 [LOCAL TRACK]   - Track details: sid=${track.sid}, muted=${track.muted}');
-        }
-      }
-    }
-    
+
+    // For local participant, get camera track by source (subscribed is for remote)
     final videoTrack = _localParticipant!.videoTrackPublications
-        .where((pub) => pub.subscribed)
+        .where((pub) => pub.source == TrackSource.camera && pub.track != null)
         .map((pub) => pub.track)
         .whereType<LocalVideoTrack>()
         .firstOrNull;
-    
-    print('🎥 [LOCAL TRACK] Found local video track: ${videoTrack != null}');
-    if (videoTrack != null) {
-      print('🎥 [LOCAL TRACK] Video track muted: ${videoTrack.muted}');
-    }
-    
+
     localVideoTrack.value = videoTrack;
   }
 
@@ -2417,10 +2820,12 @@ class CallClassController extends GetxController {
       return;
     }
 
-    print('🔄 [ROOM EVENT] Room changed - ConnectionState: ${_room!.connectionState}');
-    
+    print(
+      '🔄 [ROOM EVENT] Room changed - ConnectionState: ${_room!.connectionState}',
+    );
+
     final previousState = connectionStatus.value;
-    
+
     // Update connection status
     if (_room!.connectionState == ConnectionState.connected) {
       print('✅ [ROOM EVENT] Room connected');
@@ -2433,14 +2838,19 @@ class CallClassController extends GetxController {
       _remoteVideoTrackSyncTimer?.cancel();
       _remoteVideoTrackSyncTimer = Timer(const Duration(milliseconds: 500), () {
         _remoteVideoTrackSyncTimer = null;
-        if (_room != null && _room!.connectionState == ConnectionState.connected) {
+        if (_room != null &&
+            _room!.connectionState == ConnectionState.connected) {
           _onRemoteParticipantsChanged();
-          print('🎥 [REMOTE TRACK] Delayed sync after connect (admin black screen fix)');
+          print(
+            '🎥 [REMOTE TRACK] Delayed sync after connect (admin black screen fix)',
+          );
         }
       });
       // Start polling for call details if we have a session ID
       final sessionId = currentSessionId.value;
-      if (sessionId != null && sessionId.isNotEmpty && callDetails.value == null) {
+      if (sessionId != null &&
+          sessionId.isNotEmpty &&
+          callDetails.value == null) {
         _startCallDetailsPolling();
       }
     } else if (_room!.connectionState == ConnectionState.disconnected) {
@@ -2453,7 +2863,9 @@ class CallClassController extends GetxController {
         try {
           AppToasts.showError('Connection lost. Please try again.');
         } catch (e) {
-          print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
+          print(
+            '⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e',
+          );
         }
         callStatus.value = 'idle';
         _handleCallEnded(shouldNavigate: false);
@@ -2468,21 +2880,30 @@ class CallClassController extends GetxController {
     }
 
     // Check for connection errors
-    if (_room!.connectionState == ConnectionState.disconnected && 
-        (previousState == 'Connecting...' || previousState == 'Reconnecting...')) {
+    if (_room!.connectionState == ConnectionState.disconnected &&
+        (previousState == 'Connecting...' ||
+            previousState == 'Reconnecting...')) {
       print('❌ [ROOM EVENT] Connection failed during connect/reconnect');
       // Only show toast if we have a valid context (avoid overlay errors)
       try {
-        AppToasts.showError('Failed to connect. Please check your internet and try again.');
+        AppToasts.showError(
+          'Failed to connect. Please check your internet and try again.',
+        );
       } catch (e) {
-        print('⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e');
+        print(
+          '⚠️ [ROOM EVENT] Could not show toast (overlay not available): $e',
+        );
       }
       callStatus.value = 'idle';
       callNetworkStatus.value = NetworkStatus.ERROR;
     }
 
-    print('🔄 [ROOM EVENT] Remote participants: ${_room!.remoteParticipants.length}');
-    print('🔄 [ROOM EVENT] Local participant: ${_room!.localParticipant != null ? "exists" : "null"}');
+    print(
+      '🔄 [ROOM EVENT] Remote participants: ${_room!.remoteParticipants.length}',
+    );
+    print(
+      '🔄 [ROOM EVENT] Local participant: ${_room!.localParticipant != null ? "exists" : "null"}',
+    );
 
     // Update local video track
     _updateLocalVideoTrack();
@@ -2511,21 +2932,30 @@ class CallClassController extends GetxController {
       return;
     }
     // Track is null but we may have a subscribed video publication (SDK sets track async on Android)
-    final hasSubscribedVideo = remoteParticipants.any((p) => p.videoTrackPublications.any((pub) => pub.subscribed));
+    final hasSubscribedVideo = remoteParticipants.any(
+      (p) => p.videoTrackPublications.any((pub) => pub.subscribed),
+    );
     if (hasSubscribedVideo && _remoteVideoTrackRetryTimer == null) {
       _remoteVideoTrackRetryCount = 0;
-      _remoteVideoTrackRetryTimer = Timer.periodic(_remoteVideoTrackRetryInterval, (_) {
-        _remoteVideoTrackRetryCount++;
-        if (_remoteVideoTrackRetryCount > _remoteVideoTrackRetryMax) {
-          _remoteVideoTrackRetryTimer?.cancel();
-          _remoteVideoTrackRetryTimer = null;
-          _remoteVideoTrackRetryCount = 0;
-          print('🎥 [REMOTE TRACK] Retry timeout waiting for remote video track');
-          return;
-        }
-        _updateRemoteVideoTrack();
-      });
-      print('🎥 [REMOTE TRACK] Started retry polling for remote video track (LiveKit #919 workaround)');
+      _remoteVideoTrackRetryTimer = Timer.periodic(
+        _remoteVideoTrackRetryInterval,
+        (_) {
+          _remoteVideoTrackRetryCount++;
+          if (_remoteVideoTrackRetryCount > _remoteVideoTrackRetryMax) {
+            _remoteVideoTrackRetryTimer?.cancel();
+            _remoteVideoTrackRetryTimer = null;
+            _remoteVideoTrackRetryCount = 0;
+            print(
+              '🎥 [REMOTE TRACK] Retry timeout waiting for remote video track',
+            );
+            return;
+          }
+          _updateRemoteVideoTrack();
+        },
+      );
+      print(
+        '🎥 [REMOTE TRACK] Started retry polling for remote video track (LiveKit #919 workaround)',
+      );
     }
   }
 
@@ -2535,10 +2965,12 @@ class CallClassController extends GetxController {
       print('⚠️ [PARTICIPANTS] Room is null');
       return;
     }
-    
+
     final participants = _room!.remoteParticipants.values.toList();
-    print('👥 [PARTICIPANTS] Remote participants changed: ${participants.length}');
-    
+    print(
+      '👥 [PARTICIPANTS] Remote participants changed: ${participants.length}',
+    );
+
     // Remove listeners from participants no longer in the room
     for (var entry in _remoteParticipantListeners.entries.toList()) {
       if (!participants.contains(entry.key)) {
@@ -2548,29 +2980,40 @@ class CallClassController extends GetxController {
         _remoteParticipantListeners.remove(entry.key);
       }
     }
-    
+
     for (var participant in participants) {
-      print('👥 [PARTICIPANTS] - Identity: ${participant.identity}, SID: ${participant.sid}');
-      print('👥 [PARTICIPANTS] - Video tracks: ${participant.videoTrackPublications.length}');
-      print('👥 [PARTICIPANTS] - Audio tracks: ${participant.audioTrackPublications.length}');
-      
+      print(
+        '👥 [PARTICIPANTS] - Identity: ${participant.identity}, SID: ${participant.sid}',
+      );
+      print(
+        '👥 [PARTICIPANTS] - Video tracks: ${participant.videoTrackPublications.length}',
+      );
+      print(
+        '👥 [PARTICIPANTS] - Audio tracks: ${participant.audioTrackPublications.length}',
+      );
+
       for (var videoPub in participant.videoTrackPublications) {
-        print('👥 [PARTICIPANTS]   Video track: subscribed=${videoPub.subscribed}, muted=${videoPub.muted}, track=${videoPub.track != null}');
+        print(
+          '👥 [PARTICIPANTS]   Video track: subscribed=${videoPub.subscribed}, muted=${videoPub.muted}, track=${videoPub.track != null}',
+        );
       }
-      
+
       // Listen to participant so we update when track gets subscribed (fixes admin black screen)
       if (!_remoteParticipantListeners.containsKey(participant)) {
         void onParticipantChanged() {
           _updateRemoteVideoTrack();
         }
+
         participant.addListener(onParticipantChanged);
         _remoteParticipantListeners[participant] = onParticipantChanged;
       }
     }
-    
+
     remoteParticipants.assignAll(participants);
     _updateRemoteVideoTrack();
-    print('👥 [PARTICIPANTS] Updated remoteParticipants list: ${remoteParticipants.length}');
+    print(
+      '👥 [PARTICIPANTS] Updated remoteParticipants list: ${remoteParticipants.length}',
+    );
   }
 
   /// Get preferred language from LanguageController if available
@@ -2580,11 +3023,15 @@ class CallClassController extends GetxController {
       if (Get.isRegistered<LanguageController>()) {
         final languageController = Get.find<LanguageController>();
         final selectedIndex = languageController.selectedLanguageIndex.value;
-        
+
         // Check if a language was actually selected (index >= 0)
-        if (selectedIndex >= 0 && selectedIndex < LanguageView.allLanguages.length) {
-          final languageName = LanguageView.allLanguages[selectedIndex]['name'] as String;
-          print('🌐 [LANGUAGE] Found selected language: $languageName (index: $selectedIndex)');
+        if (selectedIndex >= 0 &&
+            selectedIndex < LanguageView.allLanguages.length) {
+          final languageName =
+              LanguageView.allLanguages[selectedIndex]['name'] as String;
+          print(
+            '🌐 [LANGUAGE] Found selected language: $languageName (index: $selectedIndex)',
+          );
           return languageName;
         } else {
           print('🌐 [LANGUAGE] No language selected (index: $selectedIndex)');
@@ -2606,44 +3053,48 @@ class CallClassController extends GetxController {
       print('⚠️ [CALL DETAILS] Cannot load call details: sessionId is empty');
       return;
     }
-    
+
     // Prevent overlapping requests
     if (_isLoadingCallDetails) {
       print('⏳ [CALL DETAILS] Request already in progress, skipping...');
       return;
     }
-    
+
     _isLoadingCallDetails = true;
-    
+
     try {
       print('📋 [CALL DETAILS] Loading call details for session: $sessionId');
-      
+
       // Add timestamp for cache-busting to ensure fresh data in release mode
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final response = await _directCallService.getCallDetails(sessionId, timestamp);
-      
+      final response = await _directCallService.getCallDetails(
+        sessionId,
+        timestamp,
+      );
+
       if (response.success == true && response.data != null) {
         callDetails.value = response.data;
         print('✅ [CALL DETAILS] Call details loaded successfully');
         print('  - Caller: ${response.data!.caller?.name ?? "Unknown"}');
         print('  - Receiver: ${response.data!.receiver?.name ?? "Unknown"}');
         print('  - Status: ${response.data!.status}');
-        
+
         // Extract report and statement info
         final newReport = response.data!.report;
         final newStatement = response.data!.statement;
-        
+
         // Check if statement text changed to detect updates
         bool statementChanged = false;
         bool reportChanged = false;
-        
+
         if (newStatement != null && statementInfo.value != null) {
           final oldStatementText = statementInfo.value!.statement ?? '';
           final newStatementText = newStatement.statement ?? '';
           final oldStatementId = statementInfo.value!.id ?? '';
           final newStatementId = newStatement.id ?? '';
-          
-          if (oldStatementText != newStatementText || oldStatementId != newStatementId) {
+
+          if (oldStatementText != newStatementText ||
+              oldStatementId != newStatementId) {
             statementChanged = true;
             print('🔄 [CALL DETAILS] Statement changed detected');
             print('  - Old length: ${oldStatementText.length}');
@@ -2660,7 +3111,7 @@ class CallClassController extends GetxController {
           statementChanged = true;
           print('🔄 [CALL DETAILS] Statement appeared for the first time');
         }
-        
+
         if (newReport != null && reportInfo.value != null) {
           final oldReportId = reportInfo.value!.id ?? '';
           final newReportId = newReport.id ?? '';
@@ -2672,13 +3123,13 @@ class CallClassController extends GetxController {
           reportChanged = true;
           print('🔄 [CALL DETAILS] Report appeared for the first time');
         }
-        
+
         // Always update values - create new references to ensure GetX detects changes
         // This is important in release mode where object references might be optimized
         final oldReportSubmitted = reportInfo.value?.submitted ?? false;
         reportInfo.value = newReport;
         statementInfo.value = newStatement;
-        
+
         // Force refresh to ensure UI updates immediately
         // Use update() method which is more reliable in release mode
         if (statementChanged || newStatement != null) {
@@ -2687,33 +3138,39 @@ class CallClassController extends GetxController {
           statementInfo.value = newStatement; // Re-assign to trigger change
           print('🔄 [CALL DETAILS] Forced statementInfo refresh and update');
         }
-        
+
         if (reportChanged || newReport != null) {
           reportInfo.refresh();
           reportInfo.value = newReport; // Re-assign to trigger change
-          
+
           // Auto-confirm when report is submitted (only if coming from Fayda verification)
           final newReportSubmitted = newReport?.submitted ?? false;
-          if (!oldReportSubmitted && newReportSubmitted && faydaTransactionID.value.isNotEmpty) {
-            print('✅ [AUTO CONFIRM] Report submitted, auto-confirming for Fayda user...');
+          if (!oldReportSubmitted &&
+              newReportSubmitted &&
+              faydaTransactionID.value.isNotEmpty) {
+            print(
+              '✅ [AUTO CONFIRM] Report submitted, auto-confirming for Fayda user...',
+            );
             // Auto-confirm after a short delay to allow UI to update
             Future.delayed(const Duration(milliseconds: 1000), () {
               confirmReportSubmission();
             });
           }
         }
-        
+
         if (newReport != null) {
-          print('✅ [CALL DETAILS] Report found: ${newReport.caseNumber ?? "No case number"}');
+          print(
+            '✅ [CALL DETAILS] Report found: ${newReport.caseNumber ?? "No case number"}',
+          );
           print('  - Report Type: ${newReport.reportType?.name ?? "Unknown"}');
         }
-        
+
         if (newStatement != null) {
           print('✅ [CALL DETAILS] Statement found: ${newStatement.id}');
           print('  - Person: ${newStatement.person?.fullName ?? "Unknown"}');
           print('  - Statement length: ${newStatement.statement?.length ?? 0}');
         }
-        
+
         // Update ID Information from call details
         _updateIdInformationFromCallDetails(response.data!);
       } else {
@@ -2722,20 +3179,23 @@ class CallClassController extends GetxController {
     } catch (e, stackTrace) {
       print('❌ [CALL DETAILS] Error loading call details: $e');
       print('❌ [CALL DETAILS] Stack trace: $stackTrace');
-      
+
       // Check if it's a network/internet error
       final errorString = e.toString().toLowerCase();
-      final isNetworkError = errorString.contains('socketexception') ||
+      final isNetworkError =
+          errorString.contains('socketexception') ||
           errorString.contains('failed host lookup') ||
           errorString.contains('no address associated') ||
           errorString.contains('network is unreachable') ||
           errorString.contains('connection failed') ||
-          (e is dio.DioException && 
-           (e.type == dio.DioExceptionType.connectionError ||
-            e.type == dio.DioExceptionType.connectionTimeout));
-      
+          (e is dio.DioException &&
+              (e.type == dio.DioExceptionType.connectionError ||
+                  e.type == dio.DioExceptionType.connectionTimeout));
+
       if (isNetworkError && !connectivityUtil.isOnline.value) {
-        print('🌐 [CALL DETAILS] Network error detected, will retry when internet comes back');
+        print(
+          '🌐 [CALL DETAILS] Network error detected, will retry when internet comes back',
+        );
         // Don't retry immediately - the polling will retry automatically when internet comes back
         // The connectivity listener will trigger a retry
       }
@@ -2749,18 +3209,22 @@ class CallClassController extends GetxController {
   void _startCallDetailsPolling() {
     final sessionId = currentSessionId.value;
     if (sessionId == null || sessionId.isEmpty) {
-      print('⚠️ [CALL DETAILS POLLING] Cannot start polling: sessionId is empty');
+      print(
+        '⚠️ [CALL DETAILS POLLING] Cannot start polling: sessionId is empty',
+      );
       return;
     }
-    
+
     // Stop any existing polling
     _stopCallDetailsPolling();
-    
-    print('📋 [CALL DETAILS POLLING] Starting call details polling for session: $sessionId');
-    
+
+    print(
+      '📋 [CALL DETAILS POLLING] Starting call details polling for session: $sessionId',
+    );
+
     // Load immediately first time
     _loadCallDetails(sessionId);
-    
+
     // Schedule periodic polling every 10 seconds
     _callDetailsPollingTimer = Timer.periodic(
       const Duration(seconds: _callDetailsPollInterval),
@@ -2770,13 +3234,13 @@ class CallClassController extends GetxController {
           _stopCallDetailsPolling();
           return;
         }
-        
+
         // Stop polling if call is not active
         if (callStatus.value != 'active' && callStatus.value != 'connecting') {
           _stopCallDetailsPolling();
           return;
         }
-        
+
         // Poll for call details
         _loadCallDetails(currentSessionId);
       },
@@ -2795,56 +3259,59 @@ class CallClassController extends GetxController {
   /// Update ID Information from call details
   void _updateIdInformationFromCallDetails(CallDetailsResponse details) {
     final infoRows = <InfoRow>[];
-    
+
     // Determine which user info to show (caller or receiver)
     // For USER role, show receiver (employee/officer) info
     // For EMPLOYEE role, show caller (user) info
     final userInfo = details.receiver ?? details.caller;
-    
+
     // Only add officer name
     if (userInfo != null) {
       if (userInfo.name != null && userInfo.name!.isNotEmpty) {
         infoRows.add(InfoRow('Officer Name', userInfo.name!));
       }
     }
-    
+
     // Add call status
     if (details.status != null) {
       infoRows.add(InfoRow('Call Status', details.status!));
     }
-    
+
     // Add call date
     if (details.createdAt != null) {
-      final dateStr = '${details.createdAt!.day}/${details.createdAt!.month}/${details.createdAt!.year}';
+      final dateStr =
+          '${details.createdAt!.day}/${details.createdAt!.month}/${details.createdAt!.year}';
       infoRows.add(InfoRow('Call Date', dateStr));
     }
-    
+
     idInformation.assignAll(infoRows);
-    print('✅ [CALL DETAILS] Updated ID Information with ${infoRows.length} rows');
+    print(
+      '✅ [CALL DETAILS] Updated ID Information with ${infoRows.length} rows',
+    );
   }
 
   /// Handle call ended (cleanup)
   Future<void> _handleCallEnded({bool shouldNavigate = true}) async {
     // Stop polling when call ends
     _stopCallDetailsPolling();
-    
+
     // Save report ID before clearing call details
     final reportId = reportInfo.value?.id;
     print('📋 [CALL ENDED] Report ID: ${reportId ?? "null"}');
-    
+
     await disconnectFromRoom();
     callStatus.value = 'ended';
-    
+
     // Clear call details (but keep reportId for fetching)
     final savedReportId = reportId;
     callDetails.value = null;
     reportInfo.value = null;
     statementInfo.value = null;
-    
+
     currentSessionId.value = '';
     currentRoomName.value = '';
     currentWsUrl.value = '';
-    
+
     // If there's a report ID and we should navigate, fetch and show report
     if (shouldNavigate && savedReportId != null && savedReportId.isNotEmpty) {
       try {
@@ -2879,18 +3346,18 @@ class CallClassController extends GetxController {
       print('📋 [REPORT FETCH] Fetching report from admin API...');
       // Use Dio directly for admin API since it has a different base URL
       final dio = DioUtil().getDio(useAccessToken: true);
-    
+
       final response = await dio.get('${Constants.baseUrl}/reports/$reportId');
-      
+
       if (response.statusCode == 200 && response.data != null) {
         final responseData = response.data is Map
             ? Map<String, dynamic>.from(response.data as Map)
             : <String, dynamic>{};
         print('✅ [REPORT FETCH] Report fetched successfully');
-        
+
         // Parse response using model
         final reportWrapper = ReportResponseWrapper.fromJson(responseData);
-        
+
         if (reportWrapper.data == null) {
           print('⚠️ [REPORT FETCH] Report data is null');
           Future.delayed(const Duration(milliseconds: 500), () {
@@ -2898,16 +3365,18 @@ class CallClassController extends GetxController {
           });
           return;
         }
-        
+
         final reportData = reportWrapper.data!;
         print('📋 [REPORT FETCH] Report ID: ${reportData.id}');
         print('📋 [REPORT FETCH] Case Number: ${reportData.caseNumber}');
         print('📋 [REPORT FETCH] Report Type: ${reportData.reportType?.name}');
-        print('📋 [REPORT FETCH] Statements count: ${reportData.statements?.length ?? 0}');
-      
+        print(
+          '📋 [REPORT FETCH] Statements count: ${reportData.statements?.length ?? 0}',
+        );
+
         // Convert report data to formData format for ConfirmationPageView
         final formData = _convertReportToFormData(reportData);
-        
+
         // Navigate directly to confirmation page view
         print('📋 [REPORT FETCH] Navigating to confirmation page view');
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -2933,10 +3402,10 @@ class CallClassController extends GetxController {
   /// Only extracts necessary fields for the confirmation page
   Map<String, String> _convertReportToFormData(ReportData reportData) {
     final formData = <String, String>{};
-    
+
     try {
       print('📋 [REPORT CONVERT] Converting report data...');
-      
+
       // Extract ID - use caseNumber if available, otherwise use id
       if (reportData.caseNumber != null && reportData.caseNumber!.isNotEmpty) {
         formData['id'] = reportData.caseNumber!;
@@ -2944,111 +3413,126 @@ class CallClassController extends GetxController {
       } else if (reportData.id != null) {
         formData['id'] = reportData.id!;
       }
-      
+
       // Extract Category - use reportType.code
-      if (reportData.reportType?.code != null && reportData.reportType!.code!.isNotEmpty) {
+      if (reportData.reportType?.code != null &&
+          reportData.reportType!.code!.isNotEmpty) {
         formData['category'] = reportData.reportType!.code!;
       }
-      
+
       // Extract Type - use reportType.name
-      if (reportData.reportType?.name != null && reportData.reportType!.name!.isNotEmpty) {
+      if (reportData.reportType?.name != null &&
+          reportData.reportType!.name!.isNotEmpty) {
         formData['incidentType'] = reportData.reportType!.name!;
       }
-      
+
       // Extract information from first statement
       if (reportData.statements != null && reportData.statements!.isNotEmpty) {
         final statement = reportData.statements!.first;
-        
+
         // Extract full name
-        if (statement.fullName != null && statement.fullName!.trim().isNotEmpty) {
+        if (statement.fullName != null &&
+            statement.fullName!.trim().isNotEmpty) {
           formData['fullName'] = statement.fullName!.trim();
         }
-        
+
         // Extract phone number
-        if (statement.phoneMobile != null && statement.phoneMobile!.trim().isNotEmpty) {
+        if (statement.phoneMobile != null &&
+            statement.phoneMobile!.trim().isNotEmpty) {
           formData['phoneNumber'] = statement.phoneMobile!.trim();
         }
-        
+
         // Extract age
         if (statement.age != null) {
           formData['age'] = statement.age.toString();
         }
-        
+
         // Extract sex
         if (statement.sex != null && statement.sex!.trim().isNotEmpty) {
           formData['sex'] = statement.sex!.trim();
         }
-        
+
         // Extract nationality
-        if (statement.nationality != null && statement.nationality!.trim().isNotEmpty) {
+        if (statement.nationality != null &&
+            statement.nationality!.trim().isNotEmpty) {
           formData['nationality'] = statement.nationality!.trim();
         }
-        
+
         // Extract date of birth
         if (statement.dateOfBirth != null) {
           try {
             final dob = statement.dateOfBirth!;
-            formData['dateOfBirth'] = '${dob.day} ${_getMonthName(dob.month)}, ${dob.year}';
+            formData['dateOfBirth'] =
+                '${dob.day} ${_getMonthName(dob.month)}, ${dob.year}';
           } catch (e) {
             print('⚠️ [REPORT CONVERT] Error formatting date of birth: $e');
           }
         }
-        
+
         // Extract statement text
-        if (statement.statement != null && statement.statement!.trim().isNotEmpty) {
+        if (statement.statement != null &&
+            statement.statement!.trim().isNotEmpty) {
           formData['statement'] = statement.statement!.trim();
         }
-        
+
         // Extract statement date
         if (statement.statementDate != null) {
           try {
             final stmtDate = statement.statementDate!;
-            formData['statementDate'] = '${stmtDate.day} ${_getMonthName(stmtDate.month)}, ${stmtDate.year}';
+            formData['statementDate'] =
+                '${stmtDate.day} ${_getMonthName(stmtDate.month)}, ${stmtDate.year}';
           } catch (e) {
             print('⚠️ [REPORT CONVERT] Error formatting statement date: $e');
           }
         }
-        
+
         // Extract statement time
-        if (statement.statementTime != null && statement.statementTime!.trim().isNotEmpty) {
+        if (statement.statementTime != null &&
+            statement.statementTime!.trim().isNotEmpty) {
           formData['statementTime'] = statement.statementTime!.trim();
         }
-        
+
         // Build address from available fields
         final addressParts = <String>[];
-        
-        if (statement.specificAddress != null && statement.specificAddress!.trim().isNotEmpty) {
+
+        if (statement.specificAddress != null &&
+            statement.specificAddress!.trim().isNotEmpty) {
           addressParts.add(statement.specificAddress!.trim());
         }
-        if (statement.currentSubCity != null && statement.currentSubCity!.trim().isNotEmpty) {
+        if (statement.currentSubCity != null &&
+            statement.currentSubCity!.trim().isNotEmpty) {
           addressParts.add(statement.currentSubCity!.trim());
         }
-        if (statement.currentKebele != null && statement.currentKebele!.trim().isNotEmpty) {
+        if (statement.currentKebele != null &&
+            statement.currentKebele!.trim().isNotEmpty) {
           addressParts.add(statement.currentKebele!.trim());
         }
-        if (statement.currentHouseNumber != null && statement.currentHouseNumber!.trim().isNotEmpty) {
+        if (statement.currentHouseNumber != null &&
+            statement.currentHouseNumber!.trim().isNotEmpty) {
           addressParts.add('House: ${statement.currentHouseNumber!.trim()}');
         }
-        if (statement.otherAddress != null && statement.otherAddress!.trim().isNotEmpty) {
+        if (statement.otherAddress != null &&
+            statement.otherAddress!.trim().isNotEmpty) {
           addressParts.add(statement.otherAddress!.trim());
         }
-        
+
         if (addressParts.isNotEmpty) {
           formData['address'] = addressParts.join(', ');
         }
       }
-      
+
       // Extract Schedule Time - use createdAt
       if (reportData.createdAt != null) {
         try {
           final createdAt = reportData.createdAt!;
-          formData['submitTime'] = '${createdAt.day} ${_getMonthName(createdAt.month)}, ${createdAt.year}';
+          formData['submitTime'] =
+              '${createdAt.day} ${_getMonthName(createdAt.month)}, ${createdAt.year}';
           formData['scheduleTime'] = formData['submitTime']!;
         } catch (e) {
           print('⚠️ [REPORT CONVERT] Error formatting date: $e');
         }
       }
-      
+
       print('✅ [REPORT CONVERT] Converted report data:');
       print('  - ID: ${formData['id'] ?? 'N/A'}');
       print('  - Category: ${formData['category'] ?? 'N/A'}');
@@ -3060,24 +3544,35 @@ class CallClassController extends GetxController {
       print('  - Nationality: ${formData['nationality'] ?? 'N/A'}');
       print('  - Date of Birth: ${formData['dateOfBirth'] ?? 'N/A'}');
       print('  - Address: ${formData['address'] ?? 'N/A'}');
-      print('  - Statement: ${formData['statement'] != null ? "${formData['statement']!.substring(0, formData['statement']!.length > 50 ? 50 : formData['statement']!.length)}..." : 'N/A'}');
+      print(
+        '  - Statement: ${formData['statement'] != null ? "${formData['statement']!.substring(0, formData['statement']!.length > 50 ? 50 : formData['statement']!.length)}..." : 'N/A'}',
+      );
       print('  - Statement Date: ${formData['statementDate'] ?? 'N/A'}');
       print('  - Statement Time: ${formData['statementTime'] ?? 'N/A'}');
       print('  - Schedule Time: ${formData['scheduleTime'] ?? 'N/A'}');
-      
     } catch (e, stackTrace) {
       print('⚠️ [REPORT CONVERT] Error converting report data: $e');
       print('⚠️ [REPORT CONVERT] Stack trace: $stackTrace');
     }
-    
+
     return formData;
   }
 
   /// Helper to get month name
   String _getMonthName(int month) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return months[month - 1];
   }
@@ -3096,14 +3591,14 @@ class CallClassController extends GetxController {
             print('✅ [UPLOAD POPUP] Dialog closed using rootNavigator');
             return;
           }
-          
+
           // Try regular navigator
           if (Navigator.canPop(context)) {
             Navigator.of(context).pop();
             print('✅ [UPLOAD POPUP] Dialog closed using Navigator');
             return;
           }
-          
+
           print('⚠️ [UPLOAD POPUP] Cannot pop dialog - no routes to pop');
         } else {
           print('⚠️ [UPLOAD POPUP] No context available to close dialog');
