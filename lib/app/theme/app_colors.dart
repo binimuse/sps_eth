@@ -27,7 +27,7 @@ class AppColors {
   static Color white10 = const Color(0xffffffff).withOpacity(0.1);
 
   //PRIMARY
-  static Color primary = const Color(0xff0A5B95);
+  static Color primary = const Color(0xff114A75);
   static Color primaryLighter = const Color(0xff18304E).withOpacity(0.1);
   static Color primaryLight = const Color(0xff18304E).withOpacity(0.3);
   static Color primaryDark = const Color(0xff18304E);

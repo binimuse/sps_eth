@@ -1031,6 +1031,9 @@ class CallClassController extends GetxController {
         try {
           final devices = await Hardware.instance.enumerateDevices();
           allCameras = devices.where((d) => d.kind == 'videoinput').toList();
+          // Update availableCameras immediately so it's available for switching
+          availableCameras.assignAll(allCameras);
+          hasMultipleCameras.value = allCameras.length > 1;
           print(
             '🎥 [VIDEO] ========== CAMERA ENUMERATION (KIOSK DEBUG) ==========',
           );
@@ -1192,10 +1195,27 @@ class CallClassController extends GetxController {
 
         _updateLocalVideoTrack();
 
-        // Enumerate actual media devices for debugging
+        // Enumerate actual media devices for debugging (this will also update currentCameraDeviceId from track)
         await _enumerateMediaDevices();
+        
+        // Ensure currentCameraDeviceId is set if not already set
+        if (currentCameraDeviceId.value.isEmpty && localVideoTrack.value != null) {
+          try {
+            final track = localVideoTrack.value as LocalVideoTrack;
+            final settings = track.mediaStreamTrack.getSettings();
+            final deviceId = settings['deviceId']?.toString();
+            if (deviceId != null && deviceId.isNotEmpty) {
+              currentCameraDeviceId.value = deviceId;
+              print('✅ [VIDEO] Set currentCameraDeviceId from track: $deviceId');
+            }
+          } catch (e) {
+            print('⚠️ [VIDEO] Could not set currentCameraDeviceId from track: $e');
+          }
+        }
 
         print('✅ [VIDEO] Video enabled and published successfully');
+        print('📷 [VIDEO] Current camera deviceId: ${currentCameraDeviceId.value}');
+        print('📷 [VIDEO] Available cameras: ${availableCameras.length}');
       } else {
         print('❌ [VIDEO] Local participant is null, cannot enable video');
         throw Exception('Local participant is null');
@@ -1351,9 +1371,15 @@ class CallClassController extends GetxController {
   Future<void> switchCamera(String deviceId) async {
     if (_localParticipant == null ||
         isSwitchingCamera.value ||
-        isSwitchingCodec.value)
+        isSwitchingCodec.value) {
+      print('⚠️ [CAMERA] Switch skipped: participant=${_localParticipant != null}, switching=${isSwitchingCamera.value}, codecSwitching=${isSwitchingCodec.value}');
       return;
-    if (deviceId == currentCameraDeviceId.value) return;
+    }
+    
+    if (deviceId == currentCameraDeviceId.value) {
+      print('⚠️ [CAMERA] Switch skipped: same deviceId=$deviceId');
+      return;
+    }
 
     final oldTrack = _localParticipant!.videoTrackPublications
         .where((pub) => pub.source == TrackSource.camera && pub.track != null)
@@ -1361,63 +1387,358 @@ class CallClassController extends GetxController {
         .whereType<LocalVideoTrack>()
         .firstOrNull;
 
-    if (oldTrack == null) return;
+    if (oldTrack == null) {
+      print('❌ [CAMERA] Switch failed: no existing video track');
+      return;
+    }
 
+    // Save previous device ID for error recovery
+    final previousDeviceId = currentCameraDeviceId.value;
+    
+    print('🔄 [CAMERA] Switching camera from $previousDeviceId to $deviceId');
     isSwitchingCamera.value = true;
+    
+    // Clear local video track reference immediately to prevent UI from rendering stopped track
+    localVideoTrack.value = null;
+    localVideoTrack.refresh(); // Force UI to update immediately
+    print('🔄 [CAMERA] Cleared local video track reference');
+    
     try {
       // Refresh camera list so we have the latest devices and labels
       await _enumerateMediaDevices();
+      
+      // Verify the target device exists
+      final targetDevice = availableCameras
+          .where((c) => c.deviceId == deviceId)
+          .firstOrNull;
+      
+      if (targetDevice == null) {
+        print('❌ [CAMERA] Switch failed: target deviceId $deviceId not found in available cameras');
+        print('📷 [CAMERA] Available cameras: ${availableCameras.map((c) => '${c.deviceId} (${c.label})').join(', ')}');
+        return;
+      }
+      
+      print('✅ [CAMERA] Target device found: ${targetDevice.deviceId} (${targetDevice.label})');
 
-      await _localParticipant!.setCameraEnabled(false);
-      await Future.delayed(const Duration(milliseconds: 250));
+      // Step 1: Get all camera tracks and publications before cleanup
+      final allCameraPublications = _localParticipant!.videoTrackPublications
+          .where((pub) => pub.source == TrackSource.camera)
+          .toList();
+      final allCameraTracks = allCameraPublications
+          .where((pub) => pub.track != null)
+          .map((pub) => pub.track as LocalVideoTrack)
+          .toList();
+      
+      print('🔄 [CAMERA] Found ${allCameraTracks.length} camera track(s) to cleanup');
 
-      await oldTrack.stop();
+      // Step 2: Unpublish all camera tracks by disabling camera
+      print('🔄 [CAMERA] Disabling camera to unpublish all tracks...');
+      try {
+        await _localParticipant!.setCameraEnabled(false);
+        print('✅ [CAMERA] Camera disabled (all tracks unpublished)');
+      } catch (e) {
+        print('⚠️ [CAMERA] Error disabling camera: $e');
+      }
+      
+      // Wait for unpublish to complete
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Step 3: Stop all camera tracks explicitly
+      print('🔄 [CAMERA] Stopping all camera tracks...');
+      for (var track in allCameraTracks) {
+        try {
+          await track.stop();
+          print('✅ [CAMERA] Track stopped: ${track.mediaStreamTrack.label}');
+        } catch (e) {
+          print('⚠️ [CAMERA] Error stopping track (may already be stopped): $e');
+        }
+      }
+      
+      // Step 4: Wait longer for Android camera system to fully release the camera
+      // Android requires cameras to be fully closed before opening a new one
+      print('🔄 [CAMERA] Waiting for camera system to release cameras...');
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // Step 5: Verify no active camera tracks exist
+      final remainingPublications = _localParticipant!.videoTrackPublications
+          .where((pub) => pub.source == TrackSource.camera && pub.track != null)
+          .toList();
+      
+      if (remainingPublications.isNotEmpty) {
+        print('⚠️ [CAMERA] Warning: ${remainingPublications.length} camera track(s) still exist after cleanup');
+        // Try stopping any remaining tracks one more time
+        for (var pub in remainingPublications) {
+          try {
+            if (pub.track != null) {
+              final track = pub.track as LocalVideoTrack;
+              await track.stop();
+              print('✅ [CAMERA] Stopped remaining track: ${track.mediaStreamTrack.label}');
+            }
+          } catch (e) {
+            print('⚠️ [CAMERA] Error stopping remaining track: $e');
+          }
+        }
+        // Wait again after stopping remaining tracks
+        await Future.delayed(const Duration(milliseconds: 500));
+      } else {
+        print('✅ [CAMERA] All camera tracks cleaned up successfully');
+      }
 
       final isZC3588A = await _isZC3588ATablet();
       final videoParams = isZC3588A
           ? VideoParametersPresets.h360_169
           : VideoParametersPresets.h720_169;
 
-      final device = availableCameras
-          .where((c) => c.deviceId == deviceId)
-          .firstOrNull;
-      final position = device != null
-          ? _positionFromLabel(device.label)
-          : CameraPosition.front;
+      // Determine camera position from device label
+      final position = _positionFromLabel(targetDevice.label);
+      print('📷 [CAMERA] Using camera position: $position for device: ${targetDevice.label}');
 
+      // Create new track with target device
       final captureOptions = CameraCaptureOptions(
         cameraPosition: position,
         deviceId: deviceId,
         params: videoParams,
       );
+      
+      print('🔄 [CAMERA] Creating new track with deviceId: $deviceId');
+      LocalVideoTrack? newTrack;
+      
+      // Retry logic: Android camera system sometimes needs extra time to release
+      int maxRetries = 3;
+      int retryDelay = 500; // Start with 500ms delay
+      
+      for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          newTrack = await LocalVideoTrack.createCameraTrack(captureOptions);
+          print('✅ [CAMERA] New track created successfully on attempt $attempt');
+          break; // Success, exit retry loop
+        } catch (e) {
+          print('❌ [CAMERA] Failed to create new track (attempt $attempt/$maxRetries): $e');
+          
+          if (attempt < maxRetries) {
+            // Wait longer before retrying (exponential backoff)
+            print('🔄 [CAMERA] Waiting ${retryDelay}ms before retry...');
+            await Future.delayed(Duration(milliseconds: retryDelay));
+            retryDelay *= 2; // Double the delay for next retry
+          } else {
+            // Last attempt failed, rethrow the error
+            print('❌ [CAMERA] All retry attempts failed');
+            rethrow;
+          }
+        }
+      }
+      
+      if (newTrack == null) {
+        throw Exception('Failed to create camera track after $maxRetries attempts');
+      }
 
-      final newTrack = await LocalVideoTrack.createCameraTrack(captureOptions);
+      // Ensure the track is enabled (should be by default, but verify)
+      try {
+        if (!newTrack.mediaStreamTrack.enabled) {
+          newTrack.mediaStreamTrack.enabled = true;
+          print('✅ [CAMERA] Enabled new track');
+        }
+        print('📷 [CAMERA] Track enabled state: ${newTrack.mediaStreamTrack.enabled}');
+      } catch (e) {
+        print('⚠️ [CAMERA] Could not check/enable track: $e');
+      }
 
-      await _localParticipant!.publishVideoTrack(
-        newTrack,
-        publishOptions: _getVideoPublishOptions(currentVideoCodec.value),
-      );
+      // Verify the new track is using the correct device
+      String actualDeviceId = deviceId;
+      try {
+        final settings = newTrack.mediaStreamTrack.getSettings();
+        final deviceIdFromSettings = settings['deviceId']?.toString();
+        if (deviceIdFromSettings != null && deviceIdFromSettings.isNotEmpty) {
+          actualDeviceId = deviceIdFromSettings;
+          print('📷 [CAMERA] New track actual deviceId: $actualDeviceId');
+          if (actualDeviceId != deviceId) {
+            print('⚠️ [CAMERA] Warning: Track deviceId ($actualDeviceId) differs from requested ($deviceId)');
+          }
+        }
+      } catch (e) {
+        print('⚠️ [CAMERA] Could not verify track deviceId: $e');
+      }
+      
+      // Wait a bit for the track to start producing frames before updating UI
+      print('🔄 [CAMERA] Waiting for track to start producing frames...');
+      await Future.delayed(const Duration(milliseconds: 400));
 
-      currentCameraDeviceId.value = deviceId;
-      _updateLocalVideoTrack();
+      // Publish new track
+      print('🔄 [CAMERA] Publishing new track...');
+      try {
+        await _localParticipant!.publishVideoTrack(
+          newTrack,
+          publishOptions: _getVideoPublishOptions(currentVideoCodec.value),
+        );
+        print('✅ [CAMERA] New track published successfully');
+        
+        // Update current camera device ID
+        currentCameraDeviceId.value = actualDeviceId;
+        print('✅ [CAMERA] Current camera device ID updated to: $actualDeviceId');
+        
+        // Small delay to let publication complete
+        await Future.delayed(const Duration(milliseconds: 400));
+        
+        // Verify track is enabled
+        try {
+          if (!newTrack.mediaStreamTrack.enabled) {
+            newTrack.mediaStreamTrack.enabled = true;
+            print('✅ [CAMERA] Re-enabled track after publishing');
+          }
+        } catch (e) {
+          print('⚠️ [CAMERA] Could not verify track enabled state: $e');
+        }
+        
+        // Wait for the track to be fully ready and producing frames
+        // Android cameras need time to initialize and start producing frames
+        print('🔄 [CAMERA] Waiting for track to be ready and producing frames...');
+        await Future.delayed(const Duration(milliseconds: 800));
+        
+        // Update local video track reference with the new track we just created
+        // Use the newTrack directly since we know it's the active one we just published
+        print('🔄 [CAMERA] Updating local video track reference...');
+        print('📷 [CAMERA] New track label: ${newTrack.mediaStreamTrack.label}');
+        print('📷 [CAMERA] New track ID: ${newTrack.mediaStreamTrack.id}');
+        print('📷 [CAMERA] Track enabled: ${newTrack.mediaStreamTrack.enabled}');
+        
+        // Clear the track value first to force widget disposal
+        localVideoTrack.value = null;
+        localVideoTrack.refresh();
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // Now set the new track - this will force VideoTrackRenderer to rebuild
+        localVideoTrack.value = newTrack;
+        localVideoTrack.refresh(); // Force GetX to notify listeners
+        print('✅ [CAMERA] Local video track reference updated with new track');
+        
+        // Wait for the UI to rebuild with the new track
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        // Also call _updateLocalVideoTrack() to ensure consistency
+        _updateLocalVideoTrack();
+        
+        // Force another refresh to ensure UI updates
+        localVideoTrack.refresh();
+        print('✅ [CAMERA] UI refresh completed');
+        
+        // Verify the track is actually in publications (double-check)
+        final publishedTrack = _localParticipant!.videoTrackPublications
+            .where((pub) => pub.source == TrackSource.camera && pub.track != null)
+            .map((pub) => pub.track)
+            .whereType<LocalVideoTrack>()
+            .firstOrNull;
+        
+        if (publishedTrack != null) {
+          // Ensure we're using the published track (should be the same as newTrack)
+          if (publishedTrack.mediaStreamTrack.id != newTrack.mediaStreamTrack.id) {
+            print('⚠️ [CAMERA] Warning: Published track differs from new track, using published track');
+            localVideoTrack.value = publishedTrack;
+            localVideoTrack.refresh();
+          }
+          print('✅ [CAMERA] Verified track is published and active');
+        } else {
+          print('⚠️ [CAMERA] Warning: Track not found in publications, but using newTrack directly');
+        }
+        
+        // Ensure video is still enabled
+        isVideoEnabled.value = true;
+        
+        // Wait one more time to ensure the track is rendering before marking switch as complete
+        await Future.delayed(const Duration(milliseconds: 200));
+        
+        print('✅ [CAMERA] Camera switch completed successfully');
+      } catch (e) {
+        print('❌ [CAMERA] Failed to publish new track: $e');
+        // Clean up the track if publish failed
+        try {
+          await newTrack.stop();
+        } catch (_) {}
+        rethrow;
+      }
     } catch (e, stackTrace) {
       print('❌ [CAMERA] Switch failed: $e');
-      print('❌ [CAMERA] $stackTrace');
+      print('❌ [CAMERA] Stack trace: $stackTrace');
+      
+      // Try to restore camera state on error
+      try {
+        // Check if we still have a valid video track
+        final existingTrack = _localParticipant!.videoTrackPublications
+            .where((pub) => pub.source == TrackSource.camera && pub.track != null)
+            .map((pub) => pub.track)
+            .whereType<LocalVideoTrack>()
+            .firstOrNull;
+        
+        if (existingTrack == null) {
+          print('⚠️ [CAMERA] No active track after error, attempting to restore...');
+          // Try to re-enable video with the previous camera
+          if (previousDeviceId.isNotEmpty) {
+            print('🔄 [CAMERA] Attempting to restore previous camera: $previousDeviceId');
+            // Restore the previous device ID
+            currentCameraDeviceId.value = previousDeviceId;
+            // Don't recursively call switchCamera, just try to enable video again
+            await enableVideo();
+            // Update local video track after restoring
+            _updateLocalVideoTrack();
+            localVideoTrack.refresh();
+          } else {
+            print('⚠️ [CAMERA] No previous camera device ID to restore');
+          }
+        } else {
+          print('✅ [CAMERA] Existing track still active, no restoration needed');
+          _updateLocalVideoTrack();
+          localVideoTrack.refresh();
+        }
+      } catch (restoreError) {
+        print('❌ [CAMERA] Failed to restore camera state: $restoreError');
+      }
+      
+      AppToasts.showError('Failed to switch camera: ${e.toString()}');
     } finally {
       isSwitchingCamera.value = false;
+      // Ensure video enabled state is correct and local track is updated
+      final hasActiveTrack = _localParticipant?.videoTrackPublications
+          .any((pub) => pub.source == TrackSource.camera && pub.track != null) ?? false;
+      if (hasActiveTrack) {
+        isVideoEnabled.value = true;
+        // Ensure local video track reference is up to date
+        _updateLocalVideoTrack();
+        localVideoTrack.refresh();
+      } else {
+        // No active track, clear the reference
+        localVideoTrack.value = null;
+      }
     }
   }
 
   /// Get next camera deviceId for cycling through ALL cameras (so normal ↔ night/back works).
   String? getNextCameraDeviceId() {
     final cameras = availableCameras;
-    if (cameras.isEmpty) return null;
-    if (cameras.length == 1) return cameras.first.deviceId;
+    print('📷 [CAMERA] Getting next camera deviceId');
+    print('📷 [CAMERA] Available cameras count: ${cameras.length}');
+    print('📷 [CAMERA] Current camera deviceId: ${currentCameraDeviceId.value}');
+    
+    if (cameras.isEmpty) {
+      print('⚠️ [CAMERA] No cameras available');
+      return null;
+    }
+    
+    if (cameras.length == 1) {
+      print('📷 [CAMERA] Only one camera available, returning: ${cameras.first.deviceId}');
+      return cameras.first.deviceId;
+    }
 
     final currentId = currentCameraDeviceId.value;
     final idx = cameras.indexWhere((c) => c.deviceId == currentId);
+    
+    print('📷 [CAMERA] Current camera index: $idx');
+    
+    // If current camera not found, start from first camera
     final nextIdx = (idx < 0 ? 0 : idx + 1) % cameras.length;
-    return cameras[nextIdx].deviceId;
+    final nextDeviceId = cameras[nextIdx].deviceId;
+    
+    print('📷 [CAMERA] Next camera index: $nextIdx, deviceId: $nextDeviceId (${cameras[nextIdx].label})');
+    
+    return nextDeviceId;
   }
 
   /// Switch codec using unpublish → stop → create new → publish pattern (matches web client)

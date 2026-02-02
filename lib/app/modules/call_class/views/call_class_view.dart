@@ -186,14 +186,42 @@ class CallClassView extends GetView<CallClassController> {
                                         child: Obx(() {
                                           final localVideoTrack =
                                               controller.localVideoTrack.value;
+                                          final isSwitching = controller.isSwitchingCamera.value;
+                                          
+                                          // Show placeholder while switching to prevent black screen
+                                          if (isSwitching) {
+                                            return Container(
+                                              width: 140,
+                                              height: 100,
+                                              color: AppColors.backgroundLight,
+                                              child: Center(
+                                                child: SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                                      AppColors.primary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                          
                                           if (localVideoTrack != null &&
                                               controller.isVideoEnabled.value) {
+                                            // Use track ID and device ID for key to force rebuild on camera switch
                                             return Container(
                                               width: 140,
                                               height: 100,
                                               color: AppColors.black,
                                               child: VideoTrackRenderer(
+                                                key: ValueKey(
+                                                  'local-video-${localVideoTrack.mediaStreamTrack.id}-${controller.currentCameraDeviceId.value}',
+                                                ),
                                                 localVideoTrack,
+                                                fit: VideoViewFit.contain,
                                               ),
                                             );
                                           }
@@ -415,11 +443,11 @@ class CallClassView extends GetView<CallClassController> {
                                                   left: 12,
                                                 ),
                                                 child: GestureDetector(
-                                                  onTap: canSwitch
-                                                      ? () => controller
-                                                            .switchCamera(
-                                                              nextId,
-                                                            )
+                                                  onTap: canSwitch && nextId != null
+                                                      ? () {
+                                                          print('🔘 [CAMERA SWITCH] Button tapped, switching to: $nextId');
+                                                          controller.switchCamera(nextId);
+                                                        }
                                                       : null,
                                                   child: Opacity(
                                                     opacity: canSwitch
@@ -461,61 +489,7 @@ class CallClassView extends GetView<CallClassController> {
                                               );
                                             }),
                                             // Codec switcher
-                                            const SizedBox(width: 12),
-                                            Obx(() {
-                                              final isSwitching =
-                                                  controller
-                                                      .isSwitchingCodec
-                                                      .value ||
-                                                  controller
-                                                      .isSwitchingCamera
-                                                      .value;
-                                              final enabled =
-                                                  !isSwitching &&
-                                                  controller
-                                                      .isVideoEnabled
-                                                      .value;
-                                              return PopupMenuButton<String>(
-                                                enabled: enabled,
-                                                tooltip: 'Video codec',
-                                                icon: Opacity(
-                                                  opacity: enabled ? 1 : 0.5,
-                                                  child: Container(
-                                                    width: 48,
-                                                    height: 48,
-                                                    decoration: BoxDecoration(
-                                                      color: AppColors.primary
-                                                          .withOpacity(0.1),
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    child: Icon(
-                                                      Icons.video_settings,
-                                                      color: AppColors.primary,
-                                                      size: 24,
-                                                    ),
-                                                  ),
-                                                ),
-                                                onSelected: (String codec) =>
-                                                    controller.switchCodec(
-                                                      codec,
-                                                    ),
-                                                itemBuilder:
-                                                    (BuildContext context) => [
-                                                      _codecItem(
-                                                        controller,
-                                                        'H264',
-                                                      ),
-                                                      _codecItem(
-                                                        controller,
-                                                        'VP8',
-                                                      ),
-                                                      _codecItem(
-                                                        controller,
-                                                        'VP9',
-                                                      ),
-                                                    ],
-                                              );
-                                            }),
+                                          
                                           ],
                                         ),
                                       );

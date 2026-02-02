@@ -245,7 +245,10 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                           ],
                                           TextField(
                                             controller: controller.otpController,
-                                            keyboardType: TextInputType.number,
+                                            focusNode: controller.otpFocusNode,
+                                            keyboardType: TextInputType.none,
+                                            showCursor: true,
+                                            enableInteractiveSelection: true,
                                             maxLength: 6,
                                             decoration: InputDecoration(
                                               hintText: 'Enter OTP Code'.tr,
@@ -274,6 +277,10 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                                 onPressed: () {
                                                   controller.isOtpSent.value = false;
                                                   controller.otpController.clear();
+                                                  // Re-focus FAN/FIN field when changing back
+                                                  Future.delayed(const Duration(milliseconds: 100), () {
+                                                    controller.phoneFocusNode.requestFocus();
+                                                  });
                                                 },
                                                 child: Text(
                                                   'Change FAN/FIN Number'.tr,
@@ -336,7 +343,10 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                         children: [
                                           TextField(
                                             controller: controller.phoneController,
-                                            keyboardType: TextInputType.number,
+                                            focusNode: controller.phoneFocusNode,
+                                            keyboardType: TextInputType.none,
+                                            showCursor: true,
+                                            enableInteractiveSelection: true,
                                             maxLength: 20,
                                             decoration: InputDecoration(
                                               hintText: 'Enter FAN or FIN Number'.tr,
@@ -422,6 +432,10 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                       children: [
                                         TextField(
                                           controller: controller.idController,
+                                          focusNode: controller.idFocusNode,
+                                          keyboardType: TextInputType.none,
+                                          showCursor: true,
+                                          enableInteractiveSelection: true,
                                           decoration: InputDecoration(
                                             hintText: 'Residence ID / National ID'.tr,
                                             hintStyle: TextStyle(
@@ -496,7 +510,10 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                       children: [
                                         TextField(
                                           controller: controller.tinController,
-                                          keyboardType: TextInputType.number,
+                                          focusNode: controller.tinFocusNode,
+                                          keyboardType: TextInputType.none,
+                                          showCursor: true,
+                                          enableInteractiveSelection: true,
                                           decoration: InputDecoration(
                                             hintText: 'TIN Number'.tr,
                                             hintStyle: TextStyle(

@@ -38,6 +38,12 @@ class ResidenceIdController extends GetxController {
   final tinController = TextEditingController();
   final otpController = TextEditingController();
   
+  // Focus nodes for auto-focusing fields (for barcode/QR scanner)
+  final phoneFocusNode = FocusNode();
+  final idFocusNode = FocusNode();
+  final tinFocusNode = FocusNode();
+  final otpFocusNode = FocusNode();
+  
   // Service
   late final IdIntegrationService _idIntegrationService;
   
@@ -58,12 +64,28 @@ class ResidenceIdController extends GetxController {
     idController.dispose();
     otpController.dispose();
     tinController.dispose();
+    phoneFocusNode.dispose();
+    idFocusNode.dispose();
+    tinFocusNode.dispose();
+    otpFocusNode.dispose();
     super.onClose();
   }
 
   /// Select ID type
   void selectIdType(String type) {
     selectedIdType.value = type;
+    
+    // Auto-focus the appropriate text field for barcode/QR scanner input
+    // Delay to ensure the widget is built before focusing
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (type == 'fayda' && !isOtpSent.value) {
+        phoneFocusNode.requestFocus();
+      } else if (type == 'residence') {
+        idFocusNode.requestFocus();
+      } else if (type == 'tin') {
+        tinFocusNode.requestFocus();
+      }
+    });
   }
 
   /// Clear selection and reset
@@ -123,6 +145,11 @@ class ResidenceIdController extends GetxController {
         print('✅ [FAYDA OTP] OTP sent successfully');
         print('  - Transaction ID: ${transactionID.value}');
         print('  - Masked Mobile: ${maskedMobile.value}');
+        
+        // Auto-focus OTP field for scanner input
+        Future.delayed(const Duration(milliseconds: 100), () {
+          otpFocusNode.requestFocus();
+        });
         
         // Use Get.context to safely show toast
         final context = Get.context;
