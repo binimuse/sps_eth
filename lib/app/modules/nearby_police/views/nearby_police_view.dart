@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:sps_eth_app/gen/assets.gen.dart';
 
 import '../controllers/nearby_police_controller.dart';
 
@@ -14,7 +15,13 @@ class NearbyPoliceView extends GetView<NearbyPoliceController> {
       backgroundColor: const Color(0xFFE9F6FF),
       body: SafeArea(
         child: Stack(
+          fit: StackFit.expand,
           children: [
+            // Background image (same as residency_type, language, etc.)
+            Image.asset(
+              Assets.images.logoBackground.path,
+              fit: BoxFit.fitWidth,
+            ),
             Obx(() {
               if (controller.isLoading.value) {
                 return const Center(child: CircularProgressIndicator());
@@ -53,35 +60,31 @@ class NearbyPoliceView extends GetView<NearbyPoliceController> {
                 mapType: MapType.normal,
               );
             }),
-            // Back button
+            // Back button (same as residence_service_detail_view)
             Positioned(
               top: 16,
               left: 16,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back,
-                    color: Colors.white,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  side: const BorderSide(color: Color(0xFFCBDCE7)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  tooltip: 'Back',
-                  onPressed: () {
-                    // Use Navigator directly to avoid GetX overlay controller issues
-                    if (Navigator.canPop(context)) {
-                      Navigator.pop(context);
-                    } else {
-                      // Fallback: navigate to home if can't pop
-                      try {
-                        Get.offAllNamed(Routes.HOME);
-                      } catch (e) {
-                        print('⚠️ [NAVIGATION] Error navigating back: $e');
-                      }
-                    }
-                  },
                 ),
+                onPressed: () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    try {
+                      Get.offAllNamed(Routes.HOME);
+                    } catch (e) {
+                      print('⚠️ [NAVIGATION] Error navigating back: $e');
+                    }
+                  }
+                },
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
               ),
             ),
           ],

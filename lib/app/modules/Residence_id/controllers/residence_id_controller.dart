@@ -43,6 +43,12 @@ class ResidenceIdController extends GetxController {
   final idFocusNode = FocusNode();
   final tinFocusNode = FocusNode();
   final otpFocusNode = FocusNode();
+
+  /// When true, keyboard is shown for manual input (double-tap to enable).
+  final RxBool keyboardEnabledFayda = false.obs;
+  final RxBool keyboardEnabledOtp = false.obs;
+  final RxBool keyboardEnabledResidence = false.obs;
+  final RxBool keyboardEnabledTin = false.obs;
   
   // Service
   late final IdIntegrationService _idIntegrationService;
@@ -104,6 +110,54 @@ class ResidenceIdController extends GetxController {
     residenceNetworkStatus.value = NetworkStatus.IDLE;
     tinError.value = '';
     tinNetworkStatus.value = NetworkStatus.IDLE;
+    keyboardEnabledFayda.value = false;
+    keyboardEnabledOtp.value = false;
+    keyboardEnabledResidence.value = false;
+    keyboardEnabledTin.value = false;
+  }
+
+  /// Enable keyboard for FAN/FIN field (double-tap).
+  void enableKeyboardFayda() {
+    keyboardEnabledFayda.value = true;
+    phoneFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        phoneFocusNode.requestFocus();
+      });
+    });
+  }
+
+  /// Enable keyboard for OTP field (double-tap).
+  void enableKeyboardOtp() {
+    keyboardEnabledOtp.value = true;
+    otpFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        otpFocusNode.requestFocus();
+      });
+    });
+  }
+
+  /// Enable keyboard for Residence ID field (double-tap).
+  void enableKeyboardResidence() {
+    keyboardEnabledResidence.value = true;
+    idFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        idFocusNode.requestFocus();
+      });
+    });
+  }
+
+  /// Enable keyboard for TIN field (double-tap).
+  void enableKeyboardTin() {
+    keyboardEnabledTin.value = true;
+    tinFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        tinFocusNode.requestFocus();
+      });
+    });
   }
   
   /// Request OTP for Fayda ID

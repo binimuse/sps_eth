@@ -13,35 +13,70 @@ class RecentAlertsView extends GetView<RecentAlertsController> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FB),
-      body: SafeArea(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background image (same as residency_type, language, etc.)
+          Image.asset(
+            Assets.images.logoBackground.path,
+            fit: BoxFit.fitWidth,
+          ),
+          SafeArea(
         child: Obx(() {
           if (controller.isLoading.value) {
             return const Center(child: CircularProgressIndicator());
           }
           return Padding(
             padding: const EdgeInsets.all(20.0),
-            child: Row(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // LEFT PROMO CARD
-                const SizedBox(width: 340, child: PromoCard()),
+                // Back button (same as residence_service_detail_view - use Navigator to avoid GetX snackbar crash)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    side: const BorderSide(color: Color(0xFFCBDCE7)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    }
+                  },
+                  icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
+                  label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // LEFT PROMO CARD
+                      const SizedBox(width: 340, child: PromoCard()),
 
-                const SizedBox(width: 24),
+                      const SizedBox(width: 24),
 
-                // CENTER ARTICLE
-                Expanded(flex: 2, child: _ArticlePanel(controller: controller)),
+                      // CENTER ARTICLE
+                      Expanded(flex: 2, child: _ArticlePanel(controller: controller)),
 
-                const SizedBox(width: 24),
+                      const SizedBox(width: 24),
 
-                // RIGHT SIDEBAR
-                SizedBox(
-                  width: 320,
-                  child: _RightSidebar(controller: controller),
+                      // RIGHT SIDEBAR
+                      SizedBox(
+                        width: 320,
+                        child: _RightSidebar(controller: controller),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           );
         }),
+          ),
+        ],
       ),
     );
   }
@@ -80,24 +115,28 @@ class _ArticlePanel extends StatelessWidget {
                       width: double.infinity,
                       fit: BoxFit.cover,
                     ),
-                    Positioned(
-                      top: 16,
-                      left: 16,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black45,
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                          ),
-                          tooltip: 'Back',
-                          onPressed: Get.back,
-                        ),
-                      ),
-                    ),
+                    // Positioned(
+                    //   top: 16,
+                    //   left: 16,
+                    //   child: DecoratedBox(
+                    //     decoration: BoxDecoration(
+                    //       color: Colors.black45,
+                    //       shape: BoxShape.circle,
+                    //     ),
+                    //     child: IconButton(
+                    //       icon: const Icon(
+                    //         Icons.arrow_back,
+                    //         color: Colors.white,
+                    //       ),
+                    //       tooltip: 'Back',
+                    //       onPressed: () {
+                    //         if (Navigator.canPop(context)) {
+                    //           Navigator.pop(context);
+                    //         }
+                    //       },
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),

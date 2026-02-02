@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/promo_card.dart';
 import 'package:sps_eth_app/app/utils/enums.dart';
@@ -11,20 +12,22 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
   
   @override
   Widget build(BuildContext context) {
-    return Container( 
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage(Assets.images.back1.path),
-          fit: BoxFit.contain,
-        ),
-      ),
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        backgroundColor: Colors.white.withOpacity(0.9),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+      body: SafeArea(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image (same as residency_type, language, call_class, etc.)
+            Image.asset(
+              Assets.images.logoBackground.path,
+              fit: BoxFit.fitWidth,
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // LEFT PROMO CARD
@@ -48,7 +51,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                             Expanded(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE2F0F8),
+                                  color: AppColors.primaryLight,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 padding: const EdgeInsets.all(16),
@@ -243,32 +246,48 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                             ),
                                             const SizedBox(height: 16),
                                           ],
-                                          TextField(
-                                            controller: controller.otpController,
-                                            focusNode: controller.otpFocusNode,
-                                            keyboardType: TextInputType.none,
-                                            showCursor: true,
-                                            enableInteractiveSelection: true,
-                                            maxLength: 6,
-                                            decoration: InputDecoration(
-                                              hintText: 'Enter OTP Code'.tr,
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 14,
+                                          GestureDetector(
+                                            onDoubleTap: controller.enableKeyboardOtp,
+                                            child: Obx(() => TextField(
+                                              controller: controller.otpController,
+                                              focusNode: controller.otpFocusNode,
+                                              keyboardType: controller.keyboardEnabledOtp.value
+                                                  ? TextInputType.number
+                                                  : TextInputType.none,
+                                              showCursor: true,
+                                              enableInteractiveSelection: true,
+                                              maxLength: 6,
+                                              decoration: InputDecoration(
+                                                hintText: 'Enter OTP Code'.tr,
+                                                hintStyle: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 14,
+                                                ),
+                                                filled: true,
+                                                fillColor: Colors.grey[100],
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                                contentPadding: const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 14,
+                                                ),
+                                                counterText: '',
                                               ),
-                                              filled: true,
-                                              fillColor: Colors.grey[100],
-                                              border: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              contentPadding: const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 14,
-                                              ),
-                                              counterText: '',
-                                            ),
+                                            )),
                                           ),
+                                          if (!controller.keyboardEnabledOtp.value)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 6),
+                                              child: Text(
+                                                'Double-tap field to type with keyboard'.tr,
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ),
                                           const SizedBox(height: 12),
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -276,6 +295,7 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                               TextButton(
                                                 onPressed: () {
                                                   controller.isOtpSent.value = false;
+                                                  controller.keyboardEnabledOtp.value = false;
                                                   controller.otpController.clear();
                                                   // Re-focus FAN/FIN field when changing back
                                                   Future.delayed(const Duration(milliseconds: 100), () {
@@ -341,31 +361,36 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                       return Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          TextField(
-                                            controller: controller.phoneController,
-                                            focusNode: controller.phoneFocusNode,
-                                            keyboardType: TextInputType.none,
-                                            showCursor: true,
-                                            enableInteractiveSelection: true,
-                                            maxLength: 20,
-                                            decoration: InputDecoration(
-                                              hintText: 'Enter FAN or FIN Number'.tr,
-                                              hintStyle: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 14,
+                                          GestureDetector(
+                                            onDoubleTap: controller.enableKeyboardFayda,
+                                            child: Obx(() => TextField(
+                                              controller: controller.phoneController,
+                                              focusNode: controller.phoneFocusNode,
+                                              keyboardType: controller.keyboardEnabledFayda.value
+                                                  ? TextInputType.number
+                                                  : TextInputType.none,
+                                              showCursor: true,
+                                              enableInteractiveSelection: true,
+                                              maxLength: 20,
+                                              decoration: InputDecoration(
+                                                hintText: 'Enter FAN or FIN Number'.tr,
+                                                hintStyle: TextStyle(
+                                                  color: Colors.grey[600],
+                                                  fontSize: 14,
+                                                ),
+                                                filled: true,
+                                                fillColor: Colors.grey[100],
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                                contentPadding: const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 14,
+                                                ),
+                                                counterText: '',
                                               ),
-                                              filled: true,
-                                              fillColor: Colors.grey[100],
-                                              border: OutlineInputBorder(
-                                                borderRadius: BorderRadius.circular(12),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              contentPadding: const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 14,
-                                              ),
-                                              counterText: '',
-                                            ),
+                                            )),
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
@@ -430,29 +455,34 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                     return Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        TextField(
-                                          controller: controller.idController,
-                                          focusNode: controller.idFocusNode,
-                                          keyboardType: TextInputType.none,
-                                          showCursor: true,
-                                          enableInteractiveSelection: true,
-                                          decoration: InputDecoration(
-                                            hintText: 'Residence ID / National ID'.tr,
-                                            hintStyle: TextStyle(
-                                              color: Colors.grey[600],
-                                              fontSize: 14,
+                                        GestureDetector(
+                                          onDoubleTap: controller.enableKeyboardResidence,
+                                          child: Obx(() => TextField(
+                                            controller: controller.idController,
+                                            focusNode: controller.idFocusNode,
+                                            keyboardType: controller.keyboardEnabledResidence.value
+                                                ? TextInputType.text
+                                                : TextInputType.none,
+                                            showCursor: true,
+                                            enableInteractiveSelection: true,
+                                            decoration: InputDecoration(
+                                              hintText: 'Residence ID / National ID'.tr,
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                              ),
+                                              filled: true,
+                                              fillColor: Colors.grey[100],
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: BorderSide.none,
+                                              ),
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 14,
+                                              ),
                                             ),
-                                            filled: true,
-                                            fillColor: Colors.grey[100],
-                                            border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: BorderSide.none,
-                                            ),
-                                            contentPadding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 14,
-                                            ),
-                                          ),
+                                          )),
                                         ),
                                         if (controller.residenceError.value.isNotEmpty) ...[
                                           const SizedBox(height: 8),
@@ -508,29 +538,34 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                     return Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        TextField(
-                                          controller: controller.tinController,
-                                          focusNode: controller.tinFocusNode,
-                                          keyboardType: TextInputType.none,
-                                          showCursor: true,
-                                          enableInteractiveSelection: true,
-                                          decoration: InputDecoration(
-                                            hintText: 'TIN Number'.tr,
-                                            hintStyle: TextStyle(
-                                              color: Colors.grey[600],
-                                              fontSize: 14,
+                                        GestureDetector(
+                                          onDoubleTap: controller.enableKeyboardTin,
+                                          child: Obx(() => TextField(
+                                            controller: controller.tinController,
+                                            focusNode: controller.tinFocusNode,
+                                            keyboardType: controller.keyboardEnabledTin.value
+                                                ? TextInputType.number
+                                                : TextInputType.none,
+                                            showCursor: true,
+                                            enableInteractiveSelection: true,
+                                            decoration: InputDecoration(
+                                              hintText: 'TIN Number'.tr,
+                                              hintStyle: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                              ),
+                                              filled: true,
+                                              fillColor: Colors.grey[100],
+                                              border: OutlineInputBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                                borderSide: BorderSide.none,
+                                              ),
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 14,
+                                              ),
                                             ),
-                                            filled: true,
-                                            fillColor: Colors.grey[100],
-                                            border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                              borderSide: BorderSide.none,
-                                            ),
-                                            contentPadding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 14,
-                                            ),
-                                          ),
+                                          )),
                                         ),
                                         if (controller.tinError.value.isNotEmpty) ...[
                                           const SizedBox(height: 8),
@@ -638,7 +673,8 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                 ),
               ],
             ),
-          ),
+            ),
+          ],
         ),
       ),
     );

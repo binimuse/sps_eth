@@ -23,79 +23,77 @@ class HomeView extends GetView<HomeController> {
         }
       },
       child: Scaffold(
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background image
-            Image.asset(
-              Assets.images.homeBackground.path,
-              fit: BoxFit.fitWidth,
-            ),
-            // Content
-            LayoutBuilder(
-              builder: (context, constraints) {
-                // Main tablet landscape canvas
-                return Row(
-              children: [
-                // LEFT COLUMN: hero then contact+call card
-                Expanded(
-                  flex: 5,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        Expanded(child: _HeroPanel(controller: controller)),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 210,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: _ContactCallCard(controller: controller),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background image
+          Image.asset(
+            Assets.images.homeBackground.path,
+            fit: BoxFit.fill,
+          ),
+          // Content
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Main tablet landscape canvas
+              return Row(
+            children: [
+              // LEFT COLUMN: hero then contact+call card
+              Expanded(
+                flex: 5,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Expanded(child: _HeroPanel(controller: controller)),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 210,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: _ContactCallCard(controller: controller),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: 1,
+                              child: _StartFillingCard(
+                                controller: controller,
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                flex: 1,
-                                child: _StartFillingCard(
-                                  controller: controller,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                // RIGHT COLUMN: clock + full-height alerts
-                Expanded(
-                  flex: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      right: 16,
-                      top: 16,
-                      bottom: 16,
-                    ),
-                    child: Column(
-                      children: [
-                        _ClockPanel(controller: controller),
-                        const SizedBox(height: 16),
-                        Expanded(child: _AlertsPanel(controller: controller)),
-                        const SizedBox(height: 16),
-                        _NearbyPoliceStationsCard(controller: controller),
-                      ],
-                    ),
+              ),
+              // RIGHT COLUMN: clock + full-height alerts
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    right: 16,
+                    top: 16,
+                    bottom: 16,
+                  ),
+                  child: Column(
+                    children: [
+                      _ClockPanel(controller: controller),
+                      const SizedBox(height: 16),
+                      Expanded(child: _AlertsPanel(controller: controller)),
+                      const SizedBox(height: 16),
+                      _NearbyPoliceStationsCard(controller: controller),
+                    ],
                   ),
                 ),
-              ],
-            );
-          },
-        ),
-          ],
-        ),
+              ),
+            ],
+          );
+        },
+      ),
+        ],
       ),
       ),
     );
@@ -293,8 +291,8 @@ class _ClockPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color.fromARGB(255, 157, 205, 239), Color(0xFF5078A0)],
+        gradient:  LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryLight],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -706,10 +704,10 @@ class _ContactCallCard extends StatelessWidget {
       height: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient:  LinearGradient(
           colors: [
-            Color.fromARGB(255, 126, 196, 246),
-            Color.fromARGB(255, 232, 235, 238),
+            AppColors.primaryLight,
+            AppColors.primaryLighter,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -750,15 +748,15 @@ class _ContactCallCard extends StatelessWidget {
                                 'Direct Call for Service'.tr,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
-                                  fontSize: 13.sp,
+                                  color: AppColors.whiteOff,
+                                  fontSize: 15.sp,
                                 ),
                               ),
                               Text(
                                 'These are the terms and conditions for in charge of planning'.tr,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Color(0xFF4F6B7E),
+                                  color: AppColors.whiteOff,
                                 ),
                               ),
                             ],
@@ -803,7 +801,7 @@ class _StartFillingCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFEAF3FF),
+            color: AppColors.primaryLighter,
             borderRadius: BorderRadius.circular(16),
           ),
           padding: const EdgeInsets.all(16),
@@ -874,8 +872,8 @@ class _NearbyPoliceStationsCard extends StatelessWidget {
           child: Image.asset(
             Assets.images.near.path,
             width: double.infinity,
-            height: 200, // Adjust height as needed
-            fit: BoxFit.cover,
+      
+            fit: BoxFit.fill,
           ),
         ),
       ),

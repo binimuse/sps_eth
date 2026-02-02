@@ -27,7 +27,7 @@ class NearbyPoliceController extends GetxController {
   final Rx<CameraPosition> cameraPosition = Rx<CameraPosition>(
     const CameraPosition(
       target: LatLng(9.03, 38.74),
-      zoom: 15.5, // Increased zoom level for closer view
+      zoom: 18.5, // Increased zoom level for closer view
     ),
   );
 
@@ -192,24 +192,16 @@ class NearbyPoliceController extends GetxController {
     }
   }
 
-  /// Safely show toast by checking if context is available and delaying if needed
+  /// Safely show toast only when overlay is available (avoids "No Overlay widget found")
   void _showToastSafely(VoidCallback showToast) {
-    // Delay to ensure widget tree is built
     Future.delayed(const Duration(milliseconds: 300), () {
       try {
-        if (Get.context != null) {
+        // Get.snackbar requires overlay context; skip toast if not available (error is already in UI)
+        if (Get.overlayContext != null) {
           showToast();
-        } else {
-          // If context is still not available, try again after a longer delay
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (Get.context != null) {
-              showToast();
-            }
-          });
         }
       } catch (e) {
         print('⚠️ [NEARBY POLICE] Error showing toast: $e');
-        // Silently fail - error message is already shown in UI
       }
     });
   }

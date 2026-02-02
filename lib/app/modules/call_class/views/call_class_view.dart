@@ -66,7 +66,13 @@ class CallClassView extends GetView<CallClassController> {
         child: Scaffold(
           backgroundColor: AppColors.backgroundLight,
           body: Stack(
+            fit: StackFit.expand,
             children: [
+              // Background image (same as residency_type, language, etc.)
+              Image.asset(
+                Assets.images.logoBackground.path,
+                fit: BoxFit.fitWidth,
+              ),
               // Main content - always visible
               SafeArea(
                 child: Padding(
@@ -288,8 +294,9 @@ class CallClassView extends GetView<CallClassController> {
 
                                       // Hide buttons if call is active or if auto-starting (without error)
                                       if (isCallActive ||
-                                          (isAutoStarting && !hasError))
+                                          (isAutoStarting && !hasError)) {
                                         return const SizedBox.shrink();
+                                      }
 
                                       return Positioned(
                                         bottom: 10,
@@ -336,8 +343,9 @@ class CallClassView extends GetView<CallClassController> {
                                               'active' ||
                                           controller.callStatus.value ==
                                               'connecting';
-                                      if (!isCallActive)
+                                      if (!isCallActive) {
                                         return const SizedBox.shrink();
+                                      }
 
                                       return Positioned(
                                         bottom: 10,
@@ -443,7 +451,7 @@ class CallClassView extends GetView<CallClassController> {
                                                   left: 12,
                                                 ),
                                                 child: GestureDetector(
-                                                  onTap: canSwitch && nextId != null
+                                                  onTap: canSwitch
                                                       ? () {
                                                           print('🔘 [CAMERA SWITCH] Button tapped, switching to: $nextId');
                                                           controller.switchCamera(nextId);
