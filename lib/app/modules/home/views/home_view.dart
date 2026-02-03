@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
-import 'package:video_player/video_player.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 
 import '../controllers/home_controller.dart';
@@ -615,75 +615,112 @@ class _VideoPlayerDialog extends StatefulWidget {
 }
 
 class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
-  late final VideoPlayerController _controller;
+  YoutubePlayerController? _controller;
   bool _initialized = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-      ..initialize().then((_) {
-        setState(() {
-          _initialized = true;
-        });
-        _controller.play();
+    // Extract video ID from YouTube URL
+    final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
+    if (videoId != null) {
+      _controller = YoutubePlayerController(
+        initialVideoId: videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: true,
+          mute: false,
+          enableCaption: true,
+        ),
+      );
+      setState(() {
+        _initialized = true;
       });
+    } else {
+      setState(() {
+        _errorMessage = 'Invalid YouTube URL';
+      });
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_errorMessage != null) {
+      return Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        backgroundColor: Colors.black,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_initialized || _controller == null) {
+      return Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        backgroundColor: Colors.black,
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+
+    final controller = _controller!;
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
       backgroundColor: Colors.black,
       child: AspectRatio(
-        aspectRatio: _initialized ? _controller.value.aspectRatio : 16 / 9,
+        aspectRatio: 16 / 9,
         child: Stack(
-          alignment: Alignment.center,
           children: [
-            if (_initialized)
-              VideoPlayer(_controller)
-            else
-              const Center(
-                child: CircularProgressIndicator(color: Colors.white),
+            YoutubePlayer(
+              controller: controller,
+              showVideoProgressIndicator: true,
+              progressIndicatorColor: AppColors.secondary,
+              progressColors: ProgressBarColors(
+                playedColor: AppColors.secondary,
+                handleColor: AppColors.secondaryDark,
               ),
+            ),
             // Close button (top-right)
             Positioned(
               top: 8,
               right: 8,
-              child: IconButton(
-                tooltip: 'Close'.tr,
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-            ),
-            Positioned(
-              bottom: 12,
-              right: 12,
-              child: IconButton(
-                color: Colors.white,
-                iconSize: 28,
-                icon: Icon(
-                  _controller.value.isPlaying
-                      ? Icons.pause_circle_filled
-                      : Icons.play_circle_filled,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  shape: BoxShape.circle,
                 ),
-                onPressed: () {
-                  setState(() {
-                    if (_controller.value.isPlaying) {
-                      _controller.pause();
-                    } else {
-                      _controller.play();
-                    }
-                  });
-                },
+                child: IconButton(
+                  tooltip: 'Close'.tr,
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
               ),
             ),
           ],

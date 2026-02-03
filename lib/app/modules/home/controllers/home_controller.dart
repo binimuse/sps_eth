@@ -22,8 +22,7 @@ class HomeController extends GetxController {
     'assets/images/news.png',
   ];
 
-  String get heroVideoUrl =>
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
+  String get heroVideoUrl => 'https://www.youtube.com/watch?v=9aQys4SBd5U';
 
   String get formattedDate =>
       DateFormat('dd MMMM , yyyy').format(now.value).toUpperCase();
