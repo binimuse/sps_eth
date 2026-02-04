@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
 import '../controllers/service_detail_controller.dart';
@@ -59,7 +60,7 @@ class ServiceDetailView extends GetView<ServiceDetailController> {
                         Expanded(
                           child: Obx(() => Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE2F0F8),
+                              color: AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             padding: const EdgeInsets.all(16),

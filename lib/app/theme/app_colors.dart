@@ -27,16 +27,16 @@ class AppColors {
   static Color white10 = const Color(0xffffffff).withOpacity(0.1);
 
   //PRIMARY
-  static Color primary = const Color(0xff0A5B95);
-  static Color primaryLighter = const Color(0xff18304E).withOpacity(0.1);
-  static Color primaryLight = const Color(0xff18304E).withOpacity(0.3);
-  static Color primaryDark = const Color(0xff18304E);
+  static Color primary = const Color(0xff114A75);
+  static Color primaryLighter = const Color(0xff114A75).withOpacity(0.1);
+      static Color primaryLight = const Color(0xff114A75).withOpacity(0.3);
+  static Color primaryDark = const Color(0xff114A75);
 
   //PRIMARY
-  static Color secondary = const Color(0xffEFD288);
-  static Color secondaryDark = const Color(0xffEFD288);
-  static Color secondaryLight = const Color(0xffEFD288).withOpacity(0.3);
-  static Color secondaryLighter = const Color(0xffEFD288).withOpacity(0.1);
+  static Color secondary = const Color(0xffd5b86e);
+  static Color secondaryDark = const Color(0xffd5b86e);
+  static Color secondaryLight = const Color(0xffd5b86e).withOpacity(0.3);
+  static Color secondaryLighter = const Color(0xffd5b86e).withOpacity(0.1);
 
   //ACCENT
   static Color accent = const Color(0xff784cd6);

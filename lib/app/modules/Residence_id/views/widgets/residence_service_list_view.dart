@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
+import 'package:sps_eth_app/app/theme/app_colors.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/side_info_panel.dart';
 import '../../controllers/residence_id_controller.dart';
@@ -10,24 +11,23 @@ class ResidenceServiceListView extends GetView<ResidenceIdController> {
 
   @override
   Widget build(BuildContext context) {
-    final double viewportHeight = MediaQuery.of(context).size.height - 
+    final double viewportHeight = MediaQuery.of(context).size.height -
         MediaQuery.of(context).padding.vertical - 32;
-    
-    return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background image
-            Image.asset(
-              Assets.images.logoBackground.path,
-              fit: BoxFit.fitWidth,
-            ),
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
+
+    return Container(
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage(Assets.images.back1.path),
+          fit: BoxFit.contain,
+        ),
+      ),
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        backgroundColor: Colors.white.withOpacity(0.9),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // LEFT PANEL
@@ -59,7 +59,7 @@ class ResidenceServiceListView extends GetView<ResidenceIdController> {
                         Expanded(
                           child: Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE2F0F8),
+                              color: AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             padding: const EdgeInsets.all(16),
@@ -160,9 +160,8 @@ class ResidenceServiceListView extends GetView<ResidenceIdController> {
                 ),
               ),
             ],
-              ),
             ),
-          ],
+          ),
         ),
       ),
     );

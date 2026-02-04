@@ -38,6 +38,18 @@ class ResidenceIdController extends GetxController {
   final tinController = TextEditingController();
   final otpController = TextEditingController();
   
+  // Focus nodes for auto-focusing fields (for barcode/QR scanner)
+  final phoneFocusNode = FocusNode();
+  final idFocusNode = FocusNode();
+  final tinFocusNode = FocusNode();
+  final otpFocusNode = FocusNode();
+
+  /// When true, keyboard is shown for manual input (double-tap to enable).
+  final RxBool keyboardEnabledFayda = false.obs;
+  final RxBool keyboardEnabledOtp = false.obs;
+  final RxBool keyboardEnabledResidence = false.obs;
+  final RxBool keyboardEnabledTin = false.obs;
+  
   // Service
   late final IdIntegrationService _idIntegrationService;
   
@@ -58,12 +70,28 @@ class ResidenceIdController extends GetxController {
     idController.dispose();
     otpController.dispose();
     tinController.dispose();
+    phoneFocusNode.dispose();
+    idFocusNode.dispose();
+    tinFocusNode.dispose();
+    otpFocusNode.dispose();
     super.onClose();
   }
 
   /// Select ID type
   void selectIdType(String type) {
     selectedIdType.value = type;
+    
+    // Auto-focus the appropriate text field for barcode/QR scanner input
+    // Delay to ensure the widget is built before focusing
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (type == 'fayda' && !isOtpSent.value) {
+        phoneFocusNode.requestFocus();
+      } else if (type == 'residence') {
+        idFocusNode.requestFocus();
+      } else if (type == 'tin') {
+        tinFocusNode.requestFocus();
+      }
+    });
   }
 
   /// Clear selection and reset
@@ -82,6 +110,54 @@ class ResidenceIdController extends GetxController {
     residenceNetworkStatus.value = NetworkStatus.IDLE;
     tinError.value = '';
     tinNetworkStatus.value = NetworkStatus.IDLE;
+    keyboardEnabledFayda.value = false;
+    keyboardEnabledOtp.value = false;
+    keyboardEnabledResidence.value = false;
+    keyboardEnabledTin.value = false;
+  }
+
+  /// Enable keyboard for FAN/FIN field (double-tap).
+  void enableKeyboardFayda() {
+    keyboardEnabledFayda.value = true;
+    phoneFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        phoneFocusNode.requestFocus();
+      });
+    });
+  }
+
+  /// Enable keyboard for OTP field (double-tap).
+  void enableKeyboardOtp() {
+    keyboardEnabledOtp.value = true;
+    otpFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        otpFocusNode.requestFocus();
+      });
+    });
+  }
+
+  /// Enable keyboard for Residence ID field (double-tap).
+  void enableKeyboardResidence() {
+    keyboardEnabledResidence.value = true;
+    idFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        idFocusNode.requestFocus();
+      });
+    });
+  }
+
+  /// Enable keyboard for TIN field (double-tap).
+  void enableKeyboardTin() {
+    keyboardEnabledTin.value = true;
+    tinFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        tinFocusNode.requestFocus();
+      });
+    });
   }
   
   /// Request OTP for Fayda ID
@@ -123,6 +199,11 @@ class ResidenceIdController extends GetxController {
         print('✅ [FAYDA OTP] OTP sent successfully');
         print('  - Transaction ID: ${transactionID.value}');
         print('  - Masked Mobile: ${maskedMobile.value}');
+        
+        // Auto-focus OTP field for scanner input
+        Future.delayed(const Duration(milliseconds: 100), () {
+          otpFocusNode.requestFocus();
+        });
         
         // Use Get.context to safely show toast
         final context = Get.context;

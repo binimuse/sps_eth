@@ -14,6 +14,8 @@ import 'package:sps_eth_app/gen/assets.gen.dart';
 
 class AppToasts {
   static void showSuccess(String message) {
+    // Require overlay context to avoid "No Overlay widget found" when called from delayed callbacks
+    if (Get.overlayContext == null) return;
     Get.snackbar(
       'Success',
       message,
@@ -24,6 +26,8 @@ class AppToasts {
   }
 
   static void showError(String message) {
+    // Require overlay context to avoid "No Overlay widget found" when called from delayed callbacks
+    if (Get.overlayContext == null) return;
     Get.snackbar(
       'Error',
       message,
@@ -34,6 +38,8 @@ class AppToasts {
   }
 
   static void showWarning(String message) {
+    // Require overlay context to avoid "No Overlay widget found" when called from delayed callbacks
+    if (Get.overlayContext == null) return;
     Get.snackbar(
       'Warning',
       message,
