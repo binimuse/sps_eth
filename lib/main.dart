@@ -113,6 +113,7 @@ class _FullScreenAppState extends State<_FullScreenApp>
             getPages: AppPages.routes,
             translations: MainTranslations(),
             locale: Locale(selectedLocale),
+            fallbackLocale: const Locale('en_US'),
             navigatorObservers: [BotToastNavigatorObserver()],
 
             title: 'SPS Ethiopia'.tr,

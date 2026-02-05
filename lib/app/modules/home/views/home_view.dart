@@ -624,20 +624,28 @@ class _SwipeToCallState extends State<_SwipeToCall> {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child:  Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.phone, color: Colors.white, size: 28),
-                        SizedBox(width: 8),
-                        Text(
-                          'Swipe to Call'.tr,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.phone, color: Colors.white, size: 28),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Swipe to Call'.tr,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

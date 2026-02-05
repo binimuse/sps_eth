@@ -233,7 +233,7 @@ class _RightSidebar extends StatelessWidget {
                       fit: BoxFit.cover,
                     ),
                   ),
-                  const Padding(
+                   Padding(
                     padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
                     child: Text(
                       'RECENT ALERTS'.tr,
