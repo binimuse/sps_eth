@@ -175,9 +175,7 @@ class MainTranslations extends Translations {
       "Swipe anywhere to continue": "Swipe anywhere to continue",
       "Go to Home": "Go to Home",
       
-      // Common descriptions
-      "Loreim re in charge of planning and managing marketing\ncampaigns that promote a company's brand. marketing\ncampaigns that promote a company's brand.": "Loreim re in charge of planning and managing marketing\ncampaigns that promote a company's brand. marketing\ncampaigns that promote a company's brand.",
-    },
+         },
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //Amharic
     //አማርኛ
@@ -353,8 +351,6 @@ class MainTranslations extends Translations {
       "Swipe anywhere to continue": "",
       "Go to Home": "",
       
-      // Common descriptions
-      "Loreim re in charge of planning and managing marketing\ncampaigns that promote a company's brand. marketing\ncampaigns that promote a company's brand.": "",
-    },
+        },
   };
 }
