@@ -827,8 +827,6 @@ class CallClassView extends GetView<CallClassController> {
                                       controller: controller,
                                     );
                                   }),
-                                  const SizedBox(height: 8),
-                                  _TermsAndActions(controller: controller),
                                   const Spacer(), // Push buttons to top if needed
                                 ],
                               ),
@@ -1292,177 +1290,6 @@ class _DocumentsCard extends StatelessWidget {
   }
 }
 
-class _TermsAndActions extends StatelessWidget {
-  const _TermsAndActions({required this.controller});
-
-  final CallClassController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.whiteOff,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.check_box, color: AppColors.grayDark),
-              const SizedBox(width: 8),
-              Text(
-                'Terms and Condition'.tr,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Obx(() {
-            return Text(
-              controller.termsAndConditions.value,
-              style: TextStyle(color: AppColors.grayDark),
-            );
-          }),
-          const SizedBox(height: 8),
-          Obx(() {
-            final callStatus = controller.callStatus.value;
-            final isAutoStarting = controller.autoStartCall.value;
-            print('🔘 [BUTTONS] Current call status: $callStatus');
-            print('🔘 [BUTTONS] Auto-starting: $isAutoStarting');
-            final isCallActive =
-                callStatus == 'active' ||
-                callStatus == 'connecting' ||
-                callStatus == 'pending';
-            print('🔘 [BUTTONS] Is call active: $isCallActive');
-
-            // Show error message with close button if auto-starting and there's an error
-            if (isAutoStarting &&
-                controller.callNetworkStatus.value == NetworkStatus.ERROR) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      color: AppColors.danger,
-                      size: 48,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Connection Error'.tr,
-                      style: TextStyle(
-                        color: AppColors.danger,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Failed to connect. Please try again later.'.tr,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.grayDark, fontSize: 12),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.danger,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () async {
-                        print(
-                          '🔘 [BUTTONS] Close button pressed (error in terms card)',
-                        );
-                        await controller.onWillPop();
-                        _NavigationHelper.safeNavigateBack();
-                      },
-                      child: Text(
-                        'Close'.tr,
-                        style: TextStyle(
-                          color: AppColors.whiteOff,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            // Show loading if auto-starting without error AND call is not yet active
-            if (isAutoStarting && !isCallActive) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(color: AppColors.primary),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Connecting...'.tr,
-                        style: TextStyle(
-                          color: AppColors.grayDark,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            if (callStatus == 'ended') {
-              // Show "Go Back" button when call is ended
-              print('🔘 [BUTTONS] Showing Go Back button (call ended)');
-              return ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  minimumSize: const Size(double.infinity, 0),
-                ),
-                onPressed: () async {
-                  print('🔘 [BUTTONS] Go Back button pressed (call ended)');
-                  await controller.onWillPop();
-                  _NavigationHelper.safeNavigateBack();
-                },
-                child: Text(
-                  'Go Back to Home'.tr,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.whiteOff,
-                  ),
-                ),
-              );
-            }
-
-            // No buttons shown when call is not active (user already used slide button to get here)
-            return const SizedBox.shrink();
-          }),
-        ],
-      ),
-    );
-  }
-}
-
 /// Widget to display statement details from call details
 class _StatementDetailsView extends StatelessWidget {
   const _StatementDetailsView({required this.controller});
@@ -1684,7 +1511,7 @@ class _StatementDetailsView extends StatelessWidget {
                       _buildInfoRow('Status', statement.status!),
                   ],
 
-                  // Report Submission Status (no buttons, just show status)
+                  // Report Submission Status with Confirm/Reject buttons
                   if (report?.submitted == true) ...[
                     const SizedBox(height: 16),
                     Container(
@@ -1714,6 +1541,49 @@ class _StatementDetailsView extends StatelessWidget {
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Confirm and Reject buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              print('🔘 [REPORT] Confirm button pressed');
+                              controller.confirmReportSubmission();
+                            },
+                            icon: const Icon(Icons.check, size: 18),
+                            label: const Text('Confirm'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.success,
+                              foregroundColor: AppColors.whiteOff,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              print('🔘 [REPORT] Reject button pressed');
+                              controller.rejectReportSubmission();
+                            },
+                            icon: const Icon(Icons.close, size: 18),
+                            label: const Text('Reject'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.danger,
+                              foregroundColor: AppColors.whiteOff,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],

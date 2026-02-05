@@ -3668,7 +3668,8 @@ class CallClassController extends GetxController {
       // Use Dio directly for admin API since it has a different base URL
       final dio = DioUtil().getDio(useAccessToken: true);
 
-      final response = await dio.get('${Constants.baseUrl}/reports/$reportId');
+      // Remove leading slash since baseUrl already ends with /
+      final response = await dio.get('${Constants.baseUrl}reports/$reportId');
 
       if (response.statusCode == 200 && response.data != null) {
         final responseData = response.data is Map
