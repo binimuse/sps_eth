@@ -43,7 +43,7 @@ class NearbyPoliceView extends GetView<NearbyPoliceController> {
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: () => controller.loadNearbyStations(),
-                          child: const Text('Retry'),
+                          child: Text('Retry'.tr),
                         ),
                       ],
                     ),
@@ -84,7 +84,7 @@ class NearbyPoliceView extends GetView<NearbyPoliceController> {
                   }
                 },
                 icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
               ),
             ),
           ],

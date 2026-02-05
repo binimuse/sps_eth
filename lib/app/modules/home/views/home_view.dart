@@ -8,6 +8,8 @@ import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 
+import 'package:sps_eth_app/app/utils/connectivity_util.dart';
+
 import '../controllers/home_controller.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -26,6 +28,48 @@ class HomeView extends GetView<HomeController> {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // No internet banner (top overlay)
+          Obx(() {
+            if (ConnectivityUtil().isOnline.value) return const SizedBox.shrink();
+            return Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                color: Colors.red.shade700,
+                elevation: 4,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.wifi_off_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'No internet connected'.tr,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
           // Background image
           Image.asset(
             Assets.images.homeBackground.path,
@@ -453,8 +497,8 @@ class _AlertTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
+                Text(
+                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
@@ -670,7 +714,7 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
               const SizedBox(height: 24),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close', style: TextStyle(color: Colors.white)),
+                child: Text('Close'.tr, style: TextStyle(color: Colors.white)),
               ),
             ],
           ),

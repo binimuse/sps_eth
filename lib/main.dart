@@ -8,6 +8,7 @@ import 'package:sps_eth_app/app/utils/constants.dart';
 import 'package:sps_eth_app/app/utils/prefrence_utility.dart';
 import 'package:sps_eth_app/app/utils/kiosk_machine_id_util.dart';
 import 'package:sps_eth_app/app/utils/full_screen_util.dart';
+import 'package:sps_eth_app/app/utils/connectivity_util.dart';
 import 'package:upgrader/upgrader.dart';
 import 'app/routes/app_pages.dart';
 
@@ -31,6 +32,9 @@ void main() async {
   ]);
 
   await PreferenceUtils.init();
+
+  // Initialize connectivity monitoring for internet check on home page
+  await ConnectivityUtil().initialize();
 
   // Initialize and store Android ID and Serial Number for kiosk machine identification
   await KioskMachineIdUtil.initializeAndStoreDeviceInfo();
