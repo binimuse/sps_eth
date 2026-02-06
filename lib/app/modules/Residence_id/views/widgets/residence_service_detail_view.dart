@@ -38,8 +38,8 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
                 child: SizedBox(
                   height: viewportHeight,
                   child: SideInfoPanel(
-                    title: 'SMART POLICE\nSTATION',
-                    description: 'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.',
+                    title: 'SMART POLICE\nSTATION'.tr,
+                    description: 'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
                     logoAsset: Assets.images.efpLogo.path,
                     illustrationAsset: Assets.images.law.path,
                   ),
@@ -97,7 +97,7 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
                             Get.toNamed(Routes.LANGUAGE);
                           },
                           icon: const Icon(Icons.language, color: Color(0xFF0F3955), size: 20),
-                          label: const Text('Language', style: TextStyle(color: Color(0xFF0F3955))),
+                          label: Text('Language'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                         ),
                       ],
                     ),
@@ -116,7 +116,7 @@ class ResidenceServiceDetailView extends GetView<ResidenceIdController> {
                         }
                       },
                       icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                      label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                      label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                     ),
                     const SizedBox(height: 16),
                     // Main content area with two columns

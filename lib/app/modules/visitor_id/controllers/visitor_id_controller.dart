@@ -99,15 +99,7 @@ Future<void> scanPassport() async {
     }
     print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    // Store all passport data
-    passportData.value = Map<String, dynamic>.from(data);
-
-    // Map to individual fields
-    passportNumber.value = data['passportNumber']?.toString() ?? '';
-    fullName.value = data['fullName']?.toString() ?? '';
-    nationality.value = data['nationality']?.toString() ?? '';
-    dateOfBirth.value = data['dateOfBirth']?.toString() ?? '';
-    expiryDate.value = data['expiryDate']?.toString() ?? '';
+    // Extract image first (always needed)
     scannedImageBase64.value = data['imageBase64']?.toString() ?? '';
     
     print('');
@@ -120,27 +112,51 @@ Future<void> scanPassport() async {
     }
     print('');
 
-    // Update text field if passport number found
-    if (passportNumber.value.isNotEmpty) {
-      passportIdController.text = passportNumber.value;
+    // Check if image was captured
+    if (scannedImageBase64.value.isEmpty) {
+      scanError.value = 'Document scanned but no image captured';
+      return;
     }
 
-    print('=== Passport Scan Complete ===');
-    print('Passport Number: ${passportNumber.value}');
-    print('Full Name: ${fullName.value}');
-    print('Nationality: ${nationality.value}');
-    print('Date of Birth: ${dateOfBirth.value}');
-    print('Expiry Date: ${expiryDate.value}');
-    print('All Data: $data');
+    // Check if it's a passport (has passportNumber) or ID card (no passportNumber)
+    final extractedPassportNumber = data['passportNumber']?.toString()?.trim() ?? '';
+    final isPassport = extractedPassportNumber.isNotEmpty;
+    
+    print('=== Document Type Detection ===');
+    print('Passport Number found: $extractedPassportNumber');
+    print('Document Type: ${isPassport ? "PASSPORT" : "ID CARD"}');
+    
+    if (isPassport) {
+      // PASSPORT: Extract all data + image
+      print('📘 Processing as PASSPORT - extracting all data');
+      
+      // Store all passport data
+      passportData.value = Map<String, dynamic>.from(data);
 
-    // Check if we got data
-    if (passportNumber.value.isEmpty && fullName.value.isEmpty) {
-      scanError.value = 'Document scanned but no data extracted';
-    } else {
-      // Success! Automatically navigate to call class
+      // Map to individual fields
+      passportNumber.value = extractedPassportNumber;
+      fullName.value = data['fullName']?.toString() ?? '';
+      nationality.value = data['nationality']?.toString() ?? '';
+      dateOfBirth.value = data['dateOfBirth']?.toString() ?? '';
+      expiryDate.value = data['expiryDate']?.toString() ?? '';
+      
+      // Update text field
+      passportIdController.text = passportNumber.value;
+
+      print('=== Passport Scan Complete ===');
+      print('Passport Number: ${passportNumber.value}');
+      print('Full Name: ${fullName.value}');
+      print('Nationality: ${nationality.value}');
+      print('Date of Birth: ${dateOfBirth.value}');
+      print('Expiry Date: ${expiryDate.value}');
+      print('Image Base64: ${scannedImageBase64.value.isNotEmpty ? "YES (${scannedImageBase64.value.length} chars)" : "NO"}');
+      
+      // Success! Navigate to call class with passport data + image
       scanSuccess.value = true;
       
-      // Navigate to call class with scanned data
+      // Ensure base64 image is included in passportData map as well
+      passportData.value['imageBase64'] = scannedImageBase64.value;
+      
       Get.toNamed(
         Routes.CALL_CLASS,
         arguments: {
@@ -152,7 +168,48 @@ Future<void> scanPassport() async {
           'nationality': nationality.value,
           'dateOfBirth': dateOfBirth.value,
           'expiryDate': expiryDate.value,
-          'idPhoto': scannedImageBase64.value, // Pass base64 image
+          'idPhoto': scannedImageBase64.value, // Pass base64 image (REQUIRED)
+        },
+      );
+    } else {
+      // ID CARD: Only use image, skip data extraction
+      print('🆔 Processing as ID CARD - using image only, skipping data extraction');
+      
+      // Clear data fields (we don't need them for ID cards)
+      passportNumber.value = '';
+      fullName.value = '';
+      nationality.value = '';
+      dateOfBirth.value = '';
+      expiryDate.value = '';
+      
+      // Store only the image in passportData for consistency
+      passportData.value = {
+        'imageBase64': scannedImageBase64.value,
+        'documentType': 'ID_CARD',
+      };
+      
+      print('=== ID Card Scan Complete ===');
+      print('Document Type: ID Card');
+      print('Image captured: YES');
+      print('Image Base64: ${scannedImageBase64.value.isNotEmpty ? "YES (${scannedImageBase64.value.length} chars)" : "NO"}');
+      print('Data extraction: SKIPPED (not needed for ID cards)');
+      
+      // Success! Navigate to call class with image only
+      scanSuccess.value = true;
+      
+      // Verify base64 is not empty before navigating
+      if (scannedImageBase64.value.isEmpty) {
+        scanError.value = 'ID card scanned but no image captured';
+        return;
+      }
+      
+      Get.toNamed(
+        Routes.CALL_CLASS,
+        arguments: {
+          'isVisitor': true,
+          'autoStart': true,
+          'idPhoto': scannedImageBase64.value, // Pass base64 image (REQUIRED)
+          'documentType': 'ID_CARD', // Indicate it's an ID card, not passport
         },
       );
     }

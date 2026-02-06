@@ -130,8 +130,8 @@ class LanguageView extends GetView<LanguageController> {
                           return Obx(() {
                             final isSelected = controller.selectedLanguageIndex.value == index;
                             return GestureDetector(
-                              onTap: () {
-                                controller.selectLanguage(index);
+                              onTap: () async {
+                                await controller.selectLanguage(index);
                                 Get.toNamed(Routes.FIILING_CLASS);
                               },
                               child: Card(
@@ -157,7 +157,7 @@ class LanguageView extends GetView<LanguageController> {
                                       const SizedBox(height: 6),
                                       Flexible(
                                         child: Text(
-                                          language['name'] as String,
+                                          (language['name'] as String).tr,
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 11,

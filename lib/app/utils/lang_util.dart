@@ -9,23 +9,29 @@ import 'package:sps_eth_app/app/utils/prefrence_utility.dart';
 
 
 class LanUtil {
-  ///SAVE SELECTED LANGUAGE
-  static saveLanguage(String lan) async {
-    await PreferenceUtils.setString(Constants.selectedLanguage, lan);
-
-    String selectedLan = getSelecctedLanguage();
-
-    var locale = Locale(selectedLan);
-    Get.updateLocale(locale);
+  /// Map stored language code to GetX translation locale key
+  static String _toLocaleCode(String stored) {
+    if (stored == Constants.lanEn || stored.isEmpty) return 'en_US';
+    return stored;
   }
 
-  ///GET SELECTED LANGUAGE
-  static String getSelecctedLanguage() {
-    String lan = PreferenceUtils.getString(
-      Constants.selectedLanguage,
-      Constants.lanAm,
-    );
+  /// SAVE SELECTED LANGUAGE and update GetX locale
+  static saveLanguage(String lan) async {
+    await PreferenceUtils.setString(Constants.selectedLanguage, lan);
+    final localeCode = _toLocaleCode(lan);
+    Get.updateLocale(Locale(localeCode));
+  }
 
-    return lan;
+  /// GET SELECTED LANGUAGE from storage
+  static String getSelecctedLanguage() {
+    return PreferenceUtils.getString(
+      Constants.selectedLanguage,
+      Constants.lanEn,
+    );
+  }
+
+  /// GET locale code for GetX (en -> en_US)
+  static String getLocaleForGetX() {
+    return _toLocaleCode(getSelecctedLanguage());
   }
 }

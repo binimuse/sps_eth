@@ -11,7 +11,7 @@ class SplashView extends GetView<SplashController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SplashView'),
+        title: Text('SplashView'.tr),
         centerTitle: true,
       ),
       body: GestureDetector(
@@ -19,10 +19,10 @@ class SplashView extends GetView<SplashController> {
           // Detect swipe gesture
            Get.toNamed(Routes.HOME); // Navigate to the home screen
         },
-        child: const Center(
+        child: Center(
           child: Text(
-            'Swipe anywhere to continue',
-            style: TextStyle(fontSize: 20),
+            'Swipe anywhere to continue'.tr,
+            style: const TextStyle(fontSize: 20),
           ),
         ),
       ),

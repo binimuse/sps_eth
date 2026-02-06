@@ -150,7 +150,9 @@ class CallClassController extends GetxController {
   );
 
   static const int _callDetailsPollInterval =
-      3; // seconds (reduced for faster updates)
+      3; // seconds (normal polling)
+  static const int _callDetailsPollIntervalFast =
+      1; // seconds (when waiting for report submission)
   static const Duration _remoteVideoTrackRetryInterval = Duration(
     milliseconds: 200,
   );
@@ -3527,6 +3529,7 @@ class CallClassController extends GetxController {
   }
 
   /// Start polling for call details updates
+  /// Uses faster interval (1s) when report exists but not yet submitted - so Confirm button appears quickly when admin submits
   void _startCallDetailsPolling() {
     final sessionId = currentSessionId.value;
     if (sessionId == null || sessionId.isEmpty) {
@@ -3546,26 +3549,44 @@ class CallClassController extends GetxController {
     // Load immediately first time
     _loadCallDetails(sessionId);
 
-    // Schedule periodic polling every 10 seconds
-    _callDetailsPollingTimer = Timer.periodic(
-      const Duration(seconds: _callDetailsPollInterval),
-      (timer) {
-        final currentSessionId = this.currentSessionId.value;
-        if (currentSessionId == null || currentSessionId.isEmpty) {
-          _stopCallDetailsPolling();
-          return;
-        }
+    void scheduleNextPoll() {
+      final sid = currentSessionId.value;
+      if (sid == null || sid.isEmpty) {
+        _stopCallDetailsPolling();
+        return;
+      }
+      if (callStatus.value != 'active' && callStatus.value != 'connecting') {
+        _stopCallDetailsPolling();
+        return;
+      }
 
-        // Stop polling if call is not active
-        if (callStatus.value != 'active' && callStatus.value != 'connecting') {
-          _stopCallDetailsPolling();
-          return;
-        }
+      // Use fast interval (1s) when waiting for report submission - so Confirm button shows quickly
+      final report = reportInfo.value;
+      final waitingForSubmit =
+          report != null && (report.submitted != true);
+      final intervalSeconds =
+          waitingForSubmit ? _callDetailsPollIntervalFast : _callDetailsPollInterval;
 
-        // Poll for call details
-        _loadCallDetails(currentSessionId);
-      },
-    );
+      _callDetailsPollingTimer = Timer(
+        Duration(seconds: intervalSeconds),
+        () async {
+          _callDetailsPollingTimer = null;
+          final currentSid = currentSessionId.value;
+          if (currentSid == null || currentSid.isEmpty) {
+            _stopCallDetailsPolling();
+            return;
+          }
+          if (callStatus.value != 'active' && callStatus.value != 'connecting') {
+            _stopCallDetailsPolling();
+            return;
+          }
+          await _loadCallDetails(currentSid);
+          scheduleNextPoll();
+        },
+      );
+    }
+
+    scheduleNextPoll();
   }
 
   /// Stop polling for call details updates
@@ -3668,7 +3689,8 @@ class CallClassController extends GetxController {
       // Use Dio directly for admin API since it has a different base URL
       final dio = DioUtil().getDio(useAccessToken: true);
 
-      final response = await dio.get('${Constants.baseUrl}/reports/$reportId');
+      // Remove leading slash since baseUrl already ends with /
+      final response = await dio.get('${Constants.baseUrl}reports/$reportId');
 
       if (response.statusCode == 200 && response.data != null) {
         final responseData = response.data is Map
@@ -3696,7 +3718,11 @@ class CallClassController extends GetxController {
         );
 
         // Convert report data to formData format for ConfirmationPageView
-        final formData = _convertReportToFormData(reportData);
+        var formData = _convertReportToFormData(reportData);
+
+        // Enrich with call details (direct-call API) when report API has empty fields
+        // Direct-call response has caller.phone, statement.person.phoneMobile, etc.
+        formData = _enrichFormDataFromCallDetails(formData);
 
         // Navigate directly to confirmation page view
         print('📋 [REPORT FETCH] Navigating to confirmation page view');
@@ -3878,6 +3904,92 @@ class CallClassController extends GetxController {
 
     return formData;
   }
+
+  /// Enrich formData with call details when report API has empty fields.
+  /// Direct-call API returns caller (phone, name) and statement.person (phoneMobile, fullName, etc.)
+  Map<String, String> _enrichFormDataFromCallDetails(Map<String, String> formData) {
+    final details = callDetails.value;
+    if (details == null) return formData;
+
+    final result = Map<String, String>.from(formData);
+
+    // Phone: prefer caller.phone or statement.person.phoneMobile
+    if (_isEmpty(result['phoneNumber'])) {
+      final phone = details.caller?.phone?.trim();
+      if (phone != null && phone.isNotEmpty) {
+        result['phoneNumber'] = phone;
+      } else {
+        final personPhone = details.statement?.person?.phoneMobile?.trim();
+        if (personPhone != null && personPhone.isNotEmpty) {
+          result['phoneNumber'] = personPhone;
+        }
+      }
+    }
+
+    // Full name: caller.name or statement.person.fullName
+    if (_isEmpty(result['fullName'])) {
+      final name = details.caller?.name?.trim();
+      if (name != null && name.isNotEmpty) {
+        result['fullName'] = name;
+      } else {
+        final personName = details.statement?.person?.fullName?.trim();
+        if (personName != null && personName.isNotEmpty) {
+          result['fullName'] = personName;
+        }
+      }
+    }
+
+    // Person fields from statement.person
+    final person = details.statement?.person;
+    if (person != null) {
+      if (_isEmpty(result['sex']) && person.sex?.trim().isNotEmpty == true) {
+        result['sex'] = person.sex!.trim();
+      }
+      if (_isEmpty(result['age']) && person.age != null) {
+        result['age'] = person.age.toString();
+      }
+      if (_isEmpty(result['nationality']) &&
+          person.nationality?.trim().isNotEmpty == true) {
+        result['nationality'] = person.nationality!.trim();
+      }
+      if (_isEmpty(result['dateOfBirth']) && person.dateOfBirth != null) {
+        try {
+          final dob = person.dateOfBirth!;
+          result['dateOfBirth'] =
+              '${dob.day} ${_getMonthName(dob.month)}, ${dob.year}';
+        } catch (_) {}
+      }
+    }
+
+    // Statement text
+    if (_isEmpty(result['statement']) &&
+        details.statement?.statement?.trim().isNotEmpty == true) {
+      result['statement'] = details.statement!.statement!.trim();
+    }
+
+    // Report fields from call details
+    final report = details.report;
+    if (report != null) {
+      if (_isEmpty(result['id']) &&
+          report.caseNumber?.trim().isNotEmpty == true) {
+        result['id'] = report.caseNumber!;
+        result['caseNumber'] = report.caseNumber!;
+      }
+      if (_isEmpty(result['category']) &&
+          report.reportType?.code?.trim().isNotEmpty == true) {
+        result['category'] = report.reportType!.code!;
+      }
+      if (_isEmpty(result['incidentType']) &&
+          report.reportType?.name?.trim().isNotEmpty == true) {
+        result['incidentType'] = report.reportType!.name!;
+      }
+    }
+
+    return result;
+  }
+
+  bool _isEmpty(String? s) =>
+      s == null || s.trim().isEmpty;
 
   /// Helper to get month name
   String _getMonthName(int month) {
