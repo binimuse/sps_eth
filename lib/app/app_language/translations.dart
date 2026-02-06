@@ -456,7 +456,7 @@ class MainTranslations extends Translations {
     "Scan Document": "Sanada Iskaanii godhi",
     "Scanning document...": "Sanadi  iskaanii gochaa jira",
     "Insert your passport or ID card into the scanner":"Paaspoortii yookaan waraqaa eenyummaa keessan gara iskaaneriitti seensisaa",
-    "Then press \"Scan Document\" button below": "Isa booda\Sanada keessan iskaanii godhaa\ furtuu gadii  tuqaa",  
+    "Then press \"Scan Document\" button below": "Isa boodaSanada keessan iskaanii godhaa furtuu gadii  tuqaa",  
     "SDK Status:": "Haala SDK n  irra jiru",
     "Enter FAN or FIN Number": "Lakkoofsa kaardii faayidaa yookaan lakkoofsa addaa faayidaa",  
     "Enter OTP Code": "Lakkofsa iccitii yeroo tokkoo galchaa " ,           

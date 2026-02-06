@@ -1,4 +1,4 @@
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -448,9 +448,12 @@ class _AlertsPanel extends StatelessWidget {
                 itemCount: alerts.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
+                  final item = alerts[index];
                   return _AlertTile(
-                    title: alerts[index],
-                    onTap: controller.openRecentAlerts,
+                    title: item.title,
+                    summary: item.excerpt,
+                    imageUrl: item.featuredImageUrl, 
+                    onTap: () => controller.openRecentAlerts(item.id),
                   );
                 },
               );
@@ -464,8 +467,15 @@ class _AlertsPanel extends StatelessWidget {
 
 class _AlertTile extends StatelessWidget {
   final String title;
+  final String summary;
+  final String? imageUrl;
   final VoidCallback onTap;
-  const _AlertTile({required this.title, required this.onTap});
+  const _AlertTile({
+    required this.title,
+    required this.summary,
+    this.imageUrl,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -475,12 +485,31 @@ class _AlertTile extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              Assets.images.news.path,
-              width: 72,
-              height: 56,
-              fit: BoxFit.cover,
-            ),
+            child: imageUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: imageUrl!,
+                    width: 72,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Image.asset(
+                      Assets.images.news.path,
+                      width: 72,
+                      height: 56,
+                      fit: BoxFit.cover,
+                    ),
+                    errorWidget: (_, __, ___) => Image.asset(
+                      Assets.images.news.path,
+                      width: 72,
+                      height: 56,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Image.asset(
+                    Assets.images.news.path,
+                    width: 72,
+                    height: 56,
+                    fit: BoxFit.cover,
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -498,10 +527,10 @@ class _AlertTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'A technology-driven, modern police service outlet where users can serve themselves without human intervention. Designed to make police services more accessible, efficient, and convenient for the community.'.tr,
+                  summary,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
                 ),
               ],
             ),

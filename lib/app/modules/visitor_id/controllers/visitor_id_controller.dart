@@ -119,7 +119,7 @@ Future<void> scanPassport() async {
     }
 
     // Check if it's a passport (has passportNumber) or ID card (no passportNumber)
-    final extractedPassportNumber = data['passportNumber']?.toString()?.trim() ?? '';
+    final extractedPassportNumber = data['passportNumber']?.toString().trim() ?? '';
     final isPassport = extractedPassportNumber.isNotEmpty;
     
     print('=== Document Type Detection ===');

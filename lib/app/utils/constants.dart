@@ -132,4 +132,8 @@ static const String fileViewer = 'http://5.75.142.45:9000/';
 
   // Report endpoints
   static const reportDraft = "/reports/draft/{callSessionId}";
+
+  // Blog post (recent alerts) endpoints
+  static const blogPostPublic = "/blog-post/public";
+  static const blogPostById = "/blog-post/{id}";
 }

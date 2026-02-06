@@ -7,12 +7,15 @@ import 'package:intl/intl.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 import 'package:sps_eth_app/app/common/app_toasts.dart';
 import 'package:sps_eth_app/app/theme/app_colors.dart';
+import 'package:sps_eth_app/app/modules/recent_alerts/models/blog_post_model.dart';
+import 'package:sps_eth_app/app/modules/recent_alerts/services/blog_post_service.dart';
 
 class HomeController extends GetxController {
   final Rx<DateTime> now = DateTime.now().obs;
   Timer? _ticker;
 
-  final RxList<String> alerts = <String>[].obs;
+  final RxList<BlogPostListItem> alerts = <BlogPostListItem>[].obs;
+  final BlogPostService _blogPostService = BlogPostService();
 
   // Hero section images for carousel slider
   final List<String> heroImages = [
@@ -49,12 +52,14 @@ class HomeController extends GetxController {
   }
 
   Future<void> fetchAlerts() async {
-    // Placeholder for API integration; keep existing UI populated.
-    final updatedAlerts = List.generate(
-      6,
-      (index) => 'Recent alert item ${index + 1}',
-    );
-    alerts.assignAll(updatedAlerts);
+    try {
+      final response = await _blogPostService.getPublicPosts(page: 1, limit: 10);
+      if (response.success && response.data.isNotEmpty) {
+        alerts.assignAll(response.data);
+      }
+    } catch (e) {
+      // Keep list empty on error; UI will show empty state
+    }
   }
 
   Future<void> onSwipeToCallComplete() async {
@@ -70,8 +75,8 @@ class HomeController extends GetxController {
     }
   }
 
-  void openRecentAlerts() {
-    Get.toNamed(Routes.RECENT_ALERTS);
+  void openRecentAlerts([String? blogPostId]) {
+    Get.toNamed(Routes.RECENT_ALERTS, arguments: blogPostId);
   }
 
   void openLanguageSelection() {

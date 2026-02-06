@@ -1414,7 +1414,7 @@ class CallClassController extends GetxController {
         } catch (enableError, enableStack) {
           print('❌ [AUDIO ERROR] setMicrophoneEnabled failed: $enableError');
           print('❌ [AUDIO ERROR] Stack trace: $enableStack');
-          throw enableError;
+          rethrow;
         }
         
         // Wait longer for VP9 codec
