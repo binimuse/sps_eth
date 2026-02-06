@@ -770,48 +770,7 @@ class CallClassView extends GetView<CallClassController> {
                                   }),
                                   const SizedBox(height: 12),
 
-                                  Obx(() {
-                                    if (controller
-                                        .supportingDocuments
-                                        .isEmpty) {
-                                      return Container(
-                                        width: double.infinity,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.whiteOff,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        padding: const EdgeInsets.all(16),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'Supporting Document'.tr,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.primary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Text(
-                                              'No documents available'.tr,
-                                              style: TextStyle(
-                                                color: AppColors.grayDark,
-                                                fontStyle: FontStyle.italic,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }
-
-                                    return _DocumentsCard(
-                                      documents: controller.supportingDocuments
-                                          .toList(),
-                                    );
-                                  }),
+                                  
                                   const SizedBox(height: 12),
                                   // Statement Details View - Show during active calls
                                   Obx(() {

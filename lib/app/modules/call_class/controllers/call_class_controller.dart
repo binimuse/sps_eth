@@ -2448,7 +2448,7 @@ class CallClassController extends GetxController {
     }
   }
 
-  /// Confirm report submission - navigate to confirmation page and end call
+  /// Confirm report submission - end call first, then navigate to confirmation page
   Future<void> confirmReportSubmission() async {
     try {
       final reportId = reportInfo.value?.id;
@@ -2459,24 +2459,32 @@ class CallClassController extends GetxController {
 
       print('✅ [REPORT CONFIRM] Confirming report submission: $reportId');
 
-      // Fetch and show report in confirmation page
-      await _fetchAndShowReport(reportId);
+      final sessionId = currentSessionId.value;
 
-      // End the call after showing confirmation page (without navigation since we're already showing confirmation page)
+      // End the call first (before showing confirmation page)
+      if (sessionId != null && sessionId.isNotEmpty) {
+        try {
+          await _directCallService.endCall(sessionId);
+        } catch (e) {
+          print('⚠️ [REPORT CONFIRM] End call API failed (continuing): $e');
+        }
+      }
       await disconnectFromRoom();
       callStatus.value = 'ended';
+      _stopCallDetailsPolling();
 
-      // Clear call details
-      callDetails.value = null;
-      reportInfo.value = null;
-      statementInfo.value = null;
-
+      // Clear session info but keep callDetails for PDF enrichment until after fetch
       currentSessionId.value = '';
       currentRoomName.value = '';
       currentWsUrl.value = '';
 
-      // Stop polling
-      _stopCallDetailsPolling();
+      // Fetch and show report in confirmation page (callDetails still available for enrichment)
+      await _fetchAndShowReport(reportId);
+
+      // Clear call details after confirmation page is shown
+      callDetails.value = null;
+      reportInfo.value = null;
+      statementInfo.value = null;
 
       print('✅ [REPORT CONFIRM] Call ended and confirmation page shown');
     } catch (e, stackTrace) {
@@ -4366,9 +4374,8 @@ class CallClassController extends GetxController {
     await disconnectFromRoom();
     callStatus.value = 'ended';
 
-    // Clear call details (but keep reportId for fetching)
+    // Keep callDetails for PDF enrichment until after fetch (statement from admin input)
     final savedReportId = reportId;
-    callDetails.value = null;
     reportInfo.value = null;
     statementInfo.value = null;
 
@@ -4383,20 +4390,19 @@ class CallClassController extends GetxController {
         // Clear loading state when navigation happens
         isEndingCall.value = false;
         await _fetchAndShowReport(savedReportId);
+        callDetails.value = null;
       } catch (e, stackTrace) {
         print('❌ [CALL ENDED] Error fetching report: $e');
         print('❌ [CALL ENDED] Stack trace: $stackTrace');
-        // Clear loading state when navigation happens
+        callDetails.value = null;
         isEndingCall.value = false;
-        // If report fetch fails, just navigate to home
         Future.delayed(const Duration(milliseconds: 500), () {
           Get.offAllNamed(Routes.HOME);
         });
       }
     } else if (shouldNavigate) {
-      // No report, just navigate to home
       print('📋 [CALL ENDED] No report found, navigating to home');
-      // Clear loading state when navigation happens
+      callDetails.value = null;
       isEndingCall.value = false;
       Future.delayed(const Duration(milliseconds: 500), () {
         Get.offAllNamed(Routes.HOME);
@@ -4495,42 +4501,48 @@ class CallClassController extends GetxController {
         formData['incidentType'] = reportData.reportType!.name!;
       }
 
-      // Extract information from first statement
+      // Extract information from first statement (admin input during call)
       if (reportData.statements != null && reportData.statements!.isNotEmpty) {
         final statement = reportData.statements!.first;
 
-        // Extract full name
-        if (statement.fullName != null &&
-            statement.fullName!.trim().isNotEmpty) {
-          formData['fullName'] = statement.fullName!.trim();
+        // Extract full name - from statement (flat) or statement.person (nested, admin input)
+        final fullName = statement.fullName?.trim() ??
+            statement.person?.fullName?.trim();
+        if (fullName != null && fullName.isNotEmpty) {
+          formData['fullName'] = fullName;
         }
 
-        // Extract phone number
-        if (statement.phoneMobile != null &&
-            statement.phoneMobile!.trim().isNotEmpty) {
-          formData['phoneNumber'] = statement.phoneMobile!.trim();
+        // Extract phone number - from statement or statement.person
+        final phoneNumber = statement.phoneMobile?.trim() ??
+            statement.person?.phoneMobile?.toString().trim();
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          formData['phoneNumber'] = phoneNumber;
         }
 
-        // Extract age
-        if (statement.age != null) {
-          formData['age'] = statement.age.toString();
+        // Extract age - from statement or statement.person
+        final age = statement.age ?? statement.person?.age;
+        if (age != null) {
+          formData['age'] = age.toString();
         }
 
-        // Extract sex
-        if (statement.sex != null && statement.sex!.trim().isNotEmpty) {
-          formData['sex'] = statement.sex!.trim();
+        // Extract sex - from statement or statement.person
+        final sex = statement.sex?.trim() ?? statement.person?.sex?.trim();
+        if (sex != null && sex.isNotEmpty) {
+          formData['sex'] = sex;
         }
 
-        // Extract nationality
-        if (statement.nationality != null &&
-            statement.nationality!.trim().isNotEmpty) {
-          formData['nationality'] = statement.nationality!.trim();
+        // Extract nationality - from statement or statement.person
+        final nationality =
+            statement.nationality?.trim() ?? statement.person?.nationality?.trim();
+        if (nationality != null && nationality.isNotEmpty) {
+          formData['nationality'] = nationality;
         }
 
-        // Extract date of birth
-        if (statement.dateOfBirth != null) {
+        // Extract date of birth - from statement or statement.person
+        final dateOfBirth = statement.dateOfBirth ?? statement.person?.dateOfBirth;
+        if (dateOfBirth != null) {
           try {
-            final dob = statement.dateOfBirth!;
+            final dob = dateOfBirth;
             formData['dateOfBirth'] =
                 '${dob.day} ${_getMonthName(dob.month)}, ${dob.year}';
           } catch (e) {
@@ -4648,15 +4660,15 @@ class CallClassController extends GetxController {
       }
     }
 
-    // Full name: caller.name or statement.person.fullName
+    // Full name: prefer statement.person.fullName (admin input during call) over caller.name
     if (_isEmpty(result['fullName'])) {
-      final name = details.caller?.name?.trim();
-      if (name != null && name.isNotEmpty) {
-        result['fullName'] = name;
+      final personName = details.statement?.person?.fullName?.trim();
+      if (personName != null && personName.isNotEmpty) {
+        result['fullName'] = personName;
       } else {
-        final personName = details.statement?.person?.fullName?.trim();
-        if (personName != null && personName.isNotEmpty) {
-          result['fullName'] = personName;
+        final name = details.caller?.name?.trim();
+        if (name != null && name.isNotEmpty) {
+          result['fullName'] = name;
         }
       }
     }

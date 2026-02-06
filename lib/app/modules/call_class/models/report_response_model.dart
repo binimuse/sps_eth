@@ -84,11 +84,37 @@ class ReportType {
   Map<String, dynamic> toJson() => _$ReportTypeToJson(this);
 }
 
+/// Person info in statement (admin input during call)
+@JsonSerializable()
+class StatementPersonData {
+  const StatementPersonData({
+    this.fullName,
+    this.phoneMobile,
+    this.age,
+    this.sex,
+    this.nationality,
+    this.dateOfBirth,
+  });
+
+  factory StatementPersonData.fromJson(Map<String, dynamic> json) =>
+      _$StatementPersonDataFromJson(json);
+
+  final String? fullName;
+  final String? phoneMobile;
+  final int? age;
+  final String? sex;
+  final String? nationality;
+  final DateTime? dateOfBirth;
+
+  Map<String, dynamic> toJson() => _$StatementPersonDataToJson(this);
+}
+
 @JsonSerializable()
 class StatementData {
   const StatementData({
     this.id,
     this.reportId,
+    this.person,
     this.fullName,
     this.phoneMobile,
     this.dateOfBirth,
@@ -110,6 +136,7 @@ class StatementData {
 
   final String? id;
   final String? reportId;
+  final StatementPersonData? person;
   final String? fullName;
   final String? phoneMobile;
   final DateTime? dateOfBirth;
