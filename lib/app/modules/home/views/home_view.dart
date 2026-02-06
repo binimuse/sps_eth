@@ -924,7 +924,7 @@ class _StartFillingCard extends StatelessWidget {
               Text(
                 'These are the terms and conditions for in charge of planning'.tr,
                 textAlign: TextAlign.start,
-                style: TextStyle(fontSize: 12, color: Color(0xFF4F6B7E)),
+                style: TextStyle(fontSize: 10, color: Color(0xFF4F6B7E)),
               ),
             ],
           ),

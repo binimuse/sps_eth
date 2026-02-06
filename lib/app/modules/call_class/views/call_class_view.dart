@@ -1121,20 +1121,6 @@ class CallClassView extends GetView<CallClassController> {
   }
 }
 
-PopupMenuItem<String> _codecItem(CallClassController controller, String codec) {
-  final isSelected = controller.currentVideoCodec.value == codec;
-  return PopupMenuItem<String>(
-    value: codec,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (isSelected) Icon(Icons.check, color: AppColors.primary, size: 20),
-        if (isSelected) const SizedBox(width: 8),
-        Text(codec),
-      ],
-    ),
-  );
-}
 
 Widget _roundCtrl(IconData icon, {Color? color}) {
   return Container(
