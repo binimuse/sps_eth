@@ -46,7 +46,7 @@ class RecentAlertsView extends GetView<RecentAlertsController> {
                     }
                   },
                   icon: const Icon(Icons.arrow_back, color: Color(0xFF0F3955)),
-                  label: const Text('Back', style: TextStyle(color: Color(0xFF0F3955))),
+                  label: Text('Back'.tr, style: TextStyle(color: Color(0xFF0F3955))),
                 ),
                 const SizedBox(height: 16),
                 Expanded(
@@ -233,10 +233,10 @@ class _RightSidebar extends StatelessWidget {
                       fit: BoxFit.cover,
                     ),
                   ),
-                  const Padding(
+                   Padding(
                     padding: EdgeInsets.fromLTRB(12, 12, 12, 8),
                     child: Text(
-                      'RECENT ALERTS',
+                      'RECENT ALERTS'.tr,
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF0F3955),

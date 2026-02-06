@@ -175,7 +175,7 @@ class CallClassView extends GetView<CallClassController> {
                                             Icons.arrow_back,
                                             color: Colors.white,
                                           ),
-                                          tooltip: 'Back',
+                                          tooltip: 'Back'.tr,
                                           onPressed: () async {
                                             await controller.onWillPop();
                                             _NavigationHelper.safeNavigateBack();
@@ -534,7 +534,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (faydaData['name'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Name',
+                                            'Name'.tr,
                                             faydaData['name'].toString(),
                                           ),
                                         );
@@ -542,7 +542,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (faydaData['individualId'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'FAN/FIN Number',
+                                            'FAN/FIN Number'.tr,
                                             faydaData['individualId']
                                                 .toString(),
                                           ),
@@ -551,7 +551,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (faydaData['dateOfBirth'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Date of Birth',
+                                            'Date of Birth'.tr,
                                             faydaData['dateOfBirth'].toString(),
                                           ),
                                         );
@@ -559,7 +559,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (faydaData['gender'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Gender',
+                                            'Gender'.tr,
                                             faydaData['gender'].toString(),
                                           ),
                                         );
@@ -567,7 +567,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (faydaData['nationality'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Nationality',
+                                            'Nationality'.tr,
                                             faydaData['nationality'].toString(),
                                           ),
                                         );
@@ -575,7 +575,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (faydaData['phoneNumber'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Phone Number',
+                                            'Phone Number'.tr,
                                             faydaData['phoneNumber'].toString(),
                                           ),
                                         );
@@ -583,7 +583,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (faydaData['status'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Status',
+                                            'Status'.tr,
                                             faydaData['status'].toString(),
                                           ),
                                         );
@@ -591,7 +591,7 @@ class CallClassView extends GetView<CallClassController> {
 
                                       if (rows.isNotEmpty) {
                                         return _InfoCard(
-                                          title: 'User Information',
+                                          title: 'User Information'.tr,
                                           rows: rows,
                                         );
                                       }
@@ -607,7 +607,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (residenceData['fullName'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Name',
+                                            'Name'.tr,
                                             residenceData['fullName']
                                                 .toString(),
                                           ),
@@ -618,7 +618,7 @@ class CallClassView extends GetView<CallClassController> {
                                           args['residenceId'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Residence ID',
+                                            'Residence ID'.tr,
                                             args['residenceId'].toString(),
                                           ),
                                         );
@@ -626,7 +626,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (residenceData['dob'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Date of Birth',
+                                            'Date of Birth'.tr,
                                             residenceData['dob'].toString(),
                                           ),
                                         );
@@ -634,7 +634,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (residenceData['gender'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Gender',
+                                            'Gender'.tr,
                                             residenceData['gender'].toString(),
                                           ),
                                         );
@@ -643,7 +643,7 @@ class CallClassView extends GetView<CallClassController> {
                                           null) {
                                         rows.add(
                                           InfoRow(
-                                            'Nationality',
+                                            'Nationality'.tr,
                                             residenceData['nationality']
                                                 .toString(),
                                           ),
@@ -655,7 +655,7 @@ class CallClassView extends GetView<CallClassController> {
                                               .isNotEmpty) {
                                         rows.add(
                                           InfoRow(
-                                            'Phone Number',
+                                            'Phone Number'.tr,
                                             residenceData['phoneNo'].toString(),
                                           ),
                                         );
@@ -667,7 +667,7 @@ class CallClassView extends GetView<CallClassController> {
                                               .isNotEmpty) {
                                         rows.add(
                                           InfoRow(
-                                            'Status',
+                                            'Status'.tr,
                                             residenceData['currentStatus']
                                                 .toString(),
                                           ),
@@ -676,7 +676,7 @@ class CallClassView extends GetView<CallClassController> {
 
                                       if (rows.isNotEmpty) {
                                         return _InfoCard(
-                                          title: 'User Information',
+                                          title: 'User Information'.tr,
                                           rows: rows,
                                         );
                                       }
@@ -691,7 +691,7 @@ class CallClassView extends GetView<CallClassController> {
                                       if (tinData['fullName'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'Name',
+                                            'Name'.tr,
                                             tinData['fullName'].toString(),
                                           ),
                                         );
@@ -701,7 +701,7 @@ class CallClassView extends GetView<CallClassController> {
                                           args['tinNumber'] != null) {
                                         rows.add(
                                           InfoRow(
-                                            'TIN Number',
+                                            'TIN Number'.tr,
                                             args['tinNumber'].toString(),
                                           ),
                                         );
@@ -712,7 +712,7 @@ class CallClassView extends GetView<CallClassController> {
                                               .isNotEmpty) {
                                         rows.add(
                                           InfoRow(
-                                            'Phone Number',
+                                            'Phone Number'.tr,
                                             tinData['phoneNumber'].toString(),
                                           ),
                                         );
@@ -720,7 +720,7 @@ class CallClassView extends GetView<CallClassController> {
 
                                       if (rows.isNotEmpty) {
                                         return _InfoCard(
-                                          title: 'User Information',
+                                          title: 'User Information'.tr,
                                           rows: rows,
                                         );
                                       }
@@ -744,7 +744,7 @@ class CallClassView extends GetView<CallClassController> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Report Info',
+                                              'Report Info'.tr,
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 color: AppColors.primary,
@@ -752,7 +752,7 @@ class CallClassView extends GetView<CallClassController> {
                                             ),
                                             const SizedBox(height: 12),
                                             Text(
-                                              'No information available yet',
+                                              'No information available yet'.tr,
                                               style: TextStyle(
                                                 color: AppColors.grayDark,
                                                 fontStyle: FontStyle.italic,
@@ -764,7 +764,7 @@ class CallClassView extends GetView<CallClassController> {
                                     }
 
                                     return _InfoCard(
-                                      title: 'Report Info',
+                                      title: 'Report Info'.tr,
                                       rows: controller.idInformation.toList(),
                                     );
                                   }),
@@ -788,7 +788,7 @@ class CallClassView extends GetView<CallClassController> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Supporting Document',
+                                              'Supporting Document'.tr,
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 color: AppColors.primary,
@@ -796,7 +796,7 @@ class CallClassView extends GetView<CallClassController> {
                                             ),
                                             const SizedBox(height: 12),
                                             Text(
-                                              'No documents available',
+                                              'No documents available'.tr,
                                               style: TextStyle(
                                                 color: AppColors.grayDark,
                                                 fontStyle: FontStyle.italic,
@@ -1016,7 +1016,7 @@ class CallClassView extends GetView<CallClassController> {
           children: [
             // Title
             Text(
-              'Call Progress',
+              'Call Progress'.tr,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -1032,7 +1032,7 @@ class CallClassView extends GetView<CallClassController> {
                 Expanded(
                   child: _buildProgressStep(
                     stepNumber: 1,
-                    title: 'Connect to\nPolice Officer',
+                    title: 'Connect to\nPolice Officer'.tr,
                     isActive: currentStep >= 1,
                     isCurrent: currentStep == 1,
                     isLoading: isConnecting && currentStep == 1,
@@ -1056,7 +1056,7 @@ class CallClassView extends GetView<CallClassController> {
                 Expanded(
                   child: _buildProgressStep(
                     stepNumber: 2,
-                    title: 'Report\nInitiated',
+                    title: 'Report\nInitiated'.tr,
                     isActive: currentStep >= 2,
                     isCurrent: currentStep == 2,
                     isLoading: isReportInit && currentStep == 2,
@@ -1080,7 +1080,7 @@ class CallClassView extends GetView<CallClassController> {
                 Expanded(
                   child: _buildProgressStep(
                     stepNumber: 3,
-                    title: 'Attachment\nUpload',
+                    title: 'Attachment\nUpload'.tr,
                     isActive: currentStep >= 3,
                     isCurrent: currentStep == 3,
                     isLoading: isUploading && currentStep == 3,
@@ -1250,7 +1250,7 @@ class _DocumentsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Supporting Document',
+            'Supporting Document'.tr,
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: AppColors.primary,
@@ -1321,7 +1321,7 @@ class _StatementDetailsView extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Report and statement will appear here once created',
+                'Report and statement will appear here once created'.tr,
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.grayDark,
@@ -1363,7 +1363,7 @@ class _StatementDetailsView extends StatelessWidget {
                       children: [
                         if (report?.reportType != null) ...[
                           Text(
-                            report!.reportType!.name ?? 'Report',
+                            report!.reportType!.name ?? 'Report'.tr,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1383,7 +1383,7 @@ class _StatementDetailsView extends StatelessWidget {
                           ],
                         ] else
                           Text(
-                            'Statement Details',
+                            'Statement Details'.tr,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1394,7 +1394,7 @@ class _StatementDetailsView extends StatelessWidget {
                             report!.caseNumber!.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            'Case: ${report.caseNumber}',
+                            '${'Case'.tr}: ${report.caseNumber}',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppColors.grayDark,
@@ -1417,7 +1417,7 @@ class _StatementDetailsView extends StatelessWidget {
                   // Person Information
                   if (statement?.person != null) ...[
                     Text(
-                      'Person Information',
+                      'Person Information'.tr,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -1426,20 +1426,20 @@ class _StatementDetailsView extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     _buildInfoRow(
-                      'Full Name',
+                      'Full Name'.tr,
                       statement!.person!.fullName ?? 'N/A',
                     ),
                     if (statement.person!.age != null)
-                      _buildInfoRow('Age', '${statement.person!.age}'),
+                      _buildInfoRow('Age'.tr, '${statement.person!.age}'),
                     if (statement.person!.sex != null)
-                      _buildInfoRow('Gender', statement.person!.sex!),
+                      _buildInfoRow('Gender'.tr, statement.person!.sex!),
                     if (statement.person!.phoneMobile != null &&
                         statement.person!.phoneMobile!.isNotEmpty)
-                      _buildInfoRow('Phone', statement.person!.phoneMobile!),
+                      _buildInfoRow('Phone'.tr, statement.person!.phoneMobile!),
                     if (statement.person!.nationality != null &&
                         statement.person!.nationality!.isNotEmpty)
                       _buildInfoRow(
-                        'Nationality',
+                        'Nationality'.tr,
                         statement.person!.nationality!,
                       ),
                     const SizedBox(height: 16),
@@ -1449,7 +1449,7 @@ class _StatementDetailsView extends StatelessWidget {
                   if (statement?.statement != null &&
                       statement!.statement!.isNotEmpty) ...[
                     Text(
-                      'Statement',
+                      'Statement'.tr,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -1483,7 +1483,7 @@ class _StatementDetailsView extends StatelessWidget {
                   // Statement Metadata
                   if (statement != null) ...[
                     Text(
-                      'Statement Details',
+                      'Statement Details'.tr,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -1494,21 +1494,21 @@ class _StatementDetailsView extends StatelessWidget {
                     if (statement.statementTakerName != null &&
                         statement.statementTakerName!.isNotEmpty)
                       _buildInfoRow(
-                        'Statement Taker',
+                        'Statement Taker'.tr,
                         statement.statementTakerName!,
                       ),
                     if (statement.applicantType != null)
-                      _buildInfoRow('Applicant Type', statement.applicantType!),
+                      _buildInfoRow('Applicant Type'.tr, statement.applicantType!),
                     if (statement.statementDate != null)
                       _buildInfoRow(
-                        'Statement Date',
+                        'Statement Date'.tr,
                         '${statement.statementDate!.day}/${statement.statementDate!.month}/${statement.statementDate!.year}',
                       ),
                     if (statement.statementTime != null &&
                         statement.statementTime!.isNotEmpty)
-                      _buildInfoRow('Statement Time', statement.statementTime!),
+                      _buildInfoRow('Statement Time'.tr, statement.statementTime!),
                     if (statement.status != null)
-                      _buildInfoRow('Status', statement.status!),
+                      _buildInfoRow('Status'.tr, statement.status!),
                   ],
 
                   // Report Submission Status with Confirm/Reject buttons
@@ -1531,7 +1531,7 @@ class _StatementDetailsView extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Report Submitted',
+                              'Report Submitted'.tr,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -1543,47 +1543,25 @@ class _StatementDetailsView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // Confirm and Reject buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              print('🔘 [REPORT] Confirm button pressed');
-                              controller.confirmReportSubmission();
-                            },
-                            icon: const Icon(Icons.check, size: 18),
-                            label: const Text('Confirm'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.success,
-                              foregroundColor: AppColors.whiteOff,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
+                    // Confirm button only
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          print('🔘 [REPORT] Confirm button pressed');
+                          controller.confirmReportSubmission();
+                        },
+                        icon: const Icon(Icons.check, size: 18),
+                            label: Text('Confirm'.tr),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: AppColors.whiteOff,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              print('🔘 [REPORT] Reject button pressed');
-                              controller.rejectReportSubmission();
-                            },
-                            icon: const Icon(Icons.close, size: 18),
-                            label: const Text('Reject'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.danger,
-                              foregroundColor: AppColors.whiteOff,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ],
