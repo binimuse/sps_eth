@@ -409,7 +409,7 @@ class _LanguageSelectorPanel extends StatelessWidget {
                       style: TextStyle(
                         color: index == effectiveIndex
                             ? AppColors.whiteOff
-                            : const Color(0xFF0F3955),
+                            : AppColors.whiteOff,
                         fontWeight:
                             index == effectiveIndex ? FontWeight.w700 : FontWeight.w500,
                       ),
