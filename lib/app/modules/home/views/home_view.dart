@@ -10,6 +10,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 
 import 'package:sps_eth_app/app/utils/connectivity_util.dart';
 
+import '../../language/controllers/language_controller.dart';
 import '../controllers/home_controller.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -72,7 +73,7 @@ class HomeView extends GetView<HomeController> {
           }),
           // Background image
           Image.asset(
-            Assets.images.homeBackground.path,
+            Assets.images.logoBackground.path,
             fit: BoxFit.fill,
           ),
           // Content
@@ -124,7 +125,22 @@ class HomeView extends GetView<HomeController> {
                   ),
                   child: Column(
                     children: [
-                      _ClockPanel(controller: controller),
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: _ClockPanel(controller: controller),
+                            ),
+                            const SizedBox(width: 2),
+                            Expanded(
+                              flex: 1,
+                              child: _LanguageSelectorPanel(),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       Expanded(child: _AlertsPanel(controller: controller)),
                       const SizedBox(height: 16),
@@ -325,6 +341,95 @@ class _HeroPanelState extends State<_HeroPanel> {
   }
 }
 
+// Language names matching LanguageView - index matches LanguageController
+const List<String> _homeLanguageNames = [
+  'English',
+  'አማርኛ',
+  'Afaan Oromoo',
+  'ትግርኛ',
+  'Afi Somali',
+  'Arabic',
+];
+
+class _LanguageSelectorPanel extends StatelessWidget {
+  const _LanguageSelectorPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    final langCtrl = Get.find<LanguageController>();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.primary, AppColors.primary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+      
+          Obx(() {
+            final selectedIndex = langCtrl.selectedLanguageIndex.value;
+            final effectiveIndex = selectedIndex >= 0 ? selectedIndex : 0;
+            // Build items with selected first
+            final orderedIndices = [
+              effectiveIndex,
+              ...List.generate(_homeLanguageNames.length, (i) => i)
+                  .where((i) => i != effectiveIndex),
+            ];
+            return DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                value: effectiveIndex,
+                isExpanded: true,
+                dropdownColor: AppColors.primary,
+                icon: Icon(Icons.arrow_drop_down, color: AppColors.whiteOff, size: 16.sp,),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                ),
+                items: orderedIndices.map((index) {
+                  return DropdownMenuItem<int>(
+                    value: index,
+                    child: Text(
+                      _homeLanguageNames[index].tr,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: index == effectiveIndex
+                            ? AppColors.whiteOff
+                            : const Color(0xFF0F3955),
+                        fontWeight:
+                            index == effectiveIndex ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (int? value) async {
+                  if (value != null) {
+                    await langCtrl.selectLanguage(value);
+                  }
+                },
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
 class _ClockPanel extends StatelessWidget {
   const _ClockPanel({required this.controller});
 
@@ -336,7 +441,7 @@ class _ClockPanel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         gradient:  LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryLight],
+          colors: [AppColors.primary, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -354,6 +459,7 @@ class _ClockPanel extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Obx(() {
                   return Text(
@@ -361,15 +467,12 @@ class _ClockPanel extends StatelessWidget {
                     textAlign: TextAlign.right,
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: AppColors.whiteOff,
                     ),
                   );
                 }),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _DigitalClock(controller: controller),
-                ),
+              
+                _DigitalClock(controller: controller),
               ],
             ),
           ),
@@ -387,14 +490,18 @@ class _DigitalClock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      return Text(
-        controller.formattedTime,
-        style: Theme.of(context).textTheme.displayLarge?.copyWith(
-          fontFeatures: const [FontFeature.tabularFigures()],
-          letterSpacing: 1,
-          fontWeight: FontWeight.w700,
-          fontFamily: GoogleFonts.sintony().fontFamily,
-          color: const Color.fromARGB(255, 250, 250, 250),
+      return Center(
+        child: Text(
+          controller.formattedTime,
+          style: Theme.of(context).textTheme.displayLarge?.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+            letterSpacing: 1,
+            fontWeight: FontWeight.w700,
+            fontSize: 19.sp,
+            fontFamily: GoogleFonts.sintony().fontFamily,
+            color: AppColors.whiteOff,
+          ),
+          textAlign: TextAlign.center,
         ),
       );
     });
@@ -410,7 +517,7 @@ class _AlertsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.white.withOpacity(0.3),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -419,7 +526,7 @@ class _AlertsPanel extends StatelessWidget {
           Padding(
             padding: EdgeInsets.all(8),
             child: Text(
-              'RECENT ALERTS'.tr,
+              'RECENT BLOGS'.tr,
               style: TextStyle(
                 fontFamily: GoogleFonts.montserrat().fontFamily,
                 fontWeight: FontWeight.w800,
@@ -427,18 +534,12 @@ class _AlertsPanel extends StatelessWidget {
               ),
             ),
           ),
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-            ),
-            child: Image.asset(
+         Image.asset(
               Assets.images.recent.path,
               height: 120, // Minimized height
               width: double.infinity,
               fit: BoxFit.cover,
             ),
-          ),
 
           Expanded(
             child: Obx(() {
@@ -551,8 +652,29 @@ class _SwipeToCall extends StatefulWidget {
   State<_SwipeToCall> createState() => _SwipeToCallState();
 }
 
-class _SwipeToCallState extends State<_SwipeToCall> {
+class _SwipeToCallState extends State<_SwipeToCall>
+    with SingleTickerProviderStateMixin {
   double _dragX = 0;
+  late AnimationController _arrowController;
+  late Animation<double> _arrowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _arrowController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: true);
+    _arrowAnimation = Tween<double>(begin: 0, end: 12).animate(
+      CurvedAnimation(parent: _arrowController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _arrowController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -571,30 +693,39 @@ class _SwipeToCallState extends State<_SwipeToCall> {
           ),
           child: Stack(
             children: [
-              // Center chevrons
+              // Center chevrons (animated slide-to-right)
               Align(
                 alignment: Alignment.center,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(
-                      Icons.chevron_right,
-                      size: 36,
-                      color: Color(0xFF9DB3C1),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(
-                      Icons.chevron_right,
-                      size: 36,
-                      color: Color(0xFF9DB3C1),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(
-                      Icons.chevron_right,
-                      size: 36,
-                      color: Color(0xFF9DB3C1),
-                    ),
-                  ],
+                child: AnimatedBuilder(
+                  animation: _arrowAnimation,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(_arrowAnimation.value, 0),
+                      child: child,
+                    );
+                  },
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.chevron_right,
+                        size: 36,
+                        color: Color(0xFF9DB3C1),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 36,
+                        color: Color(0xFF9DB3C1),
+                      ),
+                      SizedBox(width: 8),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 36,
+                        color: Color(0xFF9DB3C1),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               // Right target pill
@@ -824,7 +955,7 @@ class _ContactCallCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient:  LinearGradient(
           colors: [
-            AppColors.primaryLight,
+            AppColors.primary,
             AppColors.primaryLighter,
           ],
           begin: Alignment.topLeft,
@@ -911,52 +1042,53 @@ class _StartFillingCard extends StatelessWidget {
     return GestureDetector(
       onTap: controller.openLanguageSelection,
       child: Container(
-        height: double.infinity,
+
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+      gradient:  LinearGradient(
+        colors: [
+          AppColors.primary,
+          AppColors.primaryLighter,
+        ],
+        begin: Alignment.bottomLeft,
+        end: Alignment.topCenter,
+      ),
+      borderRadius: BorderRadius.circular(16),
+         
         ),
         padding: const EdgeInsets.all(16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.primaryLighter,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: Image.asset(
-                    Assets.images.insertcard.path,
-                    height: 120, // Minimized height
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: SizedBox(
+                width: 72,
+                height: 72,
+                child: Image.asset(
+                  Assets.images.insertcard.path,
+                  height: 120, // Minimized height
+                  width: double.infinity,
+                  fit: BoxFit.cover,
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Start Filling and Insert ID'.tr,
-                textAlign: TextAlign.start,
-                style: TextStyle(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primary,
-                ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Start Filling and Insert ID'.tr,
+              textAlign: TextAlign.start,
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w900,
+                color: AppColors.whiteOff,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'These are the terms and conditions for in charge of planning'.tr,
-                textAlign: TextAlign.start,
-                style: TextStyle(fontSize: 10, color: Color(0xFF4F6B7E)),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'These are the terms and conditions for in charge of planning'.tr,
+              textAlign: TextAlign.start,
+              style: TextStyle(fontSize: 10, color: AppColors.whiteOff),
+            ),
+          ],
         ),
       ),
     );
@@ -972,27 +1104,13 @@ class _NearbyPoliceStationsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: controller.openNearbyPoliceStations,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Image.asset(
-            Assets.images.near.path,
-            width: double.infinity,
-      
-            fit: BoxFit.fill,
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.asset(
+          Assets.images.near.path,
+          width: double.infinity,
+                 
+          fit: BoxFit.fill,
         ),
       ),
     );

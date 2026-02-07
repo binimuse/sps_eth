@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:get/get.dart';
 import 'package:sps_eth_app/app/common/widgets/promo_card.dart';
 
@@ -97,13 +98,6 @@ class _ArticlePanel extends StatelessWidget {
       if (article == null) {
         return const SizedBox.shrink();
       }
-      final paragraphs = article.content
-          .split(RegExp(r'\r?\n\n|\r\n'))
-          .where((s) => s.trim().isNotEmpty)
-          .toList();
-      if (paragraphs.isEmpty && article.content.trim().isNotEmpty) {
-        paragraphs.add(article.content.trim());
-      }
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(
@@ -163,20 +157,29 @@ class _ArticlePanel extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (var i = 0; i < paragraphs.length; i++) ...[
-                            Text(
-                              paragraphs[i].trim(),
-                              style: const TextStyle(
-                                height: 1.6,
-                                color: Color(0xFF4F6B7E),
-                              ),
-                            ),
-                            if (i != paragraphs.length - 1) const SizedBox(height: 14),
-                          ],
-                        ],
+                      child: Html(
+                        
+                        data: article.content,
+                        shrinkWrap: true,
+                        style: {
+                          'body': Style(
+                            fontSize: FontSize(15),
+                            lineHeight: const LineHeight(1.6),
+                            color: const Color(0xFF4F6B7E),
+                            backgroundColor: Colors.transparent,
+                          ),
+                          'p': Style(
+                            color: const Color(0xFF4F6B7E),
+                            backgroundColor: Colors.transparent,
+                          ),
+                          'span': Style(
+                            color: const Color(0xFF4F6B7E),
+                            backgroundColor: Colors.transparent,
+                          ),
+                          '*': Style(
+                            backgroundColor: Colors.transparent,
+                          ),
+                        },
                       ),
                     ),
                   ),
