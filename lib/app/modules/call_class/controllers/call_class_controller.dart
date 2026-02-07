@@ -186,6 +186,12 @@ class CallClassController extends GetxController {
   /// Delayed sync of remote participants after connect (fixes admin black screen when admin joins after kiosk).
   Timer? _remoteVideoTrackSyncTimer;
 
+  /// Audio health check timer (for VP9 codec debugging)
+  Timer? _audioHealthCheckTimer;
+  
+  /// Track previous remote audio muting states to detect changes
+  final Map<String, bool> _previousRemoteAudioMutedStates = {};
+
   // LiveKit related
   Room? _room;
 
@@ -201,6 +207,9 @@ class CallClassController extends GetxController {
     _remoteVideoTrackRetryTimer = null;
     _remoteVideoTrackSyncTimer?.cancel();
     _remoteVideoTrackSyncTimer = null;
+    _audioHealthCheckTimer?.cancel();
+    _audioHealthCheckTimer = null;
+    _previousRemoteAudioMutedStates.clear();
     _stopCallDetailsPolling();
     for (var entry in _remoteParticipantListeners.entries.toList()) {
       try {
@@ -1260,54 +1269,296 @@ class CallClassController extends GetxController {
   }
 
   /// Enable audio
+  /// For VP9 codec on Android, we need to ensure audio track is properly created and published
+  /// This method uses explicit track creation and comprehensive error logging
   Future<void> enableAudio() async {
-    print('🎤 [AUDIO] Enabling audio...');
+    print('🎤 [AUDIO] ========== STARTING AUDIO ENABLEMENT ==========');
+    print('🎤 [AUDIO] Current video codec: ${currentVideoCodec.value}');
+    print('🎤 [AUDIO] Room state: ${_room?.connectionState}');
+    print('🎤 [AUDIO] Local participant: ${_localParticipant != null ? "exists" : "null"}');
+    
     try {
-      if (_localParticipant != null) {
-        print(
-          '🎤 [AUDIO] Local participant exists, calling setMicrophoneEnabled(true)...',
-        );
-        await _localParticipant!.setMicrophoneEnabled(true);
-        isAudioEnabled.value = true;
-        print('🎤 [AUDIO] Microphone enabled: ${isAudioEnabled.value}');
-
-        // Enumerate media devices if not already done
-        if (availableMicrophones.isEmpty) {
-          await _enumerateMediaDevices();
+      // Step 0: Check microphone permission
+      print('🎤 [AUDIO] Checking microphone permission...');
+      try {
+        final micPermission = await Permission.microphone.status;
+        print('🎤 [AUDIO] Microphone permission status: $micPermission');
+        
+        if (!micPermission.isGranted) {
+          print('⚠️ [AUDIO] Microphone permission not granted, requesting...');
+          final requestResult = await Permission.microphone.request();
+          print('🎤 [AUDIO] Permission request result: $requestResult');
+          
+          if (!requestResult.isGranted) {
+            print('❌ [AUDIO ERROR] Microphone permission denied');
+            throw Exception('Microphone permission denied: $requestResult');
+          }
         }
+        print('✅ [AUDIO] Microphone permission granted');
+      } catch (permError, permStack) {
+        print('❌ [AUDIO ERROR] Permission check failed: $permError');
+        print('❌ [AUDIO ERROR] Stack trace: $permStack');
+        throw Exception('Microphone permission error: $permError');
+      }
 
-        // Try to detect current microphone device ID
+      // Step 1: Validate prerequisites
+      if (_localParticipant == null) {
+        print('❌ [AUDIO ERROR] Local participant is null, cannot enable audio');
+        throw Exception('Local participant is null');
+      }
+
+      if (_room == null) {
+        print('❌ [AUDIO ERROR] Room is null, cannot enable audio');
+        throw Exception('Room is null');
+      }
+
+      if (_room!.connectionState != ConnectionState.connected) {
+        print('❌ [AUDIO ERROR] Room not connected: ${_room!.connectionState}');
+        throw Exception('Room not connected: ${_room!.connectionState}');
+      }
+
+      print('✅ [AUDIO] Prerequisites validated');
+
+      // Step 2: Check for existing audio tracks
+      print('🎤 [AUDIO] Checking for existing audio tracks...');
+      final existingPublications = _localParticipant!.audioTrackPublications
+          .where((pub) => pub.source == TrackSource.microphone)
+          .toList();
+      
+      print('🎤 [AUDIO] Found ${existingPublications.length} existing microphone publication(s)');
+      for (var pub in existingPublications) {
+        print('🎤 [AUDIO]   Publication ${pub.sid}: track=${pub.track != null}, muted=${pub.muted}, subscribed=${pub.subscribed}');
+      }
+
+      final existingAudioTrack = existingPublications
+          .where((pub) => pub.track != null)
+          .map((pub) => pub.track)
+          .whereType<LocalAudioTrack>()
+          .firstOrNull;
+
+      if (existingAudioTrack != null) {
+        print('🎤 [AUDIO] Existing audio track found, verifying and enabling...');
+        try {
+          // Log track details
+          final settings = existingAudioTrack.mediaStreamTrack.getSettings();
+          print('🎤 [AUDIO] Track settings: $settings');
+          print('🎤 [AUDIO] Track enabled: ${existingAudioTrack.mediaStreamTrack.enabled}');
+          print('🎤 [AUDIO] Track muted: ${existingAudioTrack.muted}');
+          print('🎤 [AUDIO] Track ID: ${existingAudioTrack.mediaStreamTrack.id}');
+          print('🎤 [AUDIO] Track label: ${existingAudioTrack.mediaStreamTrack.label}');
+          
+          // Ensure track is enabled
+          if (!existingAudioTrack.mediaStreamTrack.enabled) {
+            print('🎤 [AUDIO] Enabling existing audio track...');
+            existingAudioTrack.mediaStreamTrack.enabled = true;
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
+
+          // Ensure microphone is enabled
+          await _localParticipant!.setMicrophoneEnabled(true);
+          await Future.delayed(const Duration(milliseconds: 300));
+          
+          // Verify track is still enabled after setMicrophoneEnabled
+          if (!existingAudioTrack.mediaStreamTrack.enabled) {
+            print('⚠️ [AUDIO] Track disabled after setMicrophoneEnabled, re-enabling...');
+            existingAudioTrack.mediaStreamTrack.enabled = true;
+          }
+
+          isAudioEnabled.value = true;
+          print('✅ [AUDIO] Existing track enabled successfully');
+          
+          // Log device ID
+          try {
+            final deviceId = settings['deviceId']?.toString();
+            if (deviceId != null) {
+              currentMicrophoneDeviceId.value = deviceId;
+              print('🎤 [AUDIO] Microphone device ID: $deviceId');
+            }
+          } catch (e) {
+            print('⚠️ [AUDIO] Could not read device ID: $e');
+          }
+        } catch (e, stackTrace) {
+          print('❌ [AUDIO ERROR] Error enabling existing track: $e');
+          print('❌ [AUDIO ERROR] Stack trace: $stackTrace');
+          // Continue to try creating new track
+        }
+      }
+
+      // Step 3: If no track exists or existing track failed, create new one
+      if (existingAudioTrack == null || !isAudioEnabled.value) {
+        print('🎤 [AUDIO] No valid audio track found, creating new microphone track...');
+        
+        // For VP9 codec, use longer delays
+        final isVP9 = currentVideoCodec.value == 'VP9';
+        final delayMs = isVP9 ? 1000 : 500;
+        print('🎤 [AUDIO] Using ${isVP9 ? "VP9" : "non-VP9"} delay: ${delayMs}ms');
+
+        // Strategy: Use setMicrophoneEnabled with retry logic
+        print('🎤 [AUDIO] Using setMicrophoneEnabled with VP9-aware delays...');
+        
+        // Disable first to reset state
+        print('🎤 [AUDIO] Step 1: Disabling microphone to reset state...');
+        try {
+          await _localParticipant!.setMicrophoneEnabled(false);
+          await Future.delayed(const Duration(milliseconds: 300));
+          print('✅ [AUDIO] Microphone disabled');
+        } catch (disableError) {
+          print('⚠️ [AUDIO] Error disabling microphone (may already be disabled): $disableError');
+        }
+        
+        // Enable microphone
+        print('🎤 [AUDIO] Step 2: Calling setMicrophoneEnabled(true)...');
+        try {
+          await _localParticipant!.setMicrophoneEnabled(true);
+          print('✅ [AUDIO] setMicrophoneEnabled(true) completed');
+        } catch (enableError, enableStack) {
+          print('❌ [AUDIO ERROR] setMicrophoneEnabled failed: $enableError');
+          print('❌ [AUDIO ERROR] Stack trace: $enableStack');
+          rethrow;
+        }
+        
+        // Wait longer for VP9 codec
+        print('🎤 [AUDIO] Step 3: Waiting ${delayMs * 2}ms for track creation (VP9-aware delay)...');
+        await Future.delayed(Duration(milliseconds: delayMs * 2));
+        
+        // Check for track
+        print('🎤 [AUDIO] Step 4: Checking for audio track...');
         final audioTrack = _localParticipant!.audioTrackPublications
-            .where((pub) => pub.source == TrackSource.microphone)
+            .where((pub) => pub.source == TrackSource.microphone && pub.track != null)
             .map((pub) => pub.track)
             .whereType<LocalAudioTrack>()
             .firstOrNull;
-
+        
         if (audioTrack != null) {
-          final deviceId = audioTrack.mediaStreamTrack
-              .getSettings()['deviceId'];
-          if (deviceId != null) {
-            currentMicrophoneDeviceId.value = deviceId.toString();
-            print(
-              '🎤 [MEDIA DEVICES] Current microphone device ID: ${currentMicrophoneDeviceId.value}',
-            );
+          print('✅ [AUDIO] Audio track created successfully');
+          isAudioEnabled.value = true;
+          
+          // Ensure track is enabled
+          if (!audioTrack.mediaStreamTrack.enabled) {
+            print('🎤 [AUDIO] Enabling audio track media stream...');
+            audioTrack.mediaStreamTrack.enabled = true;
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
+          
+          // Log track details
+          try {
+            final settings = audioTrack.mediaStreamTrack.getSettings();
+            print('🎤 [AUDIO] Audio track settings: $settings');
+            final deviceId = settings['deviceId']?.toString();
+            if (deviceId != null) {
+              currentMicrophoneDeviceId.value = deviceId;
+              print('🎤 [AUDIO] Microphone device ID: $deviceId');
+            }
+            
+            // Log track state
+            print('🎤 [AUDIO] Track enabled: ${audioTrack.mediaStreamTrack.enabled}');
+            print('🎤 [AUDIO] Track muted: ${audioTrack.muted}');
+            print('🎤 [AUDIO] Track ID: ${audioTrack.mediaStreamTrack.id}');
+            print('🎤 [AUDIO] Track label: ${audioTrack.mediaStreamTrack.label}');
+          } catch (e) {
+            print('⚠️ [AUDIO] Could not read track details: $e');
+          }
+        } else {
+          print('⚠️ [AUDIO] Audio track not found after setMicrophoneEnabled');
+          print('⚠️ [AUDIO] This may be normal - track might appear later');
+          // Still mark as enabled - track might appear later
+          isAudioEnabled.value = true;
+        }
+      }
+
+      // Step 4: Enumerate media devices
+      print('🎤 [AUDIO] Enumerating media devices...');
+      try {
+        if (availableMicrophones.isEmpty) {
+          await _enumerateMediaDevices();
+        }
+        print('🎤 [AUDIO] Available microphones: ${availableMicrophones.length}');
+      } catch (e) {
+        print('⚠️ [AUDIO] Error enumerating devices: $e');
+      }
+
+      // Step 5: Final verification and logging
+      print('🎤 [AUDIO] Performing final verification...');
+      final finalPublications = _localParticipant!.audioTrackPublications
+          .where((pub) => pub.source == TrackSource.microphone)
+          .toList();
+      
+      print('🎤 [AUDIO] ========== FINAL AUDIO PUBLICATION STATUS ==========');
+      print('🎤 [AUDIO] Total microphone publications: ${finalPublications.length}');
+      print('🎤 [AUDIO] isAudioEnabled state: ${isAudioEnabled.value}');
+      print('🎤 [AUDIO] Video codec: ${currentVideoCodec.value}');
+      
+      for (var pub in finalPublications) {
+        print('🎤 [AUDIO] Publication ${pub.sid}:');
+        print('🎤 [AUDIO]   - Source: ${pub.source}');
+        print('🎤 [AUDIO]   - Subscribed: ${pub.subscribed}');
+        print('🎤 [AUDIO]   - Muted: ${pub.muted}');
+        print('🎤 [AUDIO]   - Has track: ${pub.track != null}');
+        
+        if (pub.track != null) {
+          final track = pub.track as LocalAudioTrack;
+          try {
+            print('🎤 [AUDIO]   - Track enabled: ${track.mediaStreamTrack.enabled}');
+            print('🎤 [AUDIO]   - Track muted: ${track.muted}');
+            print('🎤 [AUDIO]   - Track ID: ${track.mediaStreamTrack.id}');
+            print('🎤 [AUDIO]   - Track label: ${track.mediaStreamTrack.label}');
+            
+            final settings = track.mediaStreamTrack.getSettings();
+            print('🎤 [AUDIO]   - Track settings: $settings');
+            
+            // Check for audio constraints
+            final constraints = track.mediaStreamTrack.getConstraints();
+            print('🎤 [AUDIO]   - Track constraints: $constraints');
+          } catch (e) {
+            print('⚠️ [AUDIO]   - Error reading track properties: $e');
           }
         }
+      }
+      print('🎤 [AUDIO] ====================================================');
+      
+      if (finalPublications.isEmpty || finalPublications.every((p) => p.track == null)) {
+        print('⚠️ [AUDIO WARNING] No audio tracks found after enablement!');
+        print('⚠️ [AUDIO WARNING] Audio may not work properly');
       } else {
-        print('❌ [AUDIO] Local participant is null, cannot enable audio');
-        throw Exception('Local participant is null');
-      }
-    } catch (e, stackTrace) {
-      print('❌ [AUDIO ERROR] Error enabling audio: $e');
-      print('❌ [AUDIO ERROR] Stack trace: $stackTrace');
-      isAudioEnabled.value = false;
-      // Only show error if it's a permission issue, not connection issues
-      if (e.toString().contains('permission') ||
-          e.toString().contains('Permission')) {
-        AppToasts.showError(
-          'Microphone permission denied. Please grant permission and try again.',
+        final hasEnabledTrack = finalPublications.any((p) => 
+          p.track != null && 
+          (p.track as LocalAudioTrack).mediaStreamTrack.enabled &&
+          !p.muted
         );
+        if (!hasEnabledTrack) {
+          print('⚠️ [AUDIO WARNING] Audio tracks exist but none are enabled/unmuted!');
+        } else {
+          print('✅ [AUDIO] Audio track is enabled and ready');
+          
+          // Start periodic audio health check for VP9 codec
+          if (currentVideoCodec.value == 'VP9') {
+            print('🎤 [AUDIO] Starting periodic audio health check for VP9...');
+            _startAudioHealthCheck();
+          }
+        }
       }
+      
+    } catch (e, stackTrace) {
+      print('❌ [AUDIO ERROR] ========== FATAL ERROR ==========');
+      print('❌ [AUDIO ERROR] Error: $e');
+      print('❌ [AUDIO ERROR] Type: ${e.runtimeType}');
+      print('❌ [AUDIO ERROR] Stack trace: $stackTrace');
+      print('❌ [AUDIO ERROR] Video codec: ${currentVideoCodec.value}');
+      print('❌ [AUDIO ERROR] Room state: ${_room?.connectionState}');
+      print('❌ [AUDIO ERROR] Local participant: ${_localParticipant != null}');
+      print('❌ [AUDIO ERROR] ==================================');
+      
+      isAudioEnabled.value = false;
+      
+      // Show user-friendly error
+      String errorMessage = 'Failed to enable microphone';
+      if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+        errorMessage = 'Microphone permission denied. Please grant permission and try again.';
+      } else if (e.toString().contains('not connected') || e.toString().contains('null')) {
+        errorMessage = 'Cannot enable microphone: connection issue';
+      }
+      
+      AppToasts.showError(errorMessage);
       rethrow;
     }
   }
@@ -1315,12 +1566,220 @@ class CallClassController extends GetxController {
   /// Disable audio
   Future<void> disableAudio() async {
     try {
+      _stopAudioHealthCheck();
       if (_localParticipant != null) {
         await _localParticipant!.setMicrophoneEnabled(false);
         isAudioEnabled.value = false;
       }
     } catch (e) {
       print('Error disabling audio: $e');
+    }
+  }
+
+  /// Start periodic audio health check (for VP9 codec debugging)
+  void _startAudioHealthCheck() {
+    _stopAudioHealthCheck(); // Stop any existing check
+    
+    print('🎤 [AUDIO HEALTH] Starting periodic audio health check...');
+    _audioHealthCheckTimer = Timer.periodic(
+      const Duration(seconds: 5), // Check every 5 seconds
+      (timer) {
+        _performAudioHealthCheck();
+      },
+    );
+  }
+
+  /// Stop audio health check
+  void _stopAudioHealthCheck() {
+    if (_audioHealthCheckTimer != null) {
+      _audioHealthCheckTimer!.cancel();
+      _audioHealthCheckTimer = null;
+      print('🎤 [AUDIO HEALTH] Stopped audio health check');
+    }
+  }
+
+  /// Perform audio health check
+  void _performAudioHealthCheck() {
+    try {
+      if (_localParticipant == null || _room == null) {
+        return;
+      }
+
+      print('🎤 [AUDIO HEALTH] ========== AUDIO HEALTH CHECK ==========');
+      print('🎤 [AUDIO HEALTH] Video codec: ${currentVideoCodec.value}');
+      print('🎤 [AUDIO HEALTH] Room connected: ${_room!.connectionState == ConnectionState.connected}');
+      print('🎤 [AUDIO HEALTH] isAudioEnabled state: ${isAudioEnabled.value}');
+      
+      // Check local audio
+      final localAudioPubs = _localParticipant!.audioTrackPublications
+          .where((pub) => pub.source == TrackSource.microphone)
+          .toList();
+      
+      print('🎤 [AUDIO HEALTH] Local audio publications: ${localAudioPubs.length}');
+      bool localAudioNeedsRecovery = false;
+      
+      for (var pub in localAudioPubs) {
+        if (pub.track != null) {
+          final track = pub.track as LocalAudioTrack;
+          final isEnabled = track.mediaStreamTrack.enabled;
+          final isMuted = pub.muted || track.muted;
+          final isSubscribed = pub.subscribed;
+          
+          print('🎤 [AUDIO HEALTH]   Local Publication ${pub.sid}:');
+          print('🎤 [AUDIO HEALTH]     - Subscribed: $isSubscribed');
+          print('🎤 [AUDIO HEALTH]     - Publication muted: ${pub.muted}');
+          print('🎤 [AUDIO HEALTH]     - Track muted: ${track.muted}');
+          print('🎤 [AUDIO HEALTH]     - Track enabled: $isEnabled');
+          print('🎤 [AUDIO HEALTH]     - Track ID: ${track.mediaStreamTrack.id}');
+          print('🎤 [AUDIO HEALTH]     - Track label: ${track.mediaStreamTrack.label}');
+          
+          // Check if local audio needs recovery
+          if (!isEnabled || isMuted || !isSubscribed) {
+            print('⚠️ [AUDIO HEALTH]     ⚠️ LOCAL AUDIO ISSUE DETECTED!');
+            if (!isEnabled) print('⚠️ [AUDIO HEALTH]       - Track is disabled');
+            if (isMuted) print('⚠️ [AUDIO HEALTH]       - Track is muted');
+            if (!isSubscribed) print('⚠️ [AUDIO HEALTH]       - Publication not subscribed');
+            localAudioNeedsRecovery = true;
+          }
+          
+          // Try to read track settings
+          try {
+            final settings = track.mediaStreamTrack.getSettings();
+            print('🎤 [AUDIO HEALTH]     - Track settings: $settings');
+          } catch (e) {
+            print('⚠️ [AUDIO HEALTH]     - Could not read settings: $e');
+          }
+        } else {
+          print('⚠️ [AUDIO HEALTH]   Local Publication ${pub.sid}: track is null!');
+          localAudioNeedsRecovery = true;
+        }
+      }
+      
+      // Attempt to recover local audio if needed
+      if (localAudioNeedsRecovery && isAudioEnabled.value) {
+        print('🔧 [AUDIO HEALTH] Attempting to recover local audio...');
+        _recoverLocalAudio();
+      }
+      
+      // Check remote audio
+      final remoteParts = _room!.remoteParticipants.values.toList();
+      print('🎤 [AUDIO HEALTH] Remote participants: ${remoteParts.length}');
+      
+      for (var participant in remoteParts) {
+        final remoteAudioPubs = participant.audioTrackPublications;
+        print('🎤 [AUDIO HEALTH]   Participant ${participant.identity}: ${remoteAudioPubs.length} audio publication(s)');
+        
+        for (var pub in remoteAudioPubs) {
+          if (pub.track != null) {
+            final track = pub.track as RemoteAudioTrack;
+            final isEnabled = track.mediaStreamTrack.enabled;
+            final isMuted = pub.muted || track.muted;
+            final isSubscribed = pub.subscribed;
+            
+            print('🎤 [AUDIO HEALTH]     Remote Publication ${pub.sid}:');
+            print('🎤 [AUDIO HEALTH]       - Subscribed: $isSubscribed');
+            print('🎤 [AUDIO HEALTH]       - Publication muted: ${pub.muted}');
+            print('🎤 [AUDIO HEALTH]       - Track muted: ${track.muted}');
+            print('🎤 [AUDIO HEALTH]       - Track enabled: $isEnabled');
+            print('🎤 [AUDIO HEALTH]       - Track ID: ${track.mediaStreamTrack.id}');
+            print('🎤 [AUDIO HEALTH]       - Track label: ${track.mediaStreamTrack.label}');
+            
+            if (!isSubscribed) {
+              print('⚠️ [AUDIO HEALTH]       ⚠️ WARNING: Remote audio not subscribed!');
+              print('⚠️ [AUDIO HEALTH]       This means we cannot hear the remote participant');
+            }
+            if (isMuted) {
+              print('⚠️ [AUDIO HEALTH]       ⚠️ WARNING: Remote audio is muted!');
+              print('⚠️ [AUDIO HEALTH]       The remote participant has muted their microphone');
+            }
+            if (!isEnabled) {
+              print('⚠️ [AUDIO HEALTH]       ⚠️ WARNING: Remote audio track is disabled!');
+            }
+          } else {
+            print('⚠️ [AUDIO HEALTH]     Remote Publication ${pub.sid}: track is null!');
+          }
+        }
+      }
+      
+      print('🎤 [AUDIO HEALTH] =========================================');
+    } catch (e, stackTrace) {
+      print('⚠️ [AUDIO HEALTH] Error performing health check: $e');
+      print('⚠️ [AUDIO HEALTH] Stack trace: $stackTrace');
+    }
+  }
+  
+  /// Attempt to recover local audio if it becomes disabled or muted
+  Future<void> _recoverLocalAudio() async {
+    try {
+      print('🔧 [AUDIO RECOVERY] ========== ATTEMPTING LOCAL AUDIO RECOVERY ==========');
+      
+      if (_localParticipant == null || _room == null) {
+        print('❌ [AUDIO RECOVERY] Cannot recover: room or participant is null');
+        return;
+      }
+      
+      if (_room!.connectionState != ConnectionState.connected) {
+        print('❌ [AUDIO RECOVERY] Cannot recover: room not connected');
+        return;
+      }
+      
+      final localAudioPubs = _localParticipant!.audioTrackPublications
+          .where((pub) => pub.source == TrackSource.microphone)
+          .toList();
+      
+      bool recovered = false;
+      
+      for (var pub in localAudioPubs) {
+        if (pub.track != null) {
+          final track = pub.track as LocalAudioTrack;
+          
+          // Re-enable track if disabled
+          if (!track.mediaStreamTrack.enabled) {
+            print('🔧 [AUDIO RECOVERY] Re-enabling disabled audio track...');
+            track.mediaStreamTrack.enabled = true;
+            await Future.delayed(const Duration(milliseconds: 200));
+            recovered = true;
+          }
+          
+          // Unmute if muted
+          if (pub.muted || track.muted) {
+            print('🔧 [AUDIO RECOVERY] Unmuting audio track...');
+            await _localParticipant!.setMicrophoneEnabled(true);
+            await Future.delayed(const Duration(milliseconds: 300));
+            recovered = true;
+          }
+        } else {
+          // Track is null, need to recreate
+          print('🔧 [AUDIO RECOVERY] Audio track is null, recreating...');
+          await enableAudio();
+          recovered = true;
+        }
+      }
+      
+      if (recovered) {
+        print('✅ [AUDIO RECOVERY] Audio recovery completed');
+        // Verify recovery
+        await Future.delayed(const Duration(milliseconds: 500));
+        final verifyPubs = _localParticipant!.audioTrackPublications
+            .where((pub) => pub.source == TrackSource.microphone && pub.track != null)
+            .toList();
+        
+        if (verifyPubs.isNotEmpty) {
+          final verifyTrack = verifyPubs.first.track as LocalAudioTrack;
+          if (verifyTrack.mediaStreamTrack.enabled && !verifyPubs.first.muted) {
+            print('✅ [AUDIO RECOVERY] Verification: Audio track is now enabled and unmuted');
+          } else {
+            print('⚠️ [AUDIO RECOVERY] Verification: Audio track still has issues');
+          }
+        }
+      } else {
+        print('ℹ️ [AUDIO RECOVERY] No recovery needed or recovery not possible');
+      }
+      
+      print('🔧 [AUDIO RECOVERY] ================================================');
+    } catch (e, stackTrace) {
+      print('❌ [AUDIO RECOVERY] Error during recovery: $e');
+      print('❌ [AUDIO RECOVERY] Stack trace: $stackTrace');
     }
   }
 
@@ -1826,8 +2285,39 @@ class CallClassController extends GetxController {
 
         // Step 5: Update state
         final oldCodec = currentVideoCodec.value;
+        final wasAudioEnabled = isAudioEnabled.value;
         currentVideoCodec.value = newCodec;
         _updateLocalVideoTrack();
+
+        // Step 6: Ensure audio remains enabled after codec switch (important for VP9)
+        // Wait a bit for video track to stabilize
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (wasAudioEnabled) {
+          // Verify audio is still enabled and re-enable if needed
+          final audioPublications = _localParticipant!.audioTrackPublications
+              .where((pub) => pub.source == TrackSource.microphone && pub.track != null)
+              .toList();
+          
+          if (audioPublications.isEmpty || !isAudioEnabled.value) {
+            print('🎤 [CODEC] Audio track missing after codec switch, re-enabling...');
+            try {
+              await enableAudio();
+            } catch (e) {
+              print('⚠️ [CODEC] Failed to re-enable audio after codec switch: $e');
+            }
+          } else {
+            // Verify audio track is enabled
+            final audioPub = audioPublications.first;
+            if (audioPub.track != null) {
+              final audioTrack = audioPub.track as LocalAudioTrack;
+              if (!audioTrack.mediaStreamTrack.enabled) {
+                print('🎤 [CODEC] Audio track disabled, re-enabling...');
+                audioTrack.mediaStreamTrack.enabled = true;
+              }
+            }
+          }
+        }
 
         print(
           '✅ [CODEC] Codec switched successfully from $oldCodec to $newCodec',
@@ -1958,7 +2448,7 @@ class CallClassController extends GetxController {
     }
   }
 
-  /// Confirm report submission - navigate to confirmation page and end call
+  /// Confirm report submission - end call first, then navigate to confirmation page
   Future<void> confirmReportSubmission() async {
     try {
       final reportId = reportInfo.value?.id;
@@ -1969,24 +2459,32 @@ class CallClassController extends GetxController {
 
       print('✅ [REPORT CONFIRM] Confirming report submission: $reportId');
 
-      // Fetch and show report in confirmation page
-      await _fetchAndShowReport(reportId);
+      final sessionId = currentSessionId.value;
 
-      // End the call after showing confirmation page (without navigation since we're already showing confirmation page)
+      // End the call first (before showing confirmation page)
+      if (sessionId != null && sessionId.isNotEmpty) {
+        try {
+          await _directCallService.endCall(sessionId);
+        } catch (e) {
+          print('⚠️ [REPORT CONFIRM] End call API failed (continuing): $e');
+        }
+      }
       await disconnectFromRoom();
       callStatus.value = 'ended';
+      _stopCallDetailsPolling();
 
-      // Clear call details
-      callDetails.value = null;
-      reportInfo.value = null;
-      statementInfo.value = null;
-
+      // Clear session info but keep callDetails for PDF enrichment until after fetch
       currentSessionId.value = '';
       currentRoomName.value = '';
       currentWsUrl.value = '';
 
-      // Stop polling
-      _stopCallDetailsPolling();
+      // Fetch and show report in confirmation page (callDetails still available for enrichment)
+      await _fetchAndShowReport(reportId);
+
+      // Clear call details after confirmation page is shown
+      callDetails.value = null;
+      reportInfo.value = null;
+      statementInfo.value = null;
 
       print('✅ [REPORT CONFIRM] Call ended and confirmation page shown');
     } catch (e, stackTrace) {
@@ -2885,17 +3383,121 @@ class CallClassController extends GetxController {
       try {
         await enableVideo();
         print('🎥 [LIVEKIT] Video enabled: ${isVideoEnabled.value}');
+        
+        // For VP9 codec on Android, wait a bit longer before enabling audio
+        // This ensures the video track is fully published and stable
+        final codec = currentVideoCodec.value;
+        if (codec == 'VP9') {
+          print('🎤 [LIVEKIT] VP9 codec detected, waiting extra time before enabling audio...');
+          await Future.delayed(const Duration(milliseconds: 1500));
+        } else {
+          // For other codecs, shorter delay
+          await Future.delayed(const Duration(milliseconds: 800));
+        }
       } catch (e) {
         print('⚠️ [LIVEKIT] Warning: Failed to enable video: $e');
         // Error toast already shown in enableVideo()
       }
 
-      print('🎥 [LIVEKIT] Enabling audio...');
+      print('🎥 [LIVEKIT] ========== ENABLING AUDIO ==========');
+      print('🎥 [LIVEKIT] Video codec: ${currentVideoCodec.value}');
+      print('🎥 [LIVEKIT] Video enabled: ${isVideoEnabled.value}');
+      print('🎥 [LIVEKIT] Room connected: ${_room!.connectionState == ConnectionState.connected}');
+      print('🎥 [LIVEKIT] Local participant exists: ${_localParticipant != null}');
+      
       try {
         await enableAudio();
-        print('🎥 [LIVEKIT] Audio enabled: ${isAudioEnabled.value}');
-      } catch (e) {
-        print('⚠️ [LIVEKIT] Warning: Failed to enable audio: $e');
+        print('🎥 [LIVEKIT] enableAudio() completed, isAudioEnabled: ${isAudioEnabled.value}');
+        
+        // Verify audio is actually working after a short delay
+        print('🎥 [LIVEKIT] Verifying audio track after enablement...');
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        final audioPublications = _localParticipant!.audioTrackPublications
+            .where((pub) => pub.source == TrackSource.microphone)
+            .toList();
+        
+        print('🎥 [LIVEKIT] Found ${audioPublications.length} audio publication(s) after enable');
+        
+        final audioTracks = audioPublications
+            .where((pub) => pub.track != null)
+            .map((pub) => pub.track)
+            .whereType<LocalAudioTrack>()
+            .toList();
+        
+        print('🎥 [LIVEKIT] Found ${audioTracks.length} audio track(s)');
+        
+        for (var track in audioTracks) {
+          print('🎥 [LIVEKIT] Track enabled: ${track.mediaStreamTrack.enabled}');
+          print('🎥 [LIVEKIT] Track muted: ${track.muted}');
+          print('🎥 [LIVEKIT] Track ID: ${track.mediaStreamTrack.id}');
+          print('🎥 [LIVEKIT] Track label: ${track.mediaStreamTrack.label}');
+        }
+        
+        if (audioTracks.isEmpty) {
+          print('⚠️ [LIVEKIT] No audio track found after enable, retrying...');
+          print('⚠️ [LIVEKIT] Retry attempt 1...');
+          
+          // Retry once with longer delay for VP9
+          final retryDelay = currentVideoCodec.value == 'VP9' ? 1000 : 500;
+          await Future.delayed(Duration(milliseconds: retryDelay));
+          
+          try {
+            await enableAudio();
+            print('🎥 [LIVEKIT] Retry enableAudio() completed');
+            
+            // Verify again
+            await Future.delayed(const Duration(milliseconds: 500));
+            final retryAudioTracks = _localParticipant!.audioTrackPublications
+                .where((pub) => pub.source == TrackSource.microphone && pub.track != null)
+                .map((pub) => pub.track)
+                .whereType<LocalAudioTrack>()
+                .toList();
+            
+            if (retryAudioTracks.isEmpty) {
+              print('❌ [LIVEKIT] ERROR: Still no audio tracks after retry!');
+              print('❌ [LIVEKIT] Audio may not work properly');
+            } else {
+              print('✅ [LIVEKIT] Audio track found after retry');
+            }
+          } catch (retryError, retryStack) {
+            print('❌ [LIVEKIT] ERROR: Retry enableAudio() failed: $retryError');
+            print('❌ [LIVEKIT] Stack trace: $retryStack');
+          }
+        } else {
+          // Verify tracks are enabled and unmuted
+          final enabledTracks = audioTracks.where((t) => 
+            t.mediaStreamTrack.enabled && !t.muted
+          ).toList();
+          
+          if (enabledTracks.isEmpty) {
+            print('⚠️ [LIVEKIT] WARNING: Audio tracks exist but none are enabled/unmuted!');
+            print('⚠️ [LIVEKIT] Attempting to enable tracks...');
+            
+            for (var track in audioTracks) {
+              if (!track.mediaStreamTrack.enabled) {
+                track.mediaStreamTrack.enabled = true;
+                print('🎤 [LIVEKIT] Enabled track: ${track.mediaStreamTrack.id}');
+              }
+              if (track.muted) {
+                // Note: LiveKit tracks don't have direct unmute, need to use participant
+                print('⚠️ [LIVEKIT] Track is muted, may need to unmute via participant');
+              }
+            }
+          } else {
+            print('✅ [LIVEKIT] Audio track is enabled and ready');
+          }
+        }
+        
+        print('🎥 [LIVEKIT] ====================================');
+      } catch (e, stackTrace) {
+        print('❌ [LIVEKIT] ========== AUDIO ENABLEMENT ERROR ==========');
+        print('❌ [LIVEKIT] Error: $e');
+        print('❌ [LIVEKIT] Type: ${e.runtimeType}');
+        print('❌ [LIVEKIT] Stack trace: $stackTrace');
+        print('❌ [LIVEKIT] Video codec: ${currentVideoCodec.value}');
+        print('❌ [LIVEKIT] Room state: ${_room?.connectionState}');
+        print('❌ [LIVEKIT] =============================================');
         // Error toast already shown in enableAudio()
       }
 
@@ -3321,10 +3923,71 @@ class CallClassController extends GetxController {
         );
       }
 
+      // Log audio track details for remote participants
+      print('🎤 [REMOTE AUDIO] ========== REMOTE AUDIO TRACKS ==========');
+      print('🎤 [REMOTE AUDIO] Participant: ${participant.identity}');
+      print('🎤 [REMOTE AUDIO] Audio publications count: ${participant.audioTrackPublications.length}');
+      
+      for (var audioPub in participant.audioTrackPublications) {
+        print('🎤 [REMOTE AUDIO]   Publication ${audioPub.sid}:');
+        print('🎤 [REMOTE AUDIO]     - Source: ${audioPub.source}');
+        print('🎤 [REMOTE AUDIO]     - Subscribed: ${audioPub.subscribed}');
+        print('🎤 [REMOTE AUDIO]     - Muted: ${audioPub.muted}');
+        print('🎤 [REMOTE AUDIO]     - Has track: ${audioPub.track != null}');
+        
+        if (audioPub.track != null) {
+          final audioTrack = audioPub.track as RemoteAudioTrack;
+          try {
+            print('🎤 [REMOTE AUDIO]     - Track enabled: ${audioTrack.mediaStreamTrack.enabled}');
+            print('🎤 [REMOTE AUDIO]     - Track muted: ${audioTrack.muted}');
+            print('🎤 [REMOTE AUDIO]     - Track ID: ${audioTrack.mediaStreamTrack.id}');
+            print('🎤 [REMOTE AUDIO]     - Track label: ${audioTrack.mediaStreamTrack.label}');
+            
+            // Try to get track settings
+            try {
+              final settings = audioTrack.mediaStreamTrack.getSettings();
+              print('🎤 [REMOTE AUDIO]     - Track settings: $settings');
+            } catch (e) {
+              print('⚠️ [REMOTE AUDIO]     - Could not read settings: $e');
+            }
+          } catch (e) {
+            print('⚠️ [REMOTE AUDIO]     - Error reading track properties: $e');
+          }
+        } else {
+          print('⚠️ [REMOTE AUDIO]     - WARNING: Audio track is null!');
+        }
+      }
+      
+      // Check if we need to subscribe to audio tracks
+      final unsubscribedAudio = participant.audioTrackPublications
+          .where((pub) => !pub.subscribed)
+          .toList();
+      
+      if (unsubscribedAudio.isNotEmpty) {
+        print('⚠️ [REMOTE AUDIO] Found ${unsubscribedAudio.length} unsubscribed audio publication(s)');
+        print('⚠️ [REMOTE AUDIO] Attempting to subscribe to audio tracks...');
+        
+        for (var pub in unsubscribedAudio) {
+          try {
+            print('🎤 [REMOTE AUDIO] Subscribing to audio publication ${pub.sid}...');
+            // Note: LiveKit SDK should auto-subscribe, but we log if it doesn't
+            // The subscription happens automatically when track is available
+          } catch (e) {
+            print('❌ [REMOTE AUDIO] Error subscribing to audio: $e');
+          }
+        }
+      } else {
+        print('✅ [REMOTE AUDIO] All audio publications are subscribed');
+      }
+      
+      print('🎤 [REMOTE AUDIO] =========================================');
+
       // Listen to participant so we update when track gets subscribed (fixes admin black screen)
       if (!_remoteParticipantListeners.containsKey(participant)) {
         void onParticipantChanged() {
           _updateRemoteVideoTrack();
+          // Also log audio tracks when participant changes
+          _logRemoteAudioTracks(participant);
         }
 
         participant.addListener(onParticipantChanged);
@@ -3337,6 +4000,73 @@ class CallClassController extends GetxController {
     print(
       '👥 [PARTICIPANTS] Updated remoteParticipants list: ${remoteParticipants.length}',
     );
+  }
+
+  /// Helper method to log remote audio track details
+  void _logRemoteAudioTracks(RemoteParticipant participant) {
+    try {
+      print('🎤 [REMOTE AUDIO UPDATE] Participant: ${participant.identity}');
+      final audioPubs = participant.audioTrackPublications;
+      print('🎤 [REMOTE AUDIO UPDATE] Audio publications: ${audioPubs.length}');
+      
+      for (var pub in audioPubs) {
+        final trackKey = '${participant.identity}_${pub.sid}';
+        final previousMuted = _previousRemoteAudioMutedStates[trackKey];
+        final currentMuted = pub.muted;
+        
+        if (pub.track != null) {
+          final track = pub.track as RemoteAudioTrack;
+          final trackMuted = track.muted;
+          final isEnabled = track.mediaStreamTrack.enabled;
+          final isSubscribed = pub.subscribed;
+          
+          print('🎤 [REMOTE AUDIO UPDATE] Track ${pub.sid}:');
+          print('🎤 [REMOTE AUDIO UPDATE]   - Subscribed: $isSubscribed');
+          print('🎤 [REMOTE AUDIO UPDATE]   - Publication muted: $currentMuted');
+          print('🎤 [REMOTE AUDIO UPDATE]   - Track muted: $trackMuted');
+          print('🎤 [REMOTE AUDIO UPDATE]   - Track enabled: $isEnabled');
+          print('🎤 [REMOTE AUDIO UPDATE]   - Track ID: ${track.mediaStreamTrack.id}');
+          print('🎤 [REMOTE AUDIO UPDATE]   - Track label: ${track.mediaStreamTrack.label}');
+          
+          // Detect muting state changes
+          if (previousMuted != null && previousMuted != currentMuted) {
+            if (currentMuted) {
+              print('🔇 [REMOTE AUDIO UPDATE] ⚠️ REMOTE AUDIO MUTED! (was unmuted)');
+              print('🔇 [REMOTE AUDIO UPDATE] The remote participant has muted their microphone');
+              print('🔇 [REMOTE AUDIO UPDATE] You will not be able to hear them until they unmute');
+            } else {
+              print('🔊 [REMOTE AUDIO UPDATE] ✅ REMOTE AUDIO UNMUTED! (was muted)');
+              print('🔊 [REMOTE AUDIO UPDATE] The remote participant has unmuted their microphone');
+            }
+          } else if (previousMuted == null && currentMuted) {
+            print('🔇 [REMOTE AUDIO UPDATE] ⚠️ REMOTE AUDIO IS MUTED');
+            print('🔇 [REMOTE AUDIO UPDATE] The remote participant has their microphone muted');
+          }
+          
+          // Update previous state
+          _previousRemoteAudioMutedStates[trackKey] = currentMuted;
+          
+          // Warn about issues
+          if (!isSubscribed) {
+            print('⚠️ [REMOTE AUDIO UPDATE] ⚠️ WARNING: Not subscribed to remote audio!');
+            print('⚠️ [REMOTE AUDIO UPDATE] This means audio is not being received');
+          }
+          if (currentMuted || trackMuted) {
+            print('⚠️ [REMOTE AUDIO UPDATE] ⚠️ WARNING: Remote audio is muted');
+          }
+          if (!isEnabled) {
+            print('⚠️ [REMOTE AUDIO UPDATE] ⚠️ WARNING: Remote audio track is disabled');
+          }
+        } else {
+          print('⚠️ [REMOTE AUDIO UPDATE] Publication ${pub.sid}: track is null');
+          // Clear previous state if track is null
+          _previousRemoteAudioMutedStates.remove(trackKey);
+        }
+      }
+    } catch (e, stackTrace) {
+      print('⚠️ [REMOTE AUDIO UPDATE] Error logging audio tracks: $e');
+      print('⚠️ [REMOTE AUDIO UPDATE] Stack trace: $stackTrace');
+    }
   }
 
   /// Get preferred language from LanguageController if available
@@ -3644,9 +4374,8 @@ class CallClassController extends GetxController {
     await disconnectFromRoom();
     callStatus.value = 'ended';
 
-    // Clear call details (but keep reportId for fetching)
+    // Keep callDetails for PDF enrichment until after fetch (statement from admin input)
     final savedReportId = reportId;
-    callDetails.value = null;
     reportInfo.value = null;
     statementInfo.value = null;
 
@@ -3661,20 +4390,19 @@ class CallClassController extends GetxController {
         // Clear loading state when navigation happens
         isEndingCall.value = false;
         await _fetchAndShowReport(savedReportId);
+        callDetails.value = null;
       } catch (e, stackTrace) {
         print('❌ [CALL ENDED] Error fetching report: $e');
         print('❌ [CALL ENDED] Stack trace: $stackTrace');
-        // Clear loading state when navigation happens
+        callDetails.value = null;
         isEndingCall.value = false;
-        // If report fetch fails, just navigate to home
         Future.delayed(const Duration(milliseconds: 500), () {
           Get.offAllNamed(Routes.HOME);
         });
       }
     } else if (shouldNavigate) {
-      // No report, just navigate to home
       print('📋 [CALL ENDED] No report found, navigating to home');
-      // Clear loading state when navigation happens
+      callDetails.value = null;
       isEndingCall.value = false;
       Future.delayed(const Duration(milliseconds: 500), () {
         Get.offAllNamed(Routes.HOME);
@@ -3773,42 +4501,48 @@ class CallClassController extends GetxController {
         formData['incidentType'] = reportData.reportType!.name!;
       }
 
-      // Extract information from first statement
+      // Extract information from first statement (admin input during call)
       if (reportData.statements != null && reportData.statements!.isNotEmpty) {
         final statement = reportData.statements!.first;
 
-        // Extract full name
-        if (statement.fullName != null &&
-            statement.fullName!.trim().isNotEmpty) {
-          formData['fullName'] = statement.fullName!.trim();
+        // Extract full name - from statement (flat) or statement.person (nested, admin input)
+        final fullName = statement.fullName?.trim() ??
+            statement.person?.fullName?.trim();
+        if (fullName != null && fullName.isNotEmpty) {
+          formData['fullName'] = fullName;
         }
 
-        // Extract phone number
-        if (statement.phoneMobile != null &&
-            statement.phoneMobile!.trim().isNotEmpty) {
-          formData['phoneNumber'] = statement.phoneMobile!.trim();
+        // Extract phone number - from statement or statement.person
+        final phoneNumber = statement.phoneMobile?.trim() ??
+            statement.person?.phoneMobile?.toString().trim();
+        if (phoneNumber != null && phoneNumber.isNotEmpty) {
+          formData['phoneNumber'] = phoneNumber;
         }
 
-        // Extract age
-        if (statement.age != null) {
-          formData['age'] = statement.age.toString();
+        // Extract age - from statement or statement.person
+        final age = statement.age ?? statement.person?.age;
+        if (age != null) {
+          formData['age'] = age.toString();
         }
 
-        // Extract sex
-        if (statement.sex != null && statement.sex!.trim().isNotEmpty) {
-          formData['sex'] = statement.sex!.trim();
+        // Extract sex - from statement or statement.person
+        final sex = statement.sex?.trim() ?? statement.person?.sex?.trim();
+        if (sex != null && sex.isNotEmpty) {
+          formData['sex'] = sex;
         }
 
-        // Extract nationality
-        if (statement.nationality != null &&
-            statement.nationality!.trim().isNotEmpty) {
-          formData['nationality'] = statement.nationality!.trim();
+        // Extract nationality - from statement or statement.person
+        final nationality =
+            statement.nationality?.trim() ?? statement.person?.nationality?.trim();
+        if (nationality != null && nationality.isNotEmpty) {
+          formData['nationality'] = nationality;
         }
 
-        // Extract date of birth
-        if (statement.dateOfBirth != null) {
+        // Extract date of birth - from statement or statement.person
+        final dateOfBirth = statement.dateOfBirth ?? statement.person?.dateOfBirth;
+        if (dateOfBirth != null) {
           try {
-            final dob = statement.dateOfBirth!;
+            final dob = dateOfBirth;
             formData['dateOfBirth'] =
                 '${dob.day} ${_getMonthName(dob.month)}, ${dob.year}';
           } catch (e) {
@@ -3926,15 +4660,15 @@ class CallClassController extends GetxController {
       }
     }
 
-    // Full name: caller.name or statement.person.fullName
+    // Full name: prefer statement.person.fullName (admin input during call) over caller.name
     if (_isEmpty(result['fullName'])) {
-      final name = details.caller?.name?.trim();
-      if (name != null && name.isNotEmpty) {
-        result['fullName'] = name;
+      final personName = details.statement?.person?.fullName?.trim();
+      if (personName != null && personName.isNotEmpty) {
+        result['fullName'] = personName;
       } else {
-        final personName = details.statement?.person?.fullName?.trim();
-        if (personName != null && personName.isNotEmpty) {
-          result['fullName'] = personName;
+        final name = details.caller?.name?.trim();
+        if (name != null && name.isNotEmpty) {
+          result['fullName'] = name;
         }
       }
     }

@@ -81,10 +81,38 @@ Map<String, dynamic> _$ReportTypeToJson(ReportType instance) =>
       'code': instance.code,
     };
 
+StatementPersonData _$StatementPersonDataFromJson(Map<String, dynamic> json) =>
+    StatementPersonData(
+      fullName: json['fullName'] as String?,
+      phoneMobile: json['phoneMobile'] as String?,
+      age: (json['age'] as num?)?.toInt(),
+      sex: json['sex'] as String?,
+      nationality: json['nationality'] as String?,
+      dateOfBirth: json['dateOfBirth'] == null
+          ? null
+          : DateTime.parse(json['dateOfBirth'] as String),
+    );
+
+Map<String, dynamic> _$StatementPersonDataToJson(
+  StatementPersonData instance,
+) => <String, dynamic>{
+  'fullName': instance.fullName,
+  'phoneMobile': instance.phoneMobile,
+  'age': instance.age,
+  'sex': instance.sex,
+  'nationality': instance.nationality,
+  'dateOfBirth': instance.dateOfBirth?.toIso8601String(),
+};
+
 StatementData _$StatementDataFromJson(Map<String, dynamic> json) =>
     StatementData(
       id: json['id'] as String?,
       reportId: json['reportId'] as String?,
+      person: json['person'] == null
+          ? null
+          : StatementPersonData.fromJson(
+              json['person'] as Map<String, dynamic>,
+            ),
       fullName: json['fullName'] as String?,
       phoneMobile: json['phoneMobile'] as String?,
       dateOfBirth: json['dateOfBirth'] == null
@@ -109,6 +137,7 @@ Map<String, dynamic> _$StatementDataToJson(StatementData instance) =>
     <String, dynamic>{
       'id': instance.id,
       'reportId': instance.reportId,
+      'person': instance.person,
       'fullName': instance.fullName,
       'phoneMobile': instance.phoneMobile,
       'dateOfBirth': instance.dateOfBirth?.toIso8601String(),

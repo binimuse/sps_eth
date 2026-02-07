@@ -148,18 +148,21 @@ class ResidenceIdView extends GetView<ResidenceIdController> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                          selectedType.isEmpty
-                                          ? 'Select Your ID Type'.tr
-                                          : selectedType == 'fayda'
-                                              ? 'Enter FAN or FIN Number'.tr
-                                              : selectedType == 'residence'
-                                                  ? 'Enter Residence ID'.tr
-                                                  : 'Enter TIN Number'.tr,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF0F3955),
+                                    SizedBox(
+                                      width: 200,
+                                      child: Text(
+                                            selectedType.isEmpty
+                                            ? 'Select Your ID Type'.tr
+                                            : selectedType == 'fayda'
+                                                ? 'Enter FAN or FIN Number'.tr
+                                                : selectedType == 'residence'
+                                                    ? 'Enter Residence ID'.tr
+                                                    : 'Enter TIN Number'.tr,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF0F3955),
+                                        ),
                                       ),
                                     ),
                                     if (selectedType.isNotEmpty)

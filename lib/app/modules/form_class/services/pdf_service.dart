@@ -73,7 +73,7 @@ class PdfService {
   ) async {
     final logoImage = await _loadImage(Assets.images.efpLogo.path);
 
-    final _v = (String key) => _getValue(formData, key);
+    final v = (String key) => _getValue(formData, key);
 
     pdf.addPage(
       pw.Page(
@@ -102,20 +102,20 @@ class PdfService {
               // Report Information Section
               _buildSectionHeader('REPORT INFORMATION'),
               pw.SizedBox(height: 12),
-              _buildInfoRow('Case Number', (_v('id') ?? _v('caseNumber')) ?? 'N/A'),
-              _buildInfoRow('Category', _v('category') ?? 'N/A'),
-              _buildInfoRow('Type', (_v('incidentType') ?? _v('type')) ?? 'N/A'),
-              _buildInfoRow('Full Name', _v('fullName') ?? 'N/A'),
-              _buildInfoRow('Phone Number', _v('phoneNumber') ?? 'N/A'),
-              _buildInfoRow('Age', _v('age') ?? 'N/A'),
-              _buildInfoRow('Sex', _v('sex') ?? 'N/A'),
-              _buildInfoRow('Nationality', _v('nationality') ?? 'N/A'),
-              _buildInfoRow('Date of Birth', _v('dateOfBirth') ?? 'N/A'),
-              _buildInfoRow('Address', (_v('address') ?? _v('location')) ?? 'N/A'),
-              _buildInfoRow('Statement', _v('statement') ?? 'N/A', isMultiline: true),
-              _buildInfoRow('Statement Date', _v('statementDate') ?? 'N/A'),
-              _buildInfoRow('Statement Time', _v('statementTime') ?? 'N/A'),
-              _buildInfoRow('Schedule Time', (_v('scheduleTime') ?? _v('submitTime')) ?? 'N/A'),
+              _buildInfoRow('Case Number', (v('id') ?? v('caseNumber')) ?? 'N/A'),
+              _buildInfoRow('Category', v('category') ?? 'N/A'),
+              _buildInfoRow('Type', (v('incidentType') ?? v('type')) ?? 'N/A'),
+              _buildInfoRow('Full Name', v('fullName') ?? 'N/A'),
+              _buildInfoRow('Phone Number', v('phoneNumber') ?? 'N/A'),
+              _buildInfoRow('Age', v('age') ?? 'N/A'),
+              _buildInfoRow('Sex', v('sex') ?? 'N/A'),
+              _buildInfoRow('Nationality', v('nationality') ?? 'N/A'),
+              _buildInfoRow('Date of Birth', v('dateOfBirth') ?? 'N/A'),
+              _buildInfoRow('Address', (v('address') ?? v('location')) ?? 'N/A'),
+              _buildInfoRow('Statement', v('statement') ?? 'N/A', isMultiline: true),
+              _buildInfoRow('Statement Date', v('statementDate') ?? 'N/A'),
+              _buildInfoRow('Statement Time', v('statementTime') ?? 'N/A'),
+              _buildInfoRow('Schedule Time', (v('scheduleTime') ?? v('submitTime')) ?? 'N/A'),
               pw.SizedBox(height: 24),
 
               _buildPdfFooter(),
