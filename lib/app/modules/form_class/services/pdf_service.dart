@@ -1,40 +1,77 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:sps_eth_app/gen/assets.gen.dart';
 
+/// Method channel for direct USB print (Android only).
+const String _kDirectPrintChannel = 'com.sps.eth.sps_eth_app/direct_print';
+
 class PdfService {
-  /// Generate and print PDF from form data
+  /// Direct print PDF to USB-connected printer (Android only). No system dialog.
+  /// Builds PDF from form data and sends bytes to native; native finds first USB printer and sends raw PDF.
+  static Future<void> directPrintPdf(Map<String, String> formData) async {
+    if (!Platform.isAndroid) {
+      throw PlatformException(
+        code: 'UNSUPPORTED',
+        message: 'Direct USB print is supported on Android only',
+      );
+    }
+    try {
+      final pdfBytes = await _createPdf(formData);
+      const channel = MethodChannel(_kDirectPrintChannel);
+      await channel.invokeMethod<void>('printPdf', {'pdfBytes': pdfBytes});
+    } catch (e) {
+      print('Error printing PDF: $e');
+      rethrow;
+    }
+  }
+
+  /// Share PDF (e.g. save or share via system share sheet).
+  /// Generates PDF and opens share dialog; on non-Android or when share not available, throws.
   static Future<void> generateAndPrintPdf(Map<String, String> formData) async {
     try {
-      final pdf = await _createPdf(formData);
-      
-      // Use sharePdf which provides print and share options
-      await Printing.sharePdf(
-        bytes: pdf,
-        filename: 'form_submission_${DateTime.now().millisecondsSinceEpoch}.pdf',
-      );
+      final pdfBytes = await _createPdf(formData);
+      await _sharePdfBytes(pdfBytes);
     } catch (e) {
       print('Error generating PDF: $e');
       rethrow;
     }
   }
 
-  /// Direct print PDF (alternative method)
-  /// This opens a preview with a print button
-  static Future<void> directPrintPdf(Map<String, String> formData) async {
+  /// Share PDF bytes using platform share (e.g. share_plus or file + share intent).
+  static Future<void> _sharePdfBytes(Uint8List pdfBytes) async {
+    // Use share_plus if available; otherwise defer to platform or show message.
     try {
-      final pdf = await _createPdf(formData);
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf,
-        format: PdfPageFormat.a4,
-        name: 'Form Submission',
-      );
+      final tempDir = await _tempDir;
+      final file = await _writePdfToTemp(tempDir, pdfBytes);
+      await _invokeShare(file.path);
     } catch (e) {
-      print('Error printing PDF: $e');
+      print('Error sharing PDF: $e');
       rethrow;
     }
+  }
+
+  static Future<String> get _tempDir async {
+    // path_provider is in pubspec
+    final p = await getApplicationDocumentsDirectory();
+    return p.path;
+  }
+
+  static Future<File> _writePdfToTemp(String dir, Uint8List bytes) async {
+    final path = '$dir/form_submission_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final file = File(path);
+    await file.writeAsBytes(bytes);
+    return file;
+  }
+
+  static Future<void> _invokeShare(String path) async {
+    await Share.shareXFiles([XFile(path)]);
   }
 
   /// Get PDF bytes for saving/sharing
@@ -43,7 +80,7 @@ class PdfService {
   }
 
   /// Generate PDF document
-  /// Supports both report confirmation format (id, caseNumber, statement, etc.)
+  /// Supports both report confirmation format (id, caseNumber, category, etc.)
   /// and form submission format (clearanceFor, email, etc.)
   static Future<Uint8List> _createPdf(Map<String, String> formData) async {
     final pdf = pw.Document();
@@ -62,8 +99,7 @@ class PdfService {
   static bool _isReportFormData(Map<String, String> formData) {
     return (formData['id'] != null && formData['id']!.isNotEmpty) ||
         (formData['caseNumber'] != null && formData['caseNumber']!.isNotEmpty) ||
-        (formData['category'] != null && formData['category']!.isNotEmpty) ||
-        (formData['statement'] != null && formData['statement']!.isNotEmpty);
+        (formData['category'] != null && formData['category']!.isNotEmpty);
   }
 
   /// Create report confirmation PDF (from call flow)
@@ -112,9 +148,6 @@ class PdfService {
               _buildInfoRow('Nationality', v('nationality') ?? 'N/A'),
               _buildInfoRow('Date of Birth', v('dateOfBirth') ?? 'N/A'),
               _buildInfoRow('Address', (v('address') ?? v('location')) ?? 'N/A'),
-              _buildInfoRow('Statement', v('statement') ?? 'N/A', isMultiline: true),
-              _buildInfoRow('Statement Date', v('statementDate') ?? 'N/A'),
-              _buildInfoRow('Statement Time', v('statementTime') ?? 'N/A'),
               _buildInfoRow('Schedule Time', (v('scheduleTime') ?? v('submitTime')) ?? 'N/A'),
               pw.SizedBox(height: 24),
 

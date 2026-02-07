@@ -19,13 +19,23 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import product.idcard.android.IDCardAPI
 import java.io.File
+import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
 
     private val CHANNEL = "passport_scanner"
+    private val PRINT_CHANNEL = "com.sps.eth.sps_eth_app/direct_print"
     private val TAG = "PassportScanner"
     private val ACTION_USB_PERMISSION = "com.sps.eth.sps_eth_app.USB_PERMISSION"
-    
+    private val ACTION_USB_PRINT_PERMISSION = "com.sps.eth.sps_eth_app.USB_PRINT_PERMISSION"
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val printExecutor = Executors.newSingleThreadExecutor()
+
+    @Volatile private var pendingPrintResult: MethodChannel.Result? = null
+    @Volatile private var pendingPrintPdfBytes: ByteArray? = null
+    @Volatile private var pendingPrintDevice: UsbDevice? = null
+
     private val usbPermissionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (ACTION_USB_PERMISSION == intent.action) {
@@ -43,6 +53,46 @@ class MainActivity : FlutterActivity() {
                     } else {
                         Log.e(TAG, "USB permission denied for device: ${device?.deviceName}")
                     }
+                }
+            }
+        }
+    }
+
+    private val usbPrintPermissionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (ACTION_USB_PRINT_PERMISSION != intent.action) return
+            val result = pendingPrintResult ?: return
+            val pdfBytes = pendingPrintPdfBytes ?: return
+            val device = pendingPrintDevice
+            pendingPrintResult = null
+            pendingPrintPdfBytes = null
+            pendingPrintDevice = null
+            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+            val targetDevice: UsbDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+            }
+            if (!granted || targetDevice == null) {
+                mainHandler.post { result.error("PERMISSION_DENIED", "User denied USB access", null) }
+                return
+            }
+            val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+            if (usbManager == null) {
+                mainHandler.post { result.error("PRINT_FAILED", "USB service not available", null) }
+                return
+            }
+            printExecutor.execute {
+                try {
+                    UsbPrint.printPdf(usbManager, targetDevice, pdfBytes)
+                    mainHandler.post { result.success(true) }
+                } catch (e: Exception) {
+                    val code = when (e) {
+                        is PermissionRequiredException -> "PERMISSION_DENIED"
+                        else -> "PRINT_FAILED"
+                    }
+                    mainHandler.post { result.error(code, e.message ?: "Print failed", null) }
                 }
             }
         }
@@ -72,7 +122,12 @@ class MainActivity : FlutterActivity() {
         } else {
             registerReceiver(usbPermissionReceiver, usbAttachedFilter)
         }
-        
+        val printPermFilter = IntentFilter(ACTION_USB_PRINT_PERMISSION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbPrintPermissionReceiver, printPermFilter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(usbPrintPermissionReceiver, printPermFilter)
+        }
         // Request USB permissions for connected devices
         requestUSBPermissions()
     }
@@ -95,10 +150,20 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        val cancelledResult = pendingPrintResult
+        pendingPrintResult = null
+        pendingPrintPdfBytes = null
+        pendingPrintDevice = null
+        cancelledResult?.let { mainHandler.post { it.error("CANCELLED", "Activity destroyed", null) } }
         try {
             unregisterReceiver(usbPermissionReceiver)
         } catch (e: Exception) {
             Log.w(TAG, "Error unregistering USB receiver: ${e.message}")
+        }
+        try {
+            unregisterReceiver(usbPrintPermissionReceiver)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error unregistering USB print receiver: ${e.message}")
         }
     }
     
@@ -1292,6 +1357,75 @@ class MainActivity : FlutterActivity() {
                 result.notImplemented()
             }
         }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            PRINT_CHANNEL
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "printPdf") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            @Suppress("UNCHECKED_CAST")
+            val args = call.arguments as? Map<String, Any> ?: emptyMap()
+            val pdfBytesArg = args["pdfBytes"]
+            val pdfBytes: ByteArray? = when (pdfBytesArg) {
+                is ByteArray -> pdfBytesArg
+                else -> null
+            }
+            if (pdfBytes == null || pdfBytes.isEmpty()) {
+                result.error("INVALID_ARGS", "Missing or empty pdfBytes", null)
+                return@setMethodCallHandler
+            }
+            printExecutor.execute {
+                try {
+                    val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager
+                    if (usbManager == null) {
+                        mainHandler.post { result.error("PRINT_FAILED", "USB service not available", null) }
+                        return@execute
+                    }
+                    val device = UsbPrint.findPrinter(usbManager)
+                    try {
+                        UsbPrint.printPdf(usbManager, device, pdfBytes)
+                        mainHandler.post { result.success(true) }
+                    } catch (e: PermissionRequiredException) {
+                        pendingPrintResult = result
+                        pendingPrintPdfBytes = pdfBytes
+                        pendingPrintDevice = device
+                        mainHandler.post {
+                            requestUsbPermissionAndPrint(device)
+                        }
+                    }
+                } catch (e: NoPrinterException) {
+                    mainHandler.post { result.error("NO_PRINTER", e.message ?: "No USB printer connected", null) }
+                } catch (e: Exception) {
+                    mainHandler.post {
+                        result.error("PRINT_FAILED", e.message ?: "Print failed", null)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Request USB permission for the print device; when user grants, usbPrintPermissionReceiver completes the print.
+     */
+    private fun requestUsbPermissionAndPrint(device: UsbDevice) {
+        val usbManager = getSystemService(Context.USB_SERVICE) as? UsbManager ?: return
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_IMMUTABLE
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_IMMUTABLE
+        } else {
+            @Suppress("DEPRECATION", "UnspecifiedImmutableFlag")
+            0
+        }
+        val permissionIntent = PendingIntent.getBroadcast(
+            this, 0,
+            Intent(ACTION_USB_PRINT_PERMISSION).apply { putExtra(UsbManager.EXTRA_DEVICE, device) },
+            flags
+        )
+        usbManager.requestPermission(device, permissionIntent)
     }
 
     /**

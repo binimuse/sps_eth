@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sps_eth_app/app/modules/call_class/views/widgets/confirmation_page_view.dart';
@@ -673,68 +675,109 @@ class FormClassView extends GetView<FormClassController> {
   }
 
   void _showPrintOptionsDialog(BuildContext context, Map<String, String> formData) {
+    int cooldownSeconds = 0;
+    Timer? cooldownTimer;
+
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Print / Share PDF',
-            style: TextStyle(
-              color: Color(0xFF0F3955),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: const Text('Choose an option to print or share the form PDF'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                try {
-                  await PdfService.directPrintPdf(formData);
-                } catch (e) {
-                  Get.snackbar(
-                    'Error',
-                    'Failed to print: ${e.toString()}',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.red,
-                    colorText: Colors.white,
-                  );
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void startPrintCooldown() {
+              cooldownTimer?.cancel();
+              cooldownSeconds = 60;
+              cooldownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+                if (cooldownSeconds <= 0) {
+                  cooldownTimer?.cancel();
+                  if (context.mounted) setState(() {});
+                  return;
                 }
-              },
-              icon: const Icon(Icons.print, size: 18),
-              label: const Text('Print'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F3955),
-                foregroundColor: Colors.white,
+                cooldownSeconds--;
+                if (context.mounted) setState(() {});
+              });
+              setState(() {});
+            }
+
+            return AlertDialog(
+              title: const Text(
+                'Print / Share PDF',
+                style: TextStyle(
+                  color: Color(0xFF0F3955),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                try {
-                  await PdfService.generateAndPrintPdf(formData);
-                } catch (e) {
-                  Get.snackbar(
-                    'Error',
-                    'Failed to share: ${e.toString()}',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.red,
-                    colorText: Colors.white,
-                  );
-                }
-              },
-              icon: const Icon(Icons.share, size: 18),
-              label: const Text('Share'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F3955),
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
+              content: const Text('Choose an option to print or share the form PDF'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    cooldownTimer?.cancel();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: cooldownSeconds > 0
+                      ? null
+                      : () async {
+                          startPrintCooldown();
+                          try {
+                            await PdfService.directPrintPdf(formData);
+                            if (dialogContext.mounted) {
+                              Get.snackbar(
+                                'Print',
+                                'Sent to printer',
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: Colors.green,
+                                colorText: Colors.white,
+                              );
+                            }
+                          } catch (e) {
+                            if (dialogContext.mounted) {
+                              Get.snackbar(
+                                'Error',
+                                'Failed to print: ${e.toString()}',
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: Colors.red,
+                                colorText: Colors.white,
+                              );
+                            }
+                          }
+                        },
+                  icon: Icon(Icons.print, size: 18, color: cooldownSeconds > 0 ? Colors.grey : Colors.white),
+                  label: Text(
+                    cooldownSeconds > 0 ? 'Print again in ${cooldownSeconds}s' : 'Print',
+                    style: TextStyle(color: cooldownSeconds > 0 ? Colors.grey : Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: cooldownSeconds > 0 ? Colors.grey : const Color(0xFF0F3955),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    try {
+                      await PdfService.generateAndPrintPdf(formData);
+                    } catch (e) {
+                      Get.snackbar(
+                        'Error',
+                        'Failed to share: ${e.toString()}',
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.red,
+                        colorText: Colors.white,
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.share, size: 18),
+                  label: const Text('Share'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F3955),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );

@@ -1,6 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:printing/printing.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sps_eth_app/app/modules/form_class/services/pdf_service.dart';
@@ -8,13 +10,39 @@ import 'package:sps_eth_app/gen/assets.gen.dart';
 import 'package:sps_eth_app/app/common/widgets/promo_card.dart';
 import 'package:sps_eth_app/app/routes/app_pages.dart';
 
-class ConfirmationPageView extends StatelessWidget {
+class ConfirmationPageView extends StatefulWidget {
   final Map<String, String> formData;
 
   const ConfirmationPageView({super.key, required this.formData});
 
   static void show(BuildContext context, Map<String, String> formData) {
     Get.to(() => ConfirmationPageView(formData: formData));
+  }
+
+  @override
+  State<ConfirmationPageView> createState() => _ConfirmationPageViewState();
+}
+
+class _ConfirmationPageViewState extends State<ConfirmationPageView> {
+  int _printCooldownSeconds = 0;
+  Timer? _printCooldownTimer;
+
+  @override
+  void dispose() {
+    _printCooldownTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startPrintCooldown() {
+    _printCooldownTimer?.cancel();
+    setState(() => _printCooldownSeconds = 60);
+    _printCooldownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_printCooldownSeconds <= 0) {
+        _printCooldownTimer?.cancel();
+        return;
+      }
+      setState(() => _printCooldownSeconds--);
+    });
   }
 
   @override
@@ -183,48 +211,48 @@ class ConfirmationPageView extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 16),
                                       // Table-like structure
-                                      _buildReportInfoRow('Case Number', formData['id'] ?? formData['caseNumber'] ?? 'N/A'),
+                                      _buildReportInfoRow('Case Number', widget.formData['id'] ?? widget.formData['caseNumber'] ?? 'N/A'),
                                       const SizedBox(height: 12),
-                                      _buildReportInfoRow('Category', formData['category'] ?? 'N/A'),
+                                      _buildReportInfoRow('Category', widget.formData['category'] ?? 'N/A'),
                                       const SizedBox(height: 12),
-                                      _buildReportInfoRow('Type', formData['incidentType'] ?? formData['type'] ?? 'N/A'),
+                                      _buildReportInfoRow('Type', widget.formData['incidentType'] ?? widget.formData['type'] ?? 'N/A'),
                                       const SizedBox(height: 12),
-                                      if (formData['fullName'] != null && formData['fullName']!.isNotEmpty)
-                                        _buildReportInfoRow('Full Name', formData['fullName']!),
-                                      if (formData['fullName'] != null && formData['fullName']!.isNotEmpty)
+                                      if (widget.formData['fullName'] != null && widget.formData['fullName']!.isNotEmpty)
+                                        _buildReportInfoRow('Full Name', widget.formData['fullName']!),
+                                      if (widget.formData['fullName'] != null && widget.formData['fullName']!.isNotEmpty)
                                         const SizedBox(height: 12),
-                                      if (formData['phoneNumber'] != null && formData['phoneNumber']!.isNotEmpty)
-                                        _buildReportInfoRow('Phone Number', formData['phoneNumber']!),
-                                      if (formData['phoneNumber'] != null && formData['phoneNumber']!.isNotEmpty)
+                                      if (widget.formData['phoneNumber'] != null && widget.formData['phoneNumber']!.isNotEmpty)
+                                        _buildReportInfoRow('Phone Number', widget.formData['phoneNumber']!),
+                                      if (widget.formData['phoneNumber'] != null && widget.formData['phoneNumber']!.isNotEmpty)
                                         const SizedBox(height: 12),
-                                      if (formData['age'] != null && formData['age']!.isNotEmpty)
-                                        _buildReportInfoRow('Age', formData['age']!),
-                                      if (formData['age'] != null && formData['age']!.isNotEmpty)
+                                      if (widget.formData['age'] != null && widget.formData['age']!.isNotEmpty)
+                                        _buildReportInfoRow('Age', widget.formData['age']!),
+                                      if (widget.formData['age'] != null && widget.formData['age']!.isNotEmpty)
                                         const SizedBox(height: 12),
-                                      if (formData['sex'] != null && formData['sex']!.isNotEmpty)
-                                        _buildReportInfoRow('Sex', formData['sex']!),
-                                      if (formData['sex'] != null && formData['sex']!.isNotEmpty)
+                                      if (widget.formData['sex'] != null && widget.formData['sex']!.isNotEmpty)
+                                        _buildReportInfoRow('Sex', widget.formData['sex']!),
+                                      if (widget.formData['sex'] != null && widget.formData['sex']!.isNotEmpty)
                                         const SizedBox(height: 12),
-                                      if (formData['nationality'] != null && formData['nationality']!.isNotEmpty)
-                                        _buildReportInfoRow('Nationality', formData['nationality']!),
-                                      if (formData['nationality'] != null && formData['nationality']!.isNotEmpty)
+                                      if (widget.formData['nationality'] != null && widget.formData['nationality']!.isNotEmpty)
+                                        _buildReportInfoRow('Nationality', widget.formData['nationality']!),
+                                      if (widget.formData['nationality'] != null && widget.formData['nationality']!.isNotEmpty)
                                         const SizedBox(height: 12),
-                                      if (formData['dateOfBirth'] != null && formData['dateOfBirth']!.isNotEmpty)
-                                        _buildReportInfoRow('Date of Birth', formData['dateOfBirth']!),
-                                      if (formData['dateOfBirth'] != null && formData['dateOfBirth']!.isNotEmpty)
+                                      if (widget.formData['dateOfBirth'] != null && widget.formData['dateOfBirth']!.isNotEmpty)
+                                        _buildReportInfoRow('Date of Birth', widget.formData['dateOfBirth']!),
+                                      if (widget.formData['dateOfBirth'] != null && widget.formData['dateOfBirth']!.isNotEmpty)
                                         const SizedBox(height: 12),
-                                      _buildReportInfoRow('Address', formData['address'] ?? formData['location'] ?? 'N/A'),
-                                      if (formData['statement'] != null && formData['statement']!.isNotEmpty) ...[
+                                      _buildReportInfoRow('Address', widget.formData['address'] ?? widget.formData['location'] ?? 'N/A'),
+                                      if (widget.formData['statement'] != null && widget.formData['statement']!.isNotEmpty) ...[
                                         const SizedBox(height: 12),
-                                        _buildStatementSection(formData['statement']!),
+                                        _buildStatementSection(widget.formData['statement']!),
                                       ],
-                                      if (formData['statementDate'] != null && formData['statementDate']!.isNotEmpty) ...[
+                                      if (widget.formData['statementDate'] != null && widget.formData['statementDate']!.isNotEmpty) ...[
                                         const SizedBox(height: 12),
-                                        _buildReportInfoRow('Statement Date', formData['statementDate']!),
+                                        _buildReportInfoRow('Statement Date', widget.formData['statementDate']!),
                                       ],
-                                      if (formData['statementTime'] != null && formData['statementTime']!.isNotEmpty) ...[
+                                      if (widget.formData['statementTime'] != null && widget.formData['statementTime']!.isNotEmpty) ...[
                                         const SizedBox(height: 12),
-                                        _buildReportInfoRow('Statement Time', formData['statementTime']!),
+                                        _buildReportInfoRow('Statement Time', widget.formData['statementTime']!),
                                       ],
                                     ],
                                   ),
@@ -281,16 +309,31 @@ class ConfirmationPageView extends StatelessWidget {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Print Button
+                              // Print Button (disabled 20s after tap)
                               ElevatedButton.icon(
-                                onPressed: () {
-                                  // Print functionality
-                                  _printConfirmationPage(context);
-                                },
-                                icon: const Icon(Icons.print, size: 20),
-                                label: const Text('Print'),
+                                onPressed: _printCooldownSeconds > 0
+                                    ? null
+                                    : () async {
+                                        _startPrintCooldown();
+                                        await _printConfirmationPage(context);
+                                      },
+                                icon: Icon(
+                                  Icons.print,
+                                  size: 20,
+                                  color: _printCooldownSeconds > 0 ? Colors.grey : Colors.white,
+                                ),
+                                label: Text(
+                                  _printCooldownSeconds > 0
+                                      ? 'Print again in ${_printCooldownSeconds}s'
+                                      : 'Print',
+                                  style: TextStyle(
+                                    color: _printCooldownSeconds > 0 ? Colors.grey : Colors.white,
+                                  ),
+                                ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1976D2),
+                                  backgroundColor: _printCooldownSeconds > 0
+                                      ? Colors.grey.shade400
+                                      : const Color(0xFF1976D2),
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
                                   shape: RoundedRectangleBorder(
@@ -410,11 +453,11 @@ class ConfirmationPageView extends StatelessWidget {
   String _generateQRData() {
     // Generate QR code data from form data
     final qrData = {
-      'id': formData['id'] ?? formData['caseNumber'] ?? 'N/A',
-      'category': formData['category'] ?? 'N/A',
-      'type': formData['incidentType'] ?? formData['type'] ?? 'N/A',
-      'address': formData['address'] ?? formData['location'] ?? 'N/A',
-      'scheduleTime': formData['scheduleTime'] ?? formData['submitTime'] ?? 'N/A',
+      'id': widget.formData['id'] ?? widget.formData['caseNumber'] ?? 'N/A',
+      'category': widget.formData['category'] ?? 'N/A',
+      'type': widget.formData['incidentType'] ?? widget.formData['type'] ?? 'N/A',
+      'address': widget.formData['address'] ?? widget.formData['location'] ?? 'N/A',
+      'scheduleTime': widget.formData['scheduleTime'] ?? widget.formData['submitTime'] ?? 'N/A',
     };
     
     // Convert to JSON string for QR code
@@ -423,13 +466,40 @@ class ConfirmationPageView extends StatelessWidget {
         .join('|');
   }
 
-  void _printConfirmationPage(BuildContext context)async {
-    // Print functionality - can be implemented with printing package
-    // For now, show a message
-  
-    
-    // TODO: Implement actual print functionality using printing package
-   await Printing.layoutPdf(onLayout: (format) async => await PdfService.getPdfBytes(formData));
+  Future<void> _printConfirmationPage(BuildContext context) async {
+    try {
+      await PdfService.directPrintPdf(widget.formData);
+      if (context.mounted) {
+        Get.snackbar(
+          'Print',
+          'Sent to printer',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
+    } on PlatformException catch (e) {
+      if (context.mounted) {
+        final message = e.message ?? e.code;
+        Get.snackbar(
+          'Print failed',
+          message,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Get.snackbar(
+          'Print failed',
+          e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    }
   }
 }
 
